@@ -6,10 +6,10 @@ const MLB_API = 'https://statsapi.mlb.com/api/v1'
 
 const EMPTY_CARD = {
   date: '', bankroll: 40,
-  potd: { pick: '', game: '', direction: '', odds: '', stake: 10, sources: '', analysis: '', result: 'pending', pl: 0 },
+  potd: { pick: '', game: '', direction: '', odds: '', stake: 10, sources: '', analysis: '', result: 'pending', pl: 0, type: 'money' },
   rfi: [], ml: [],
-  hitParlay: { legs: [], stake: 5, result: 'pending', pl: 0 },
-  sgp: { legs: [], stake: 8, result: 'pending', pl: 0 },
+  hitParlay: { legs: [], stake: 5, result: 'pending', pl: 0, type: 'money' },
+  sgp: { legs: [], stake: 8, result: 'pending', pl: 0, type: 'paper' },
   totalPL: 0,
 }
 
@@ -23,7 +23,8 @@ const RC = {
 
 const cycle = r => { const c=['pending','win','loss','void','paper']; return c[(c.indexOf(r)+1)%c.length] }
 
-function calcPL(result, stake, odds) {
+function calcPL(result, stake, odds, type) {
+  if (type === 'paper') return 0
   if (result === 'win') {
     const o = parseInt(odds)
     if (!o) return parseFloat(stake)
@@ -46,13 +47,37 @@ function Badge({ result, onClick, small }) {
   )
 }
 
-function Inp({ value, onChange, placeholder, type = 'text', label }) {
+function TypeToggle({ type, onChange }) {
+  const isMoney = type === 'money'
   return (
-    <div>
-      {label && <div style={{ fontSize: '.44rem', letterSpacing: '.08em', textTransform: 'uppercase', color: '#404060', marginBottom: 3 }}>{label}</div>}
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} type={type}
-        style={{ width: '100%', background: '#0c0c1a', border: '1px solid #1a1a30', borderRadius: 6, padding: '7px 10px', fontSize: '.68rem', color: '#f0f0f8', outline: 'none' }} />
+    <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+      <button onClick={() => onChange('money')} style={{
+        padding: '2px 8px', borderRadius: 4, border: '1px solid',
+        fontFamily: "'Barlow Condensed',sans-serif", fontSize: '.58rem', fontWeight: 700,
+        letterSpacing: '.04em', textTransform: 'uppercase',
+        background: isMoney ? 'rgba(74,222,128,.15)' : '#0c0c1a',
+        color: isMoney ? '#4ade80' : '#404060',
+        borderColor: isMoney ? '#14532d' : '#1a1a30',
+      }}>💰 Money</button>
+      <button onClick={() => onChange('paper')} style={{
+        padding: '2px 8px', borderRadius: 4, border: '1px solid',
+        fontFamily: "'Barlow Condensed',sans-serif", fontSize: '.58rem', fontWeight: 700,
+        letterSpacing: '.04em', textTransform: 'uppercase',
+        background: !isMoney ? 'rgba(96,165,250,.15)' : '#0c0c1a',
+        color: !isMoney ? '#60a5fa' : '#404060',
+        borderColor: !isMoney ? '#1e40af' : '#1a1a30',
+      }}>📋 Paper</button>
     </div>
+  )
+}
+
+function EditInp({ value, onChange, placeholder, type = 'text', editing }) {
+  if (!editing) return (
+    <span style={{ fontSize: '.68rem', color: '#f0f0f8' }}>{value || <span style={{ color: '#404060' }}>{placeholder}</span>}</span>
+  )
+  return (
+    <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} type={type}
+      style={{ background: '#0c0c1a', border: '1px solid #2563eb', borderRadius: 4, padding: '4px 8px', fontSize: '.68rem', color: '#f0f0f8', outline: 'none', width: '100%' }} />
   )
 }
 
@@ -94,11 +119,12 @@ export default function BetCard({ bankroll, onCardSaved }) {
   const [showNewForm, setShowNewForm] = useState(false)
   const [newDate, setNewDate] = useState('')
   const [newBR, setNewBR] = useState(bankroll || 40)
+  const [editing, setEditing] = useState(false)
   const [addingRFI, setAddingRFI] = useState(false)
   const [addingML, setAddingML] = useState(false)
   const [addingHit, setAddingHit] = useState(false)
-  const [rfiForm, setRfiForm] = useState({ game:'', homeTeam:'', awayTeam:'', pick:'YRFI', conf:'', stake:8 })
-  const [mlForm, setMlForm] = useState({ game:'', direction:'', odds:'', stake:5, sources:'' })
+  const [rfiForm, setRfiForm] = useState({ game:'', homeTeam:'', awayTeam:'', pick:'YRFI', conf:'', stake:8, type:'money' })
+  const [mlForm, setMlForm] = useState({ game:'', direction:'', odds:'', stake:5, sources:'', type:'money' })
   const [hitForm, setHitForm] = useState({ player:'', team:'', rate:'', l10:'', split:'' })
 
   useEffect(() => {
@@ -108,69 +134,60 @@ export default function BetCard({ bankroll, onCardSaved }) {
   const save = c => { setCard(c); try { localStorage.setItem(CARD_KEY, JSON.stringify(c)) } catch {} }
 
   const recalc = c => {
-    const pl = (c.potd.pl||0) + c.rfi.reduce((a,r)=>a+(r.pl||0),0) + c.ml.reduce((a,m)=>a+(m.pl||0),0) + (c.hitParlay.pl||0) + (c.sgp.pl||0)
+    const potdPL = calcPL(c.potd.result, c.potd.stake, c.potd.odds, c.potd.type)
+    c.potd.pl = potdPL
+    c.rfi = c.rfi.map(r => ({ ...r, pl: calcPL(r.result, r.stake, '-110', r.type) }))
+    c.ml = c.ml.map(m => ({ ...m, pl: calcPL(m.result, m.stake, m.odds, m.type) }))
+    const hitPL = calcPL(c.hitParlay.result, c.hitParlay.stake, c.hitParlay.odds || '+350', c.hitParlay.type)
+    c.hitParlay.pl = hitPL
+    const pl = potdPL + c.rfi.reduce((a,r)=>a+(r.pl||0),0) + c.ml.reduce((a,m)=>a+(m.pl||0),0) + hitPL + (c.sgp.pl||0)
     c.totalPL = parseFloat(pl.toFixed(2))
     save(c)
   }
 
-  // ── IMPORT FROM JSON ──────────────────────────────────────────────────────
   const importCard = () => {
     setImportError('')
     try {
-      // Strip markdown code fences if present
       const clean = importText.replace(/```json|```/g, '').trim()
       const data = JSON.parse(clean)
-
-      // Validate required fields
       if (!data.date || !data.potd) { setImportError('Missing required fields: date, potd'); return }
-
       const newCard = {
         date: data.date,
         bankroll: parseFloat(data.bankroll) || parseFloat(newBR) || 40,
         potd: {
-          pick: data.potd.pick || '',
-          game: data.potd.game || '',
-          direction: data.potd.direction || '',
-          odds: data.potd.odds || '',
-          stake: parseFloat(data.potd.stake) || 10,
-          sources: data.potd.sources || '',
-          analysis: data.potd.analysis || '',
-          result: 'pending', pl: 0,
+          pick: data.potd.pick || '', game: data.potd.game || '',
+          direction: data.potd.direction || '', odds: data.potd.odds || '',
+          stake: parseFloat(data.potd.stake) || 10, sources: data.potd.sources || '',
+          analysis: data.potd.analysis || '', result: 'pending', pl: 0,
+          type: data.potd.type || 'money',
         },
         rfi: (data.rfi || []).map(r => ({
-          game: r.game || '', homeTeam: r.homeTeam || '', awayTeam: r.awayTeam || '',
-          pick: r.pick || 'YRFI', conf: r.conf || '', stake: parseFloat(r.stake) || 8,
-          result: 'pending', pl: 0,
+          game: r.game||'', homeTeam: r.homeTeam||'', awayTeam: r.awayTeam||'',
+          pick: r.pick||'YRFI', conf: r.conf||'', stake: parseFloat(r.stake)||8,
+          result: 'pending', pl: 0, type: r.type || 'money',
         })),
         ml: (data.ml || []).map(m => ({
-          game: m.game || '', direction: m.direction || '', odds: m.odds || '',
-          stake: parseFloat(m.stake) || 5, sources: m.sources || '',
-          result: 'pending', pl: 0,
+          game: m.game||'', direction: m.direction||'', odds: m.odds||'',
+          stake: parseFloat(m.stake)||5, sources: m.sources||'',
+          result: 'pending', pl: 0, type: m.type || 'money',
         })),
         hitParlay: {
           stake: parseFloat(data.hitParlay?.stake) || 5,
+          odds: data.hitParlay?.odds || '',
+          payout: data.hitParlay?.payout || 0,
           result: 'pending', pl: 0,
+          type: data.hitParlay?.type || 'money',
           legs: (data.hitParlay?.legs || []).map(l => ({
-            player: l.player || '', team: l.team || '', rate: l.rate || '',
-            l10: l.l10 || '', split: l.split || '', result: 'pending',
+            player: l.player||'', team: l.team||'', rate: l.rate||'',
+            l10: l.l10||'', split: l.split||'', result: 'pending',
           })),
         },
-        sgp: {
-          stake: parseFloat(data.sgp?.stake) || 8,
-          result: 'pending', pl: 0,
-          legs: data.sgp?.legs || [],
-          odds: data.sgp?.odds || '',
-          game: data.sgp?.game || '',
-        },
+        sgp: { stake: parseFloat(data.sgp?.stake)||8, result:'pending', pl:0, type:'paper', legs:[], odds:'' },
         totalPL: 0,
       }
       recalc(newCard)
-      setShowImport(false)
-      setImportText('')
-      setSection('potd')
-    } catch (e) {
-      setImportError('Invalid JSON — check format and try again')
-    }
+      setShowImport(false); setImportText(''); setSection('potd')
+    } catch { setImportError('Invalid JSON — check format and try again') }
   }
 
   const startNew = () => {
@@ -193,19 +210,26 @@ export default function BetCard({ bankroll, onCardSaved }) {
 
   const updPOTD = (f, v) => {
     const c = { ...card, potd: { ...card.potd, [f]: v } }
-    if (f === 'result') c.potd.pl = calcPL(v, c.potd.stake, c.potd.odds)
     recalc(c)
   }
 
   const updRFI = (i, f, v) => {
     const rfi = [...card.rfi]; rfi[i] = { ...rfi[i], [f]: v }
-    if (f === 'result') rfi[i].pl = calcPL(v, rfi[i].stake, '-110')
+    recalc({ ...card, rfi })
+  }
+
+  const delRFI = i => {
+    const rfi = card.rfi.filter((_, idx) => idx !== i)
     recalc({ ...card, rfi })
   }
 
   const updML = (i, f, v) => {
     const ml = [...card.ml]; ml[i] = { ...ml[i], [f]: v }
-    if (f === 'result') ml[i].pl = calcPL(v, ml[i].stake, ml[i].odds)
+    recalc({ ...card, ml })
+  }
+
+  const delML = i => {
+    const ml = card.ml.filter((_, idx) => idx !== i)
     recalc({ ...card, ml })
   }
 
@@ -214,17 +238,22 @@ export default function BetCard({ bankroll, onCardSaved }) {
     const allW = legs.every(l => l.result === 'win')
     const anyL = legs.some(l => l.result === 'loss')
     const res = allW ? 'win' : anyL ? 'loss' : 'pending'
-    recalc({ ...card, hitParlay: { ...card.hitParlay, legs, result: res, pl: calcPL(res, card.hitParlay.stake, '+350') } })
+    recalc({ ...card, hitParlay: { ...card.hitParlay, legs, result: res } })
+  }
+
+  const delHit = i => {
+    const legs = card.hitParlay.legs.filter((_, idx) => idx !== i)
+    recalc({ ...card, hitParlay: { ...card.hitParlay, legs } })
   }
 
   const addRFI = () => {
     recalc({ ...card, rfi: [...card.rfi, { ...rfiForm, stake: parseFloat(rfiForm.stake)||8, result:'pending', pl:0 }] })
-    setRfiForm({ game:'', homeTeam:'', awayTeam:'', pick:'YRFI', conf:'', stake:8 }); setAddingRFI(false)
+    setRfiForm({ game:'', homeTeam:'', awayTeam:'', pick:'YRFI', conf:'', stake:8, type:'money' }); setAddingRFI(false)
   }
 
   const addML = () => {
     recalc({ ...card, ml: [...card.ml, { ...mlForm, stake: parseFloat(mlForm.stake)||5, result:'pending', pl:0 }] })
-    setMlForm({ game:'', direction:'', odds:'', stake:5, sources:'' }); setAddingML(false)
+    setMlForm({ game:'', direction:'', odds:'', stake:5, sources:'', type:'money' }); setAddingML(false)
   }
 
   const addHit = () => {
@@ -244,7 +273,7 @@ export default function BetCard({ bankroll, onCardSaved }) {
     const gradeGame = async (pick, teamAbbr, isRFI, stake, odds) => {
       const game = findGame(games, teamAbbr)
       if (!game) return { result: 'pending', note: `⚠️ Game not found for ${teamAbbr}` }
-      if (game.status?.detailedState !== 'Final') return { result: 'pending', note: `⏳ ${teamAbbr} game not final yet` }
+      if (game.status?.detailedState !== 'Final') return { result: 'pending', note: `⏳ ${teamAbbr} game not final` }
       const hs = game.teams?.home?.score; const as = game.teams?.away?.score
       const ha = game.teams?.home?.team?.abbreviation; const aa = game.teams?.away?.team?.abbreviation
       if (isRFI) {
@@ -257,35 +286,31 @@ export default function BetCard({ bankroll, onCardSaved }) {
         const picked = teamAbbr?.toUpperCase(); const homeWon = hs > as
         const pickedHome = picked === ha
         const result = (pickedHome && homeWon) || (!pickedHome && !homeWon) ? 'win' : 'loss'
-        return { result, note: `${result==='win'?'✅':'❌'} ${picked} ML: ${aa} ${as} @ ${ha} ${hs} → ${result.toUpperCase()}` }
+        return { result, note: `${result==='win'?'✅':'❌'} ${picked}: ${aa} ${as} @ ${ha} ${hs} → ${result.toUpperCase()}` }
       }
     }
 
-    // POTD
     if (card.potd.direction && card.potd.result === 'pending') {
       const isRFI = card.potd.pick?.includes('YRFI') || card.potd.pick?.includes('NRFI')
-      const { result, note } = await gradeGame(isRFI ? (card.potd.pick?.includes('YRFI') ? 'YRFI' : 'NRFI') : null, card.potd.direction, isRFI, card.potd.stake, card.potd.odds)
-      updated.potd.result = result; updated.potd.pl = calcPL(result, updated.potd.stake, updated.potd.odds)
+      const { result, note } = await gradeGame(isRFI?(card.potd.pick?.includes('YRFI')?'YRFI':'NRFI'):null, card.potd.direction, isRFI)
+      updated.potd.result = result
       log.push(`🎯 POTD: ${note}`)
     }
 
-    // RFI
     for (let i = 0; i < card.rfi.length; i++) {
       if (card.rfi[i].result !== 'pending') continue
-      const { result, note } = await gradeGame(card.rfi[i].pick, card.rfi[i].homeTeam || card.rfi[i].awayTeam, true, card.rfi[i].stake, '-110')
-      updated.rfi[i].result = result; updated.rfi[i].pl = calcPL(result, updated.rfi[i].stake, '-110')
+      const { result, note } = await gradeGame(card.rfi[i].pick, card.rfi[i].homeTeam || card.rfi[i].awayTeam, true)
+      updated.rfi[i].result = result
       log.push(`🎲 RFI: ${note}`)
     }
 
-    // ML
     for (let i = 0; i < card.ml.length; i++) {
       if (card.ml[i].result !== 'pending') continue
-      const { result, note } = await gradeGame(null, card.ml[i].direction, false, card.ml[i].stake, card.ml[i].odds)
-      updated.ml[i].result = result; updated.ml[i].pl = calcPL(result, updated.ml[i].stake, updated.ml[i].odds)
+      const { result, note } = await gradeGame(null, card.ml[i].direction, false)
+      updated.ml[i].result = result
       log.push(`⚾ ML: ${note}`)
     }
 
-    // Hit parlay legs
     for (let i = 0; i < card.hitParlay.legs.length; i++) {
       const leg = card.hitParlay.legs[i]
       if (leg.result !== 'pending') continue
@@ -299,122 +324,65 @@ export default function BetCard({ bankroll, onCardSaved }) {
           const hits = pd.stats?.batting?.hits || 0
           updated.hitParlay.legs[i].result = hits >= 1 ? 'win' : 'loss'
           log.push(`${hits>=1?'✅':'❌'} ${leg.player}: ${hits} hits`)
-        } else { log.push(`⚠️ ${leg.player}: not found in box score — grade manually`) }
+        } else { log.push(`⚠️ ${leg.player}: not found — grade manually`) }
       } else { log.push(`⏳ ${leg.player} game not final`) }
     }
 
-    // Recalc parlay
     const allW = updated.hitParlay.legs.every(l => l.result === 'win')
     const anyL = updated.hitParlay.legs.some(l => l.result === 'loss')
-    if (allW) { updated.hitParlay.result='win'; updated.hitParlay.pl=calcPL('win', updated.hitParlay.stake, '+350') }
-    else if (anyL) { updated.hitParlay.result='loss'; updated.hitParlay.pl=-updated.hitParlay.stake }
+    if (allW) updated.hitParlay.result = 'win'
+    else if (anyL) updated.hitParlay.result = 'loss'
 
     log.push('✅ Auto-grade complete — tap any result to override')
     recalc(updated); setGradeLog(log); setGrading(false)
   }
 
-  const S = { inp: { width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none' } }
-  const inp = (v, set, ph, type='text') => <input value={v} onChange={e=>set(e.target.value)} placeholder={ph} type={type} style={S.inp} />
-  const sel = (v, set, opts) => <select value={v} onChange={e=>set(e.target.value)} style={S.inp}>{opts.map(([val,lbl])=><option key={val} value={val}>{lbl}</option>)}</select>
-  const addBtn = (lbl, fn) => <button onClick={fn} style={{ width:'100%', padding:7, background:'#0c0c1a', border:'1px dashed #2a2a50', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginTop:4 }}>{lbl}</button>
-  const secBtn = (id, lbl) => <button onClick={()=>setSection(id)} style={{ flex:1, padding:'6px 2px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.6rem', fontWeight:700, letterSpacing:'.04em', textTransform:'uppercase', border:'1px solid', borderRadius:5, background: section===id?'#1a1a30':'#0c0c1a', color: section===id?'#f0f0f8':'#404060', borderColor: section===id?'#2a2a50':'#1a1a30' }}>{lbl}</button>
+  const S = { i: { background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none', width:'100%' } }
+  const inp = (v, set, ph, type='text') => <input value={v} onChange={e=>set(e.target.value)} placeholder={ph} type={type} style={S.i} />
+  const sel = (v, set, opts) => <select value={v} onChange={e=>set(e.target.value)} style={S.i}>{opts.map(([val,lbl])=><option key={val} value={val}>{lbl}</option>)}</select>
+  const addBtn = (lbl, fn) => <button onClick={fn} style={{ width:'100%', padding:7, background:'#0c0c1a', border:'1px dashed #2a2a50', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color:'#404060', marginTop:4 }}>{lbl}</button>
+  const secBtn = (id, lbl) => <button onClick={()=>setSection(id)} style={{ flex:1, padding:'6px 2px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', border:'1px solid', borderRadius:5, background:section===id?'#1a1a30':'#0c0c1a', color:section===id?'#f0f0f8':'#404060', borderColor:section===id?'#2a2a50':'#1a1a30' }}>{lbl}</button>
+  const delBtn = fn => <button onClick={fn} style={{ padding:'2px 7px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.6rem', flexShrink:0 }}>✕</button>
+  const editField = (val, key, obj, updFn) => editing
+    ? <input value={val||''} onChange={e=>updFn(key, e.target.value)} style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'3px 6px', fontSize:'.65rem', color:'#f0f0f8', outline:'none', width:'100%' }} />
+    : <span style={{ fontSize:'.65rem', color:'#a0a0c0' }}>{val||'—'}</span>
 
   // ── NO CARD ───────────────────────────────────────────────────────────────
   if (!card) return (
     <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
       <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:16 }}>
         <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.3rem', color:'#505070', marginBottom:4, textAlign:'center' }}>No Active Card</div>
-        <div style={{ fontSize:'.58rem', color:'#404060', marginBottom:12, textAlign:'center', lineHeight:1.6 }}>
-          Paste the JSON from Claude to instantly load today's card with all picks, odds, and analysis pre-filled
-        </div>
-
-        {/* IMPORT */}
+        <div style={{ fontSize:'.58rem', color:'#404060', marginBottom:12, textAlign:'center', lineHeight:1.6 }}>Paste the JSON from Claude to load today's card instantly</div>
         <button onClick={()=>setShowImport(!showImport)} style={{ width:'100%', padding:9, background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#60a5fa', marginBottom:6 }}>
           📋 Paste Card JSON
         </button>
-
         {showImport && (
           <div style={{ marginBottom:8 }}>
             <textarea value={importText} onChange={e=>setImportText(e.target.value)}
-              placeholder={`Paste the JSON card from Claude here...\n\nExample:\n{\n  "date": "Jun 14",\n  "bankroll": 40,\n  "potd": {\n    "pick": "ATL ML -116",\n    "direction": "ATL",\n    "odds": "-116",\n    "stake": 10,\n    "sources": "XGB+Con+LGB",\n    "analysis": "Pérez ERA 2.31 elite vs Kay ERA 4.89"\n  },\n  "rfi": [...],\n  "ml": [...],\n  "hitParlay": { "stake": 5, "legs": [...] }\n}`}
-              rows={10} style={{ width:'100%', background:'#0c0c1a', border:`1px solid ${importError?'#7f1d1d':'#1a1a30'}`, borderRadius:6, padding:'8px 10px', fontSize:'.6rem', color:'#f0f0f8', outline:'none', resize:'vertical', lineHeight:1.6 }} />
+              placeholder={'Paste JSON from Claude here...'} rows={8}
+              style={{ width:'100%', background:'#0c0c1a', border:`1px solid ${importError?'#7f1d1d':'#1a1a30'}`, borderRadius:6, padding:'8px 10px', fontSize:'.6rem', color:'#f0f0f8', outline:'none', resize:'vertical', lineHeight:1.6 }} />
             {importError && <div style={{ fontSize:'.55rem', color:'#f87171', marginTop:3 }}>⚠️ {importError}</div>}
-            <button onClick={importCard} style={{ width:'100%', padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#fff', marginTop:6 }}>
-              Load Card ↗
-            </button>
+            <button onClick={importCard} style={{ width:'100%', padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, color:'#fff', marginTop:6 }}>Load Card ↗</button>
           </div>
         )}
-
         <div style={{ display:'flex', alignItems:'center', gap:8, margin:'8px 0' }}>
           <div style={{ flex:1, height:1, background:'#1a1a30' }} />
-          <div style={{ fontSize:'.48rem', color:'#404060', letterSpacing:'.08em', textTransform:'uppercase' }}>or start manually</div>
+          <div style={{ fontSize:'.48rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.08em' }}>or start manually</div>
           <div style={{ flex:1, height:1, background:'#1a1a30' }} />
         </div>
-
-        <button onClick={()=>setShowNewForm(!showNewForm)} style={{ width:'100%', padding:9, background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#505070' }}>
-          + Start Blank Card
-        </button>
-
+        <button onClick={()=>setShowNewForm(!showNewForm)} style={{ width:'100%', padding:9, background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, textTransform:'uppercase', color:'#505070' }}>+ Start Blank Card</button>
         {showNewForm && (
           <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
             {inp(newDate, setNewDate, 'Date e.g. Jun 14')}
             {inp(newBR, setNewBR, 'Bankroll e.g. 40', 'number')}
-            <button onClick={startNew} style={{ width:'100%', padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#fff' }}>Create</button>
+            <button onClick={startNew} style={{ width:'100%', padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, color:'#fff', marginTop:4 }}>Create</button>
           </div>
         )}
-      </div>
-
-      {/* JSON FORMAT GUIDE */}
-      <div style={{ background:'#06060e', border:'1px solid #1a1a30', borderRadius:8, padding:10 }}>
-        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'#404060', marginBottom:6 }}>📋 JSON Format Guide</div>
-        <pre style={{ fontSize:'.5rem', color:'#505070', lineHeight:1.7, overflow:'auto', whiteSpace:'pre-wrap' }}>{`{
-  "date": "Jun 14",
-  "bankroll": 40,
-  "potd": {
-    "pick": "ATL ML -116",
-    "direction": "ATL",
-    "odds": "-116",
-    "stake": 10,
-    "sources": "XGB 93.2% · Con 93.2% · LGB 68.4%",
-    "analysis": "Pérez ERA 2.31 vs Kay ERA 4.89"
-  },
-  "rfi": [
-    {
-      "game": "ATL @ CWS",
-      "homeTeam": "CWS",
-      "awayTeam": "ATL",
-      "pick": "YRFI",
-      "conf": "64.2",
-      "stake": 15
-    }
-  ],
-  "ml": [
-    {
-      "game": "DET @ CLE",
-      "direction": "DET",
-      "odds": "+108",
-      "stake": 5,
-      "sources": "XGB 83.7% · Con 83.7%"
-    }
-  ],
-  "hitParlay": {
-    "stake": 5,
-    "legs": [
-      {
-        "player": "Josh Jung",
-        "team": "TEX",
-        "rate": "85%",
-        "l10": "9/10",
-        "split": "vsRHP .309"
-      }
-    ]
-  }
-}`}</pre>
       </div>
     </div>
   )
 
-  const totalStaked = (card.potd.stake||0) + card.rfi.reduce((a,r)=>a+(r.stake||0),0) + card.ml.reduce((a,m)=>a+(m.stake||0),0) + (card.hitParlay.stake||0) + (card.sgp.stake||0)
+  const totalStaked = (card.potd.type==='money'?card.potd.stake:0) + card.rfi.filter(r=>r.type==='money').reduce((a,r)=>a+(r.stake||0),0) + card.ml.filter(m=>m.type==='money').reduce((a,m)=>a+(m.stake||0),0) + (card.hitParlay.type==='money'?card.hitParlay.stake:0)
   const endBR = card.bankroll + card.totalPL
 
   return (
@@ -433,7 +401,7 @@ export default function BetCard({ bankroll, onCardSaved }) {
             <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.4rem', lineHeight:1, color: card.totalPL >= 0 ? '#4ade80' : '#f87171' }}>
               {card.totalPL >= 0 ? '+' : ''}${card.totalPL.toFixed(2)}
             </div>
-            <div style={{ fontSize:'.38rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060' }}>Total P&L</div>
+            <div style={{ fontSize:'.38rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060' }}>Real Money P&L</div>
           </div>
         </div>
 
@@ -446,15 +414,21 @@ export default function BetCard({ bankroll, onCardSaved }) {
 
         <div style={{ display:'flex', gap:4 }}>
           <button onClick={autoGrade} disabled={grading} style={{
-            flex:1, padding:8, background: grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb',
+            flex:2, padding:8, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb',
             borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700,
-            letterSpacing:'.08em', textTransform:'uppercase', color: grading?'#404060':'#60a5fa',
+            textTransform:'uppercase', color:grading?'#404060':'#60a5fa',
           }}>{grading ? '⏳ Grading...' : '⚡ Auto Grade'}</button>
+          <button onClick={()=>setEditing(!editing)} style={{
+            flex:1, padding:8, background:editing?'rgba(251,191,36,.15)':'#0c0c1a',
+            border:`1px solid ${editing?'#713f12':'#1a1a30'}`, borderRadius:6,
+            fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700,
+            textTransform:'uppercase', color:editing?'#fbbf24':'#404060',
+          }}>{editing ? '✓ Done' : '✏️ Edit'}</button>
           <button onClick={archive} style={{
-            padding:'8px 12px', background:'rgba(74,222,128,.08)', border:'1px solid #14532d',
+            flex:1, padding:8, background:'rgba(74,222,128,.08)', border:'1px solid #14532d',
             borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem',
-            fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', color:'#4ade80',
-          }}>Archive ✓</button>
+            fontWeight:700, textTransform:'uppercase', color:'#4ade80',
+          }}>Archive</button>
           <button onClick={()=>{localStorage.removeItem(CARD_KEY);setCard(null)}} style={{
             padding:'8px 10px', background:'rgba(248,113,113,.08)', border:'1px solid #7f1d1d',
             borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem',
@@ -476,35 +450,55 @@ export default function BetCard({ bankroll, onCardSaved }) {
 
       {/* ── POTD ── */}
       {section === 'potd' && (
-        <div style={{ background:'#09090f', border:'1px solid rgba(250,204,21,.2)', borderRadius:10, padding:12 }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, letterSpacing:'.12em', textTransform:'uppercase', color:'#fbbf24', marginBottom:8 }}>🎯 Pick of the Day</div>
+        <div style={{ background:'#09090f', border:`1px solid ${card.potd.type==='money'?'rgba(74,222,128,.2)':'rgba(96,165,250,.2)'}`, borderRadius:10, padding:12 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, letterSpacing:'.12em', textTransform:'uppercase', color:'#fbbf24' }}>🎯 Pick of the Day</div>
+            <TypeToggle type={card.potd.type||'money'} onChange={v=>updPOTD('type',v)} />
+          </div>
 
-          <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:8 }}>
-            <Inp value={card.potd.pick} onChange={v=>updPOTD('pick',v)} placeholder="ATL ML -116" label="Pick" />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              <Inp value={card.potd.direction} onChange={v=>updPOTD('direction',v)} placeholder="ATL" label="Team Abbr" />
-              <Inp value={card.potd.odds} onChange={v=>updPOTD('odds',v)} placeholder="-116" label="Odds" />
-              <Inp value={card.potd.stake} onChange={v=>updPOTD('stake',parseFloat(v)||0)} placeholder="10" type="number" label="Stake $" />
+          <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:8 }}>
+            <div>
+              <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Pick</div>
+              {editField(card.potd.pick, 'pick', card.potd, updPOTD)}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               <div>
-                <div style={{ fontSize:'.44rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginBottom:3 }}>Payout if Win</div>
-                <div style={{ background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#4ade80', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>
-                  +${calcPL('win', card.potd.stake, card.potd.odds).toFixed(2)}
-                </div>
+                <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Team Abbr</div>
+                {editField(card.potd.direction, 'direction', card.potd, updPOTD)}
+              </div>
+              <div>
+                <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Odds</div>
+                {editField(card.potd.odds, 'odds', card.potd, updPOTD)}
+              </div>
+              <div>
+                <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Stake $</div>
+                {editing
+                  ? <input value={card.potd.stake} onChange={e=>updPOTD('stake',parseFloat(e.target.value)||0)} type="number" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'3px 6px', fontSize:'.65rem', color:'#f0f0f8', outline:'none', width:'100%' }} />
+                  : <span style={{ fontSize:'.65rem', color:'#a0a0c0' }}>${card.potd.stake}</span>}
+              </div>
+              <div>
+                <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Win Payout</div>
+                <span style={{ fontSize:'.65rem', color:'#4ade80', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>
+                  +${calcPL('win', card.potd.stake, card.potd.odds, 'money').toFixed(2)}
+                </span>
               </div>
             </div>
-            <Inp value={card.potd.sources} onChange={v=>updPOTD('sources',v)} placeholder="XGB 93.2% · Con 93.2% · LGB 68.4%" label="Model Sources" />
             <div>
-              <div style={{ fontSize:'.44rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginBottom:3 }}>Analysis</div>
-              <textarea value={card.potd.analysis} onChange={e=>updPOTD('analysis',e.target.value)}
-                placeholder="Pitcher ERAs, sharp money, key signals..." rows={3}
-                style={{ width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.62rem', color:'#f0f0f8', outline:'none', resize:'none' }} />
+              <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Sources</div>
+              {editField(card.potd.sources, 'sources', card.potd, updPOTD)}
+            </div>
+            <div>
+              <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:3 }}>Analysis</div>
+              {editing
+                ? <textarea value={card.potd.analysis||''} onChange={e=>updPOTD('analysis',e.target.value)} rows={3} style={{ width:'100%', background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'4px 8px', fontSize:'.62rem', color:'#f0f0f8', outline:'none', resize:'none' }} />
+                : <div style={{ fontSize:'.6rem', color:'#808098', lineHeight:1.6 }}>{card.potd.analysis||'—'}</div>}
             </div>
           </div>
 
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderTop:'1px solid #1a1a2e' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:8, borderTop:'1px solid #1a1a2e' }}>
             <Badge result={card.potd.result} onClick={()=>updPOTD('result', cycle(card.potd.result))} />
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color: card.potd.pl>=0?'#4ade80':'#f87171' }}>
-              {card.potd.pl>=0?'+':''}${card.potd.pl.toFixed(2)}
+              {card.potd.type==='paper' ? '📋 Paper' : `${card.potd.pl>=0?'+':''}$${card.potd.pl.toFixed(2)}`}
             </div>
           </div>
         </div>
@@ -514,31 +508,38 @@ export default function BetCard({ bankroll, onCardSaved }) {
       {section === 'rfi' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           {card.rfi.map((r,i) => (
-            <div key={i} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div key={i} style={{ background:'#09090f', border:`1px solid ${r.type==='money'?'#1a2a1a':'#1a1a2e'}`, borderRadius:10, padding:12 }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-                <div>
+                <div style={{ flex:1 }}>
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:'#f0f0f8' }}>{r.game}</div>
-                  <div style={{ fontSize:'.46rem', color:'#505070' }}>{r.pick} · {r.conf}% · ${r.stake} · odds -110</div>
+                  <div style={{ fontSize:'.46rem', color:'#505070' }}>{r.pick} · {r.conf}% · ${r.stake}</div>
                 </div>
-                <Badge result={r.result} onClick={()=>updRFI(i,'result',cycle(r.result))} small />
+                <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                  <TypeToggle type={r.type||'money'} onChange={v=>updRFI(i,'type',v)} />
+                  <Badge result={r.result} onClick={()=>updRFI(i,'result',cycle(r.result))} small />
+                  {editing && delBtn(()=>delRFI(i))}
+                </div>
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div style={{ fontSize:'.5rem', color:'#404060' }}>Win: +${calcPL('win',r.stake,'-110').toFixed(2)} · Loss: -${r.stake}</div>
-                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color: r.pl>=0?'#4ade80':'#f87171' }}>{r.pl>=0?'+':''}${r.pl.toFixed(2)}</div>
+              <div style={{ display:'flex', justifyContent:'space-between' }}>
+                <div style={{ fontSize:'.5rem', color:'#404060' }}>Win: +${calcPL('win',r.stake,'-110','money').toFixed(2)} · Loss: -${r.stake}</div>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:r.pl>=0?'#4ade80':'#f87171' }}>
+                  {r.type==='paper'?'📋':r.pl>=0?'+':''}{r.type==='paper'?'Paper':`$${r.pl.toFixed(2)}`}
+                </div>
               </div>
             </div>
           ))}
           {addingRFI ? (
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12, display:'flex', flexDirection:'column', gap:4 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'#505070' }}>Add RFI Pick</div>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Add RFI Pick</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
                 {inp(rfiForm.game, v=>setRfiForm(f=>({...f,game:v})), 'ATL @ CWS')}
-                {inp(rfiForm.homeTeam, v=>setRfiForm(f=>({...f,homeTeam:v})), 'Home abbr e.g. CWS')}
+                {inp(rfiForm.homeTeam, v=>setRfiForm(f=>({...f,homeTeam:v})), 'Home abbr')}
                 {sel(rfiForm.pick, v=>setRfiForm(f=>({...f,pick:v})), [['YRFI','YRFI'],['NRFI','NRFI']])}
-                {inp(rfiForm.conf, v=>setRfiForm(f=>({...f,conf:v})), 'Conf % e.g. 67.0')}
+                {inp(rfiForm.conf, v=>setRfiForm(f=>({...f,conf:v})), 'Conf %')}
                 {inp(rfiForm.stake, v=>setRfiForm(f=>({...f,stake:v})), 'Stake $', 'number')}
               </div>
-              <div style={{ display:'flex', gap:4 }}>
+              <TypeToggle type={rfiForm.type} onChange={v=>setRfiForm(f=>({...f,type:v}))} />
+              <div style={{ display:'flex', gap:4, marginTop:4 }}>
                 <button onClick={addRFI} style={{ flex:1, padding:7, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#fff' }}>Add</button>
                 <button onClick={()=>setAddingRFI(false)} style={{ flex:1, padding:7, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
               </div>
@@ -551,31 +552,45 @@ export default function BetCard({ bankroll, onCardSaved }) {
       {section === 'ml' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           {card.ml.map((m,i) => (
-            <div key={i} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div key={i} style={{ background:'#09090f', border:`1px solid ${m.type==='money'?'#1a2a1a':'#1a1a2e'}`, borderRadius:10, padding:12 }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-                <div>
+                <div style={{ flex:1 }}>
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:'#f0f0f8' }}>{m.direction} ML · {m.odds}</div>
                   <div style={{ fontSize:'.46rem', color:'#505070' }}>{m.game} · ${m.stake} · {m.sources}</div>
                 </div>
-                <Badge result={m.result} onClick={()=>updML(i,'result',cycle(m.result))} small />
+                <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                  <TypeToggle type={m.type||'money'} onChange={v=>updML(i,'type',v)} />
+                  <Badge result={m.result} onClick={()=>updML(i,'result',cycle(m.result))} small />
+                  {editing && delBtn(()=>delML(i))}
+                </div>
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <div style={{ fontSize:'.5rem', color:'#404060' }}>Win: +${calcPL('win',m.stake,m.odds).toFixed(2)} · Loss: -${m.stake}</div>
-                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color: m.pl>=0?'#4ade80':'#f87171' }}>{m.pl>=0?'+':''}${m.pl.toFixed(2)}</div>
+              {editing && (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:6 }}>
+                  <input value={m.direction||''} onChange={e=>updML(i,'direction',e.target.value)} placeholder="Team" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'3px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
+                  <input value={m.odds||''} onChange={e=>updML(i,'odds',e.target.value)} placeholder="Odds" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'3px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
+                  <input value={m.stake||''} onChange={e=>updML(i,'stake',parseFloat(e.target.value)||0)} placeholder="Stake" type="number" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'3px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'space-between' }}>
+                <div style={{ fontSize:'.5rem', color:'#404060' }}>Win: +${calcPL('win',m.stake,m.odds,'money').toFixed(2)} · Loss: -${m.stake}</div>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:m.pl>=0?'#4ade80':'#f87171' }}>
+                  {m.type==='paper'?'📋 Paper':`${m.pl>=0?'+':''}$${m.pl.toFixed(2)}`}
+                </div>
               </div>
             </div>
           ))}
           {addingML ? (
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12, display:'flex', flexDirection:'column', gap:4 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'#505070' }}>Add ML Pick</div>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Add ML Pick</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
                 {inp(mlForm.game, v=>setMlForm(f=>({...f,game:v})), 'DET @ CLE')}
-                {inp(mlForm.direction, v=>setMlForm(f=>({...f,direction:v})), 'Team abbr e.g. DET')}
+                {inp(mlForm.direction, v=>setMlForm(f=>({...f,direction:v})), 'Team abbr')}
                 {inp(mlForm.odds, v=>setMlForm(f=>({...f,odds:v})), 'Odds e.g. +108')}
                 {inp(mlForm.stake, v=>setMlForm(f=>({...f,stake:v})), 'Stake $', 'number')}
-                {inp(mlForm.sources, v=>setMlForm(f=>({...f,sources:v})), 'Sources e.g. XGB+Con')}
+                {inp(mlForm.sources, v=>setMlForm(f=>({...f,sources:v})), 'Sources')}
               </div>
-              <div style={{ display:'flex', gap:4 }}>
+              <TypeToggle type={mlForm.type} onChange={v=>setMlForm(f=>({...f,type:v}))} />
+              <div style={{ display:'flex', gap:4, marginTop:4 }}>
                 <button onClick={addML} style={{ flex:1, padding:7, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#fff' }}>Add</button>
                 <button onClick={()=>setAddingML(false)} style={{ flex:1, padding:7, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
               </div>
@@ -587,11 +602,12 @@ export default function BetCard({ bankroll, onCardSaved }) {
       {/* ── PROPS ── */}
       {section === 'props' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          <div style={{ background:'#09090f', border:'1px solid #1a2a1a', borderRadius:10, padding:12 }}>
+          <div style={{ background:'#09090f', border:`1px solid ${card.hitParlay.type==='money'?'#1a2a1a':'#1a1a2e'}`, borderRadius:10, padding:12 }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'#4ade80' }}>⚡ Lazer Hit Parlay</div>
-              <Badge result={card.hitParlay.result} small />
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#4ade80' }}>⚡ Lazer Hit Parlay</div>
+              <TypeToggle type={card.hitParlay.type||'money'} onChange={v=>recalc({...card, hitParlay:{...card.hitParlay, type:v}})} />
             </div>
+
             {card.hitParlay.legs.map((leg,i) => (
               <div key={i} style={{ display:'flex', alignItems:'center', gap:8, background:'#0c0c1a', borderRadius:6, padding:'7px 10px', marginBottom:4 }}>
                 <div style={{ flex:1 }}>
@@ -599,16 +615,32 @@ export default function BetCard({ bankroll, onCardSaved }) {
                   <div style={{ fontSize:'.46rem', color:'#505070' }}>{leg.rate} · {leg.l10} · {leg.split}</div>
                 </div>
                 <Badge result={leg.result} onClick={()=>updHit(i,'result',cycle(leg.result))} small />
+                {editing && delBtn(()=>delHit(i))}
               </div>
             ))}
+
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6, paddingTop:6, borderTop:'1px solid #1a2a1a' }}>
-              <div style={{ fontSize:'.5rem', color:'#404060' }}>
-                ${card.hitParlay.stake} staked · Win: +${calcPL('win',card.hitParlay.stake,'+350').toFixed(2)}
+              <div>
+                <div style={{ fontSize:'.5rem', color:'#404060' }}>
+                  ${card.hitParlay.stake} staked
+                  {card.hitParlay.odds ? ` · ${card.hitParlay.odds}` : ''}
+                  {card.hitParlay.payout ? ` · Payout $${card.hitParlay.payout}` : ''}
+                </div>
+                <Badge result={card.hitParlay.result} onClick={()=>recalc({...card, hitParlay:{...card.hitParlay, result:cycle(card.hitParlay.result)}})} small />
               </div>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color: card.hitParlay.pl>=0?'#4ade80':'#f87171' }}>
-                {card.hitParlay.pl>=0?'+':''}${card.hitParlay.pl.toFixed(2)}
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:card.hitParlay.pl>=0?'#4ade80':'#f87171' }}>
+                {card.hitParlay.type==='paper'?'📋 Paper':`${card.hitParlay.pl>=0?'+':''}$${card.hitParlay.pl.toFixed(2)}`}
               </div>
             </div>
+
+            {editing && (
+              <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, borderTop:'1px solid #1a2a1a', paddingTop:8 }}>
+                <input value={card.hitParlay.odds||''} onChange={e=>save({...card,hitParlay:{...card.hitParlay,odds:e.target.value}})} placeholder="Odds e.g. +146" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'4px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
+                <input value={card.hitParlay.payout||''} onChange={e=>save({...card,hitParlay:{...card.hitParlay,payout:parseFloat(e.target.value)||0}})} placeholder="Payout $" type="number" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'4px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
+                <input value={card.hitParlay.stake||''} onChange={e=>recalc({...card,hitParlay:{...card.hitParlay,stake:parseFloat(e.target.value)||0}})} placeholder="Stake $" type="number" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'4px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
+              </div>
+            )}
+
             {addingHit ? (
               <div style={{ marginTop:8, borderTop:'1px solid #1a2a1a', paddingTop:8, display:'flex', flexDirection:'column', gap:4 }}>
                 {inp(hitForm.player, v=>setHitForm(f=>({...f,player:v})), 'Josh Jung')}
