@@ -537,7 +537,7 @@ export default function BetCard({ bankroll, onCardSaved }) {
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Add ML Pick</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
                 {inp(mlForm.game, v => setMlForm(f=>({...f,game:v})), 'DET @ CLE')}
-                {inp(mlForm.direction, v => setMlForm(f=>({...f,direction:v,team:v}}), 'Team abbr e.g. DET')}
+                {inp(mlForm.direction, v => setMlForm(f=>({...f,direction:v,team:v})), 'Team abbr e.g. DET')}
                 {inp(mlForm.odds, v => setMlForm(f=>({...f,odds:v})), 'Odds e.g. +108')}
                 {inp(mlForm.stake, v => setMlForm(f=>({...f,stake:v})), 'Stake $', 'number')}
                 {inp(mlForm.sources, v => setMlForm(f=>({...f,sources:v})), 'Sources e.g. XGB+Con')}
