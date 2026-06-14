@@ -9,15 +9,16 @@ export const SEED_CARDS = [
 ];
 
 export const SEED_MODELS = [
-  { name: "MC YRFI",       bets: 32,  wins: 24, profit: 128.80,  roi: 40.2,  status: "active",  note: "Best ROI. 65%+ threshold. STRONG AGREE only." },
+  { name: "MC YRFI",       bets: 33,  wins: 24, profit: 118.80,  roi: 36.0,  status: "active",  note: "Best ROI. 65%+ threshold. STRONG AGREE only." },
   { name: "LGB Moderate",  bets: 35,  wins: 24, profit: 120.90,  roi: 34.5,  status: "active",  note: "3rd best ROI. Underused. Check every day." },
   { name: "Hit Locks",     bets: 20,  wins: 15, profit: 65.35,   roi: 32.7,  status: "active",  note: "85%+ rate. Best parlay legs. Check splits." },
   { name: "Hit Std",       bets: 89,  wins: 64, profit: 242.16,  roi: 27.2,  status: "active",  note: "80%+ only. SGP legs not singles (-200 juice)." },
   { name: "NRFI RB v2.3",  bets: 123, wins: 78, profit: 209.90,  roi: 17.1,  status: "active",  note: "63%+ only. Dead zone 65-74% skip." },
-  { name: "Consensus ML",  bets: 59,  wins: 36, profit: 83.04,   roi: 14.1,  status: "active",  note: "Must agree with XGB for bet." },
-  { name: "XGB F5 ML",     bets: 128, wins: 77, profit: 159.57,  roi: 12.5,  status: "active",  note: "Best ML model. Sharp 20%+ against = skip." },
-  { name: "MC F5 Total",   bets: 153, wins: 90, profit: 153.00,  roi: 10.0,  status: "active",  note: "Underused. +$153 profit. Check w/ XGB Total." },
-  { name: "POI YRFI",      bets: 145, wins: 83, profit: 102.10,  roi: 7.0,   status: "active",  note: "Secondary RFI. Use when MC YRFI agrees." },
+  { name: "XGB F5 ML",     bets: 135, wins: 80, profit: 145.65,  roi: 10.8,  status: "active",  note: "Best ML model. Sharp 20%+ against = skip." },
+  { name: "MC F5 Total",   bets: 162, wins: 96, profit: 175.20,  roi: 10.8,  status: "active",  note: "+$175 profit. Check when XGB F5 Total agrees." },
+  { name: "Consensus ML",  bets: 70,  wins: 40, profit: 47.83,   roi: 6.8,   status: "active",  note: "Must agree with XGB for bet." },
+  { name: "MC F5 ML",      bets: 181, wins: 100, profit: 60.00,  roi: 3.3,   status: "active",  note: "55.2% WR. Use when STRONG AGREE fires." },
+  { name: "POI YRFI",      bets: 167, wins: 83, profit: -117.90, roi: -7.1,  status: "monitor", note: "⚠️ Monitoring — dropped to 49.7% WR · was +7% ROI. Watching for bounce back before using." },
   { name: "Hit Parlay",    bets: 45,  wins: 25, profit: -7.75,   roi: -1.7,  status: "monitor", note: "3-leg max 80%+. SGP legs preferred." },
   { name: "MC Full ML",    bets: 102, wins: 46, profit: -159.80, roi: -15.7, status: "display", note: "Display only. Never bet directly." },
   { name: "MC NRFI",       bets: 52,  wins: 25, profit: -52.50,  roi: -10.1, status: "display", note: "Display only. Negative ROI." },
