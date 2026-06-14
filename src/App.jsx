@@ -45,8 +45,22 @@ export default function App() {
   const [modelFilter, setModelFilter] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [editingBR, setEditingBR] = useState(false)
+  const [brInput, setBrInput] = useState('')
+  const [manualBR, setManualBR] = useState(() => {
+    try { const s = localStorage.getItem('betlab-bankroll-v1'); return s ? parseFloat(s) : null } catch { return null }
+  })
 
   useEffect(() => { saveCards(cards) }, [cards])
+
+  const saveBR = () => {
+    const val = parseFloat(brInput)
+    if (!val) return
+    setManualBR(val)
+    try { localStorage.setItem('betlab-bankroll-v1', val.toString()) } catch {}
+    setEditingBR(false)
+    setBrInput('')
+  }
 
   const toggle = id => setExpanded(e => ({ ...e, [id]: !e[id] }))
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -84,7 +98,7 @@ export default function App() {
   const potdWins = realCards.filter(c => c.potdResult === 'W').length
   const potdLoss = realCards.filter(c => c.potdResult === 'L').length
   const potdVoid = realCards.filter(c => c.potdResult === 'V').length
-  const latestBR = cards.length ? cards[cards.length - 1].bankroll : 40
+  const latestBR = manualBR !== null ? manualBR : (cards.length ? cards[cards.length - 1].bankroll : 40)
   const totalPL = cards.reduce((a, c) => a + c.pl, 0)
   const activeModels = models.filter(m => m.status === 'active')
   const filteredModels = modelFilter === 'all' ? models : models.filter(m => m.status === modelFilter)
@@ -103,8 +117,20 @@ export default function App() {
             <span style={{ background:'linear-gradient(135deg,#fff,#7070a0)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}> Tracker</span>
           </div>
           <div style={{ textAlign:'right' }}>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.4rem', color:'#4ade80', lineHeight:1 }}>${latestBR.toFixed(2)}</div>
-            <div style={{ fontSize:'.38rem', letterSpacing:'.1em', textTransform:'uppercase', color:'#404060' }}>Bankroll</div>
+            {editingBR ? (
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <input value={brInput} onChange={e=>setBrInput(e.target.value)} placeholder={latestBR.toFixed(2)} type="number"
+                  style={{ width:80, background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:5, padding:'4px 8px', fontSize:'.78rem', color:'#f0f0f8', outline:'none', textAlign:'right' }}
+                  onKeyDown={e=>e.key==='Enter'&&saveBR()} autoFocus />
+                <button onClick={saveBR} style={{ padding:'4px 8px', background:'#2563eb', border:'none', borderRadius:5, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, color:'#fff' }}>✓</button>
+                <button onClick={()=>setEditingBR(false)} style={{ padding:'4px 6px', background:'#1a1a30', border:'none', borderRadius:5, fontSize:'.65rem', color:'#505070' }}>✕</button>
+              </div>
+            ) : (
+              <div onClick={()=>{setBrInput(latestBR.toFixed(2));setEditingBR(true)}} style={{ cursor:'pointer' }}>
+                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.4rem', color:'#4ade80', lineHeight:1 }}>${latestBR.toFixed(2)}</div>
+                <div style={{ fontSize:'.38rem', letterSpacing:'.1em', textTransform:'uppercase', color:'#404060' }}>Bankroll · tap to edit</div>
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display:'flex', gap:4 }}>
