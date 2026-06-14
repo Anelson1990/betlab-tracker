@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { SEED_CARDS, SEED_MODELS, MODEL_COLORS, STATUS_CONFIG, RESULT_CONFIG } from './data.js'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
+import BetCard from './BetCard.jsx'
 
 const STORAGE_KEY = 'betlab-tracker-cards-v1'
 
@@ -107,7 +108,7 @@ export default function App() {
           </div>
         </div>
         <div style={{ display:'flex', gap:4 }}>
-          {[['cards','📋 Cards'],['models','📊 Models'],['analytics','📈 Analytics']].map(([t,l]) => (
+          {[['today','🎯 Today'],['cards','📋 Cards'],['models','📊 Models'],['analytics','📈 Analytics']].map(([t,l]) => (
             <button key={t} onClick={() => setTab(t)} style={{
               flex:1, padding:'7px 4px',
               fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase',
@@ -134,6 +135,27 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* ── TODAY TAB ── */}
+      {tab === 'today' && (
+        <BetCard bankroll={latestBR} onCardSaved={(card) => {
+          const newHistCard = {
+            id: Date.now().toString(),
+            date: card.date,
+            potd: card.potd.pick,
+            potdResult: card.potd.result === 'win' ? 'W' : card.potd.result === 'loss' ? 'L' : card.potd.result === 'void' ? 'V' : 'P',
+            potdPL: card.potd.pl || 0,
+            rfi: card.rfi.map(r => `${r.result === 'win' ? 'W' : 'L'}`).join('-') || '0-0',
+            ml: card.ml.map(m => `${m.result === 'win' ? 'W' : 'L'}`).join('-') || '0-0',
+            hitParlay: card.hitParlay.result === 'win' ? 'W' : card.hitParlay.result === 'loss' ? 'L' : 'P',
+            staked: (card.potd.stake||0) + card.rfi.reduce((a,r)=>a+(r.stake||0),0) + card.ml.reduce((a,m)=>a+(m.stake||0),0) + (card.hitParlay.stake||0),
+            pl: card.totalPL || 0,
+            bankroll: card.bankroll + (card.totalPL || 0),
+            notes: `POTD: ${card.potd.result} · RFI: ${card.rfi.length} picks · ML: ${card.ml.length} picks`,
+          }
+          setCards(prev => [...prev, newHistCard])
+        }} />
+      )}
 
       {/* ── CARDS TAB ── */}
       {tab === 'cards' && (
