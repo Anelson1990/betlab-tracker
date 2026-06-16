@@ -1,139 +1,392 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+const STORAGE_KEY = 'betlab-sharp-v2'
+const MLB_API = 'https://statsapi.mlb.com/api/v1'
+
+const GROUPS = [
+  { label: '10-19%', min: 10, max: 19, color: '#60a5fa', bg: 'rgba(96,165,250,.1)', border: '#1e40af' },
+  { label: '20-29%', min: 20, max: 29, color: '#fbbf24', bg: 'rgba(251,191,36,.1)', border: '#713f12' },
+  { label: '30-39%', min: 30, max: 39, color: '#f97316', bg: 'rgba(249,115,22,.1)', border: '#9a3412' },
+  { label: '40-49%', min: 40, max: 49, color: '#4ade80', bg: 'rgba(74,222,128,.1)', border: '#14532d' },
+  { label: '50%+',   min: 50, max: 999, color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: '#4c1d95' },
+]
+
+function getGroup(gap) {
+  return GROUPS.find(g => gap >= g.min && gap <= g.max) || null
+}
+
+function parseCardDate(dateStr) {
+  if (!dateStr) return new Date().toISOString().split('T')[0]
+  const months = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' }
+  const parts = dateStr.trim().split(' ')
+  if (parts.length >= 2) {
+    const month = months[parts[0]] || '06'
+    const day = parts[1].padStart(2, '0')
+    return `2026-${month}-${day}`
+  }
+  return new Date().toISOString().split('T')[0]
+}
+
+async function fetchGames(dateStr) {
+  try {
+    const res = await fetch(`${MLB_API}/schedule?sportId=1&date=${dateStr}&hydrate=linescore,team`)
+    return (await res.json())?.dates?.[0]?.games || []
+  } catch { return [] }
+}
+
+function findGame(games, abbr) {
+  if (!abbr) return null
+  const a = abbr.toUpperCase()
+  return games.find(g => {
+    const h = g.teams?.home?.team?.abbreviation?.toUpperCase() || ''
+    const aw = g.teams?.away?.team?.abbreviation?.toUpperCase() || ''
+    const hn = g.teams?.home?.team?.teamName?.toUpperCase() || ''
+    const an = g.teams?.away?.team?.teamName?.toUpperCase() || ''
+    return h===a || aw===a || hn.includes(a) || an.includes(a)
+  })
+}
+
+function loadData() {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : { days: [] } } catch { return { days: [] } }
+}
+
+function saveData(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {} }
 
 export default function SharpMoney() {
-  const [input, setInput] = useState('')
-  const [games, setGames] = useState([])
-  const [parsed, setParsed] = useState(false)
+  const [data, setData] = useState(loadData)
+  const [view, setView] = useState('today') // today | history | stats
+  const [grading, setGrading] = useState(false)
+  const [gradeLog, setGradeLog] = useState([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [editDate, setEditDate] = useState('')
+  const [form, setForm] = useState({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
 
-  const parse = () => {
-    // Parse the sharp money paste format
-    // Format: "Team1\nTeam2\nbets%1\nbets%2\nmoney%1\nmoney%2\nodds1\nodds2"
-    const lines = input.trim().split('\n').map(l => l.trim()).filter(Boolean)
-    const results = []
-    let i = 0
-    while (i < lines.length) {
-      try {
-        // Look for team names followed by percentages
-        const away = lines[i]; i++
-        const home = lines[i]; i++
-        // Skip time/date lines
-        while (i < lines.length && (lines[i].includes('PM') || lines[i].includes('AM') || lines[i].includes('/'))) i++
-        const awayBets = parseInt(lines[i]); i++
-        const homeBets = parseInt(lines[i]); i++
-        // Skip % of Money label if present
-        if (lines[i] && isNaN(parseInt(lines[i]))) i++
-        const awayMoney = parseInt(lines[i]); i++
-        const homeMoney = parseInt(lines[i]); i++
-        // Get odds
-        let awayOdds = '', homeOdds = ''
-        if (lines[i] && (lines[i].includes('+') || lines[i].includes('-'))) { awayOdds = lines[i]; i++ }
-        if (lines[i] && (lines[i].includes('+') || lines[i].includes('-'))) { homeOdds = lines[i]; i++ }
-        // Skip arrows and other UI elements
-        while (i < lines.length && (lines[i].includes('›') || lines[i].includes('+'))) i++
+  const today = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' })
 
-        if (away && home && !isNaN(awayBets) && !isNaN(awayMoney)) {
-          const betGap = Math.abs(awayMoney - awayBets)
-          const moneyFavor = awayMoney > homeMoney ? away : home
-          const betFavor = awayBets > homeBets ? away : home
-          const reverse = moneyFavor !== betFavor
-          const sharpPick = moneyFavor
-          const sharpOdds = moneyFavor === away ? awayOdds : homeOdds
+  // Get or create today's day record
+  const todayRecord = data.days.find(d => d.date === today)
+  const todayPicks = todayRecord?.picks || []
 
-          results.push({ away, home, awayBets, homeBets: 100-awayBets, awayMoney, homeMoney: 100-awayMoney, betGap, sharpPick, sharpOdds, reverse })
-        }
-      } catch { i++ }
+  const save = (d) => { setData(d); saveData(d) }
+
+  const addPick = () => {
+    if (!form.game || !form.sharpPick || !form.gap) return
+    const dateToUse = editDate || today
+    const updated = JSON.parse(JSON.stringify(data))
+    let day = updated.days.find(d => d.date === dateToUse)
+    if (!day) { day = { date: dateToUse, picks: [] }; updated.days.push(day) }
+    day.picks.push({
+      id: Date.now().toString(),
+      game: form.game,
+      sharpPick: form.sharpPick,
+      sharpOdds: form.sharpOdds,
+      gap: parseInt(form.gap) || 0,
+      confirms: form.confirms,
+      result: 'pending',
+    })
+    save(updated)
+    setForm({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
+    setShowAdd(false)
+  }
+
+  const setResult = (date, id, result) => {
+    const updated = JSON.parse(JSON.stringify(data))
+    const day = updated.days.find(d => d.date === date)
+    if (!day) return
+    const pick = day.picks.find(p => p.id === id)
+    if (pick) pick.result = result
+    save(updated)
+  }
+
+  const deletePick = (date, id) => {
+    const updated = JSON.parse(JSON.stringify(data))
+    const day = updated.days.find(d => d.date === date)
+    if (!day) return
+    day.picks = day.picks.filter(p => p.id !== id)
+    if (day.picks.length === 0) updated.days = updated.days.filter(d => d.date !== date)
+    save(updated)
+  }
+
+  // Auto grade using MLB Stats API
+  const autoGrade = async (date) => {
+    setGrading(true)
+    const log = []
+    const day = data.days.find(d => d.date === date)
+    if (!day) { setGrading(false); return }
+    const dateStr = parseCardDate(date)
+    log.push(`🔄 Fetching games for ${date}...`)
+    const games = await fetchGames(dateStr)
+    if (!games.length) { setGradeLog(['⚠️ No games found. Try after games finish.']); setGrading(false); return }
+    log.push(`✅ Found ${games.length} games`)
+    const updated = JSON.parse(JSON.stringify(data))
+    const updDay = updated.days.find(d => d.date === date)
+
+    for (const pick of updDay.picks) {
+      if (pick.result !== 'pending') continue
+      // Extract team abbr from sharpPick (e.g. "WSH -136" → "WSH")
+      const teamAbbr = pick.sharpPick.split(' ')[0]
+      const game = findGame(games, teamAbbr)
+      if (!game) { log.push(`⚠️ ${pick.game}: game not found`); continue }
+      if (game.status?.detailedState !== 'Final') { log.push(`⏳ ${pick.game}: not final yet`); continue }
+      const hs = game.teams?.home?.score
+      const as = game.teams?.away?.score
+      const ha = game.teams?.home?.team?.abbreviation?.toUpperCase()
+      const aa = game.teams?.away?.team?.abbreviation?.toUpperCase()
+      const ta = teamAbbr.toUpperCase()
+      const pickedHome = ta === ha
+      const won = (pickedHome && hs > as) || (!pickedHome && as > hs)
+      pick.result = won ? 'win' : 'loss'
+      log.push(`${won?'✅':'❌'} ${pick.game} — ${aa} ${as} @ ${ha} ${hs} — Sharp on ${teamAbbr} → ${won?'WIN':'LOSS'}`)
     }
-    setGames(results)
-    setParsed(true)
+
+    log.push('✅ Auto-grade complete')
+    save(updated)
+    setGradeLog(log)
+    setGrading(false)
   }
 
-  const getSignal = (gap, reverse) => {
-    if (gap >= 40) return { label: '🔥🔥🔥 Very Strong', color: '#4ade80' }
-    if (gap >= 30) return { label: '🔥🔥 Strong', color: '#86efac' }
-    if (gap >= 20) return { label: '🔥 Signal', color: '#fbbf24' }
-    if (gap >= 10) return { label: '⚪ Slight lean', color: '#60a5fa' }
-    return { label: '⚪ Public', color: '#505070' }
+  // Stats across all history
+  const allPicks = data.days.flatMap(d => d.picks)
+  const gradedPicks = allPicks.filter(p => p.result === 'win' || p.result === 'loss')
+
+  const groupStats = GROUPS.map(g => {
+    const picks = gradedPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
+    const wins = picks.filter(p => p.result === 'win').length
+    const wr = picks.length ? Math.round((wins/picks.length)*100) : 0
+    return { ...g, picks: picks.length, wins, wr }
+  })
+
+  const RC = {
+    pending: { color:'#fbbf24', label:'⏳' },
+    win:     { color:'#4ade80', label:'✅ Win' },
+    loss:    { color:'#f87171', label:'❌ Loss' },
+    skip:    { color:'#94a3b8', label:'⏭️ Skip' },
   }
+  const cycle = r => { const c=['pending','win','loss','skip']; return c[(c.indexOf(r)+1)%c.length] }
+
+  const IS = { background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none', width:'100%' }
 
   return (
     <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
 
+      {/* HEADER */}
       <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
-        <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', color:'#f0f0f8', marginBottom:4 }}>💰 Sharp Money</div>
-        <div style={{ fontSize:'.54rem', color:'#404060', lineHeight:1.5, marginBottom:10 }}>
-          Paste the sharp money data from covers.com or scoresandodds.com. I'll flag the gaps automatically.
-        </div>
-        <textarea value={input} onChange={e=>setInput(e.target.value)} placeholder="Paste sharp money data here..." rows={8}
-          style={{ width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'8px 10px', fontSize:'.6rem', color:'#f0f0f8', outline:'none', resize:'vertical', lineHeight:1.6, marginBottom:6 }} />
-        <div style={{ display:'flex', gap:4 }}>
-          <button onClick={parse} style={{ flex:1, padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, textTransform:'uppercase', color:'#fff' }}>Analyze Sharp Money</button>
-          <button onClick={()=>{setInput('');setGames([]);setParsed(false)}} style={{ padding:'9px 12px', background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, color:'#505070' }}>Clear</button>
-        </div>
-      </div>
-
-      {/* LEGEND */}
-      <div style={{ background:'#06060e', border:'1px solid #1a1a30', borderRadius:8, padding:10 }}>
-        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.62rem', fontWeight:800, textTransform:'uppercase', color:'#404060', marginBottom:6 }}>Signal Guide</div>
-        {[['🔥🔥🔥 40%+ gap','Very Strong — sharp piling in','#4ade80'],['🔥🔥 30%+ gap','Strong sharp signal','#86efac'],['🔥 20%+ gap','Reverse line movement','#fbbf24'],['⚪ <20% gap','Public or neutral','#505070']].map(([label,desc,color]) => (
-          <div key={label} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:3 }}>
-            <div style={{ fontSize:'.58rem', color, width:120, flexShrink:0 }}>{label}</div>
-            <div style={{ fontSize:'.52rem', color:'#404060' }}>{desc}</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+          <div>
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', color:'#f0f0f8', lineHeight:1 }}>💰 Sharp Money</div>
+            <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.08em', marginTop:2 }}>
+              {gradedPicks.length} graded · {gradedPicks.filter(p=>p.result==='win').length} wins · {gradedPicks.length ? Math.round((gradedPicks.filter(p=>p.result==='win').length/gradedPicks.length)*100) : 0}% overall WR
+            </div>
           </div>
-        ))}
+          <button onClick={()=>setShowAdd(!showAdd)} style={{ padding:'6px 12px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#60a5fa' }}>
+            + Add
+          </button>
+        </div>
+
+        {/* View toggle */}
+        <div style={{ display:'flex', gap:4 }}>
+          {[['today','Today'],['history','History'],['stats','Stats']].map(([v,l]) => (
+            <button key={v} onClick={()=>setView(v)} style={{ flex:1, padding:'6px 2px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', border:'1px solid', borderRadius:5, background:view===v?'#1a1a30':'#0c0c1a', color:view===v?'#f0f0f8':'#404060', borderColor:view===v?'#2a2a50':'#1a1a30' }}>{l}</button>
+          ))}
+        </div>
       </div>
 
-      {/* RESULTS */}
-      {parsed && games.length === 0 && (
-        <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>
-          Couldn't parse the data. Try copying directly from the sharp money table including team names and percentages.
+      {/* ADD FORM */}
+      {showAdd && (
+        <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Add Sharp Pick</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <input value={editDate} onChange={e=>setEditDate(e.target.value)} placeholder={`Date (default: ${today})`} style={IS} />
+            <input value={form.game} onChange={e=>setForm(f=>({...f,game:e.target.value}))} placeholder="Game e.g. KC @ WSH" style={IS} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              <input value={form.sharpPick} onChange={e=>setForm(f=>({...f,sharpPick:e.target.value}))} placeholder="Sharp pick e.g. WSH -136" style={IS} />
+              <input value={form.sharpOdds} onChange={e=>setForm(f=>({...f,sharpOdds:e.target.value}))} placeholder="Odds e.g. -136" style={IS} />
+              <input value={form.gap} onChange={e=>setForm(f=>({...f,gap:e.target.value}))} placeholder="Gap % e.g. 76" type="number" style={IS} />
+              <select value={form.confirms} onChange={e=>setForm(f=>({...f,confirms:e.target.value}))} style={IS}>
+                <option value="">Model signal?</option>
+                <option value="confirms">✅ Confirms models</option>
+                <option value="conflicts">⚠️ Conflicts models</option>
+                <option value="neutral">⚪ Neutral</option>
+              </select>
+            </div>
+            <div style={{ display:'flex', gap:4, marginTop:4 }}>
+              <button onClick={addPick} style={{ flex:1, padding:8, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#fff' }}>Add</button>
+              <button onClick={()=>{setShowAdd(false);setForm({game:'',sharpPick:'',sharpOdds:'',gap:'',confirms:''})}} style={{ flex:1, padding:8, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
-      {games.sort((a,b) => b.betGap - a.betGap).map((g,i) => {
-        const sig = getSignal(g.betGap, g.reverse)
-        return (
-          <div key={i} style={{ background:'#09090f', border:`1px solid ${g.betGap>=20?'rgba(74,222,128,.2)':'#1a1a2e'}`, borderRadius:10, padding:12 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-              <div>
-                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.95rem', fontWeight:800, color:'#f0f0f8' }}>{g.away} @ {g.home}</div>
-                <div style={{ fontSize:'.5rem', color:sig.color, fontWeight:700, marginTop:2 }}>{sig.label}</div>
-              </div>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:sig.color }}>{g.sharpPick}</div>
-                <div style={{ fontSize:'.46rem', color:'#505070' }}>{g.sharpOdds} · Sharp pick</div>
-              </div>
+      {/* GRADE LOG */}
+      {gradeLog.length > 0 && (
+        <div style={{ background:'#060610', border:'1px solid #1a1a30', borderRadius:8, padding:10 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+            <div style={{ fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', color:'#404060' }}>⚡ Grade Log</div>
+            <button onClick={()=>setGradeLog([])} style={{ background:'none', border:'none', color:'#404060', fontSize:'.52rem' }}>Clear</button>
+          </div>
+          {gradeLog.map((l,i) => <div key={i} style={{ fontSize:'.56rem', color:'#606080', lineHeight:1.8 }}>{l}</div>)}
+        </div>
+      )}
+
+      {/* TODAY VIEW */}
+      {view === 'today' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {todayPicks.length === 0 && (
+            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>
+              No sharp picks logged today. Tap + Add to enter today's data.
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-              <div style={{ background:'#0c0c1a', borderRadius:6, padding:'6px 8px' }}>
-                <div style={{ fontSize:'.42rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>% of Tickets</div>
-                <div style={{ display:'flex', height:6, borderRadius:3, overflow:'hidden', marginBottom:4 }}>
-                  <div style={{ width:`${g.awayBets}%`, background:'#60a5fa' }} />
-                  <div style={{ width:`${g.homeBets}%`, background:'#1a1a30' }} />
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.5rem' }}>
-                  <span style={{ color:'#60a5fa' }}>{g.away} {g.awayBets}%</span>
-                  <span style={{ color:'#505070' }}>{g.home} {g.homeBets}%</span>
-                </div>
+          )}
+
+          {/* Group by gap size */}
+          {GROUPS.map(g => {
+            const picks = todayPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
+            if (picks.length === 0) return null
+            return (
+              <div key={g.label}>
+                <div style={{ fontSize:'.52rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'.1em', color:g.color, marginBottom:4, paddingLeft:4 }}>{g.label} Gap</div>
+                {picks.sort((a,b) => b.gap - a.gap).map(pick => (
+                  <div key={pick.id} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:8, padding:'9px 10px', marginBottom:4 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{pick.sharpPick}</div>
+                        <div style={{ fontSize:'.46rem', color:'#505070' }}>{pick.game} · {pick.gap}% gap {pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}</div>
+                      </div>
+                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:g.color }}>{pick.gap}%</div>
+                        <button onClick={()=>setResult(today, pick.id, cycle(pick.result))} style={{ padding:'3px 8px', borderRadius:5, border:'1px solid #1a1a30', background:'#0c0c1a', fontSize:'.6rem', color:RC[pick.result]?.color||'#fbbf24', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>
+                          {RC[pick.result]?.label||'⏳'}
+                        </button>
+                        <button onClick={()=>deletePick(today, pick.id)} style={{ padding:'3px 6px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.55rem' }}>✕</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{ background:'#0c0c1a', borderRadius:6, padding:'6px 8px' }}>
-                <div style={{ fontSize:'.42rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:4 }}>% of Money</div>
-                <div style={{ display:'flex', height:6, borderRadius:3, overflow:'hidden', marginBottom:4 }}>
-                  <div style={{ width:`${g.awayMoney}%`, background:'#4ade80' }} />
-                  <div style={{ width:`${g.homeMoney}%`, background:'#1a1a30' }} />
+            )
+          })}
+
+          {todayPicks.length > 0 && (
+            <button onClick={()=>autoGrade(today)} disabled={grading} style={{ width:'100%', padding:9, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:grading?'#404060':'#60a5fa', marginTop:4 }}>
+              {grading ? '⏳ Grading...' : '⚡ Auto Grade Today'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* HISTORY VIEW */}
+      {view === 'history' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {data.days.length === 0 && (
+            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>No history yet.</div>
+          )}
+          {[...data.days].reverse().map(day => {
+            const wins = day.picks.filter(p=>p.result==='win').length
+            const graded = day.picks.filter(p=>p.result==='win'||p.result==='loss').length
+            const wr = graded ? Math.round((wins/graded)*100) : null
+            return (
+              <div key={day.date} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, overflow:'hidden' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px 6px' }}>
+                  <div>
+                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{day.date}</div>
+                    <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{day.picks.length} picks · {graded} graded</div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                    {wr !== null && <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:wr>=55?'#4ade80':'#f87171' }}>{wr}% WR</div>}
+                    <button onClick={()=>autoGrade(day.date)} disabled={grading} style={{ padding:'4px 8px', background:'rgba(37,99,235,.1)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.55rem', color:'#60a5fa' }}>Grade</button>
+                  </div>
                 </div>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.5rem' }}>
-                  <span style={{ color:'#4ade80' }}>{g.away} {g.awayMoney}%</span>
-                  <span style={{ color:'#505070' }}>{g.home} {g.homeMoney}%</span>
-                </div>
+                {day.picks.sort((a,b)=>b.gap-a.gap).map(pick => {
+                  const g = getGroup(pick.gap)
+                  return (
+                    <div key={pick.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 12px', borderTop:'1px solid #0d0d1a' }}>
+                      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, color:g?.color||'#60a5fa', width:32 }}>{pick.gap}%</div>
+                      <div style={{ flex:1, fontSize:'.62rem', color:'#a0a0c0' }}>{pick.sharpPick} · {pick.game}</div>
+                      <div style={{ fontSize:'.6rem', color:RC[pick.result]?.color||'#fbbf24' }}>{RC[pick.result]?.label||'⏳'}</div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-            <div style={{ marginTop:6, fontSize:'.52rem', color:'#606080', lineHeight:1.5 }}>
-              Gap: <strong style={{ color:sig.color }}>{g.betGap}%</strong> more money on {g.sharpPick} than tickets
-              {g.reverse && <span style={{ color:'#fbbf24' }}> · Reverse line movement</span>}
+            )
+          })}
+        </div>
+      )}
+
+      {/* STATS VIEW */}
+      {view === 'stats' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+
+          {/* Overall */}
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Overall Sharp Performance</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+              {[
+                { val: gradedPicks.length, lbl: 'Total Graded' },
+                { val: `${gradedPicks.filter(p=>p.result==='win').length}-${gradedPicks.filter(p=>p.result==='loss').length}`, lbl: 'W-L' },
+                { val: `${gradedPicks.length ? Math.round((gradedPicks.filter(p=>p.result==='win').length/gradedPicks.length)*100) : 0}%`, lbl: 'Win Rate' },
+              ].map(s => (
+                <div key={s.lbl} style={{ textAlign:'center', background:'#0c0c1a', borderRadius:6, padding:'8px 4px' }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:'#4ade80', lineHeight:1 }}>{s.val}</div>
+                  <div style={{ fontSize:'.38rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginTop:3 }}>{s.lbl}</div>
+                </div>
+              ))}
             </div>
           </div>
-        )
-      })}
+
+          {/* By group */}
+          {groupStats.map(g => (
+            <div key={g.label} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:10, padding:12 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:g.color }}>{g.label} Gap</div>
+                  <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{g.picks} picks graded</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.4rem', fontWeight:800, color: g.picks===0?'#404060':g.wr>=55?'#4ade80':'#f87171', lineHeight:1 }}>
+                    {g.picks === 0 ? '—' : `${g.wr}%`}
+                  </div>
+                  <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase' }}>Win Rate</div>
+                </div>
+              </div>
+              {g.picks > 0 && (
+                <>
+                  <div style={{ height:6, background:'#1a1a30', borderRadius:3, overflow:'hidden', marginBottom:6 }}>
+                    <div style={{ height:'100%', width:`${g.wr}%`, background:g.color, borderRadius:3 }} />
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.5rem', color:'#505070' }}>
+                    <span>{g.wins}W · {g.picks-g.wins}L</span>
+                    <span>{g.wr >= 55 ? '✅ Edge' : g.wr >= 50 ? '⚪ Breakeven' : '❌ Below 50%'}</span>
+                  </div>
+                </>
+              )}
+              {g.picks === 0 && <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center' }}>No graded picks in this range yet</div>}
+            </div>
+          ))}
+
+          {/* Confirms vs Conflicts */}
+          {gradedPicks.length > 0 && (
+            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Sharp vs Model Alignment</div>
+              {[
+                { key:'confirms', label:'✅ Confirms Models', color:'#4ade80' },
+                { key:'conflicts', label:'⚠️ Conflicts Models', color:'#f87171' },
+                { key:'neutral', label:'⚪ Neutral', color:'#94a3b8' },
+              ].map(s => {
+                const picks = gradedPicks.filter(p => p.confirms === s.key)
+                const wins = picks.filter(p => p.result === 'win').length
+                const wr = picks.length ? Math.round((wins/picks.length)*100) : null
+                return (
+                  <div key={s.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.label}</div>
+                    <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
+                      {picks.length === 0 ? '— no data' : `${wins}-${picks.length-wins} · ${wr}% WR`}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
