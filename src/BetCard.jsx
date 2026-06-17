@@ -565,7 +565,11 @@ export default function BetCard({ bankroll, onCardSaved }) {
                   <div style={{ fontSize:'.65rem', fontWeight:700, color:'#f0f0f8' }}>{leg.player}</div>
                   <div style={{ fontSize:'.46rem', color:'#505070' }}>{leg.rate} · {leg.l10} · {leg.split}</div>
                 </div>
-                <Badge result={leg.result} onClick={()=>updHit(i,'result',cycle(leg.result))} small />
+                <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                  <button onClick={()=>updHit(i,'result','win')} style={{ padding:'3px 8px', borderRadius:4, border:`1px solid ${leg.result==='win'?'#14532d':'#1a2a1a'}`, background:leg.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', color:leg.result==='win'?'#4ade80':'#404060', fontSize:'.65rem', fontWeight:700 }}>✅</button>
+                  <button onClick={()=>updHit(i,'result','loss')} style={{ padding:'3px 8px', borderRadius:4, border:`1px solid ${leg.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:leg.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', color:leg.result==='loss'?'#f87171':'#404060', fontSize:'.65rem', fontWeight:700 }}>❌</button>
+                  <button onClick={()=>updHit(i,'result','pending')} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid #1a2a1a', background:'#0c0c1a', color:leg.result==='pending'?'#fbbf24':'#404060', fontSize:'.65rem' }}>⏳</button>
+                </div>
                 {editing && delBtn(()=>delHit(i))}
               </div>
             ))}
