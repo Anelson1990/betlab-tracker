@@ -381,6 +381,12 @@ export default function BetCard({ bankroll, onCardSaved }) {
           {secBtn('props','⚡ Props')}
         </div>
 
+        {card.notes && (
+          <div style={{ background:'rgba(251,191,36,.08)', border:'1px solid #713f12', borderRadius:6, padding:'6px 10px', marginBottom:8, fontSize:'.56rem', color:'#fbbf24', lineHeight:1.6 }}>
+            {card.notes}
+          </div>
+        )}
+
         <div style={{ display:'flex', gap:4 }}>
           <button onClick={()=>autoGrade(card, false)} disabled={grading} style={{
             flex:2, padding:8, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb',

@@ -8,7 +8,7 @@ export const SEED_CARDS = [
   { id: "0613", date: "Jun 13", potd: "ARI ML (Paper)",     potdResult: "P", potdPL: 0,     rfi: "2-0", ml: "8-0", hitParlay: "P", staked: 0,     pl: 0,      bankroll: 40,    notes: "Missed day. Models 15/15 paper. ARI 5-2. All 8 ML won." },
   { id: "0614", date: "Jun 14", potd: "ATL ML +108",        potdResult: "L", potdPL: -10,   rfi: "0-0", ml: "3-2", hitParlay: "W", staked: 15,    pl: -2.68,  bankroll: 37.32, notes: "ATL 1-8 loss. Hit parlay +146 cashed early. SD/MIL/NYY paper wins. COL 23-9 OVER missed." },
   { id: "0615", date: "Jun 15", potd: "CIN ML -136",        potdResult: "W", potdPL: 18.38, rfi: "0-0", ml: "4-1", hitParlay: "L", staked: 30,    pl: 95.38,  bankroll: 121.22,notes: "Burns 12-0 Cy Young. ML parlay $5→$87 cashed (PHI/WSH/CIN/STL/CHC/ATH). Hit parlay lost PCA only." },
-  { id: "0616", date: "Jun 16", potd: "WSH ML -136",        potdResult: "W", potdPL: 11.03, rfi: "0-0", ml: "3-2", hitParlay: "L", staked: 35,    pl: 6.60,   bankroll: 84.23, notes: "WSH won 76% sharp gap. 6-leg ML parlay lost (SD + CHC killed it). CIN YRFI off card +$9.57. Hit parlay Lee suspended." },
+  { id: "0616", date: "Jun 16", potd: "WSH ML -136", potdResult: "W", potdPL: 11.03, rfi: "0-0", ml: "3-2", hitParlay: "P", staked: 35, pl: -4, bankroll: 84.23, notes: "WSH won 76% sharp gap. 6-leg ML parlay lost (SD + CHC killed it). CIN YRFI off card +$9.57. ⚠️ Hit parlay LIVE — Lee suspended game resumes Jun 17 2PM. Taylor ✅ Burleson ✅ Lee ⏳" },
 ];
 
 export const SEED_MODELS = [
@@ -102,6 +102,7 @@ export const TODAY_CARD = {
   },
   sgp: { stake: 0, odds: "", type: "paper", result: "pending", pl: 0, legs: [] },
   totalPL: -4,
+  notes: "⚠️ CARRYOVER: Jun 16 hit parlay (Taylor ✅ Burleson ✅ Lee ⏳) still live — suspended game resumes 2PM. Lee needs 1 hit to cash.",
 };
 
 export const SEED_SHARP = [
