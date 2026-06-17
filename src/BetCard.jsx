@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { TODAY_CARD } from './data.js'
 
 const CARD_KEY = 'betlab-daily-card-v1'
 const HISTORY_KEY = 'betlab-card-history-v1'
@@ -130,7 +131,18 @@ export default function BetCard({ bankroll, onCardSaved }) {
   const [hitForm, setHitForm] = useState({ player:'', team:'', rate:'', l10:'', split:'' })
 
   useEffect(() => {
-    try { const s = localStorage.getItem(CARD_KEY); if (s) setCard(JSON.parse(s)) } catch {}
+    try {
+      const s = localStorage.getItem(CARD_KEY)
+      if (s) {
+        const stored = JSON.parse(s)
+        // If stored card is from today use it, otherwise load TODAY_CARD
+        if (stored.date === TODAY_CARD.date) { setCard(stored) }
+        else { setCard(TODAY_CARD); localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD)) }
+      } else {
+        setCard(TODAY_CARD)
+        localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD))
+      }
+    } catch { setCard(TODAY_CARD) }
   }, [])
 
   // Auto-grade on load when card has pending picks and games may be finished

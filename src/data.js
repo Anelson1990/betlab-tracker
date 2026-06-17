@@ -64,6 +64,46 @@ export const RESULT_CONFIG = {
   P: { label: "PAPER", color: "#60a5fa", bg: "rgba(96,165,250,.15)",  border: "#1e40af" },
 };
 
+export const TODAY_CARD = {
+  date: "Jun 17",
+  bankroll: 84.23,
+  potd: {
+    pick: "MIA ML +107",
+    game: "MIA @ PHI",
+    direction: "MIA",
+    odds: "+107",
+    stake: 15,
+    type: "money",
+    sources: "XGB 87.0% · Con 87.0% · Sharp 32% gap · Alcantara ERA 4.25 · Painter ERA 6.43 1-7",
+    analysis: "Alcantara 6-4 ERA 4.25 WHIP 1.22 vs Painter 1-7 ERA 6.43 12 HRs allowed. MIA on 6-game win streak. Sharp money 32% gap on MIA plus money. NBC Sports model also on MIA. Painter K rate 17th percentile relying on worst defense in league.",
+    result: "pending", pl: 0,
+  },
+  rfi: [
+    { game: "MIA @ PHI", homeTeam: "PHI", awayTeam: "MIA", pick: "YRFI", conf: "63.4", stake: 8, type: "money", result: "pending", pl: 0 },
+    { game: "NYM @ CIN", homeTeam: "CIN", awayTeam: "NYM", pick: "YRFI", conf: "manual", stake: 4, type: "money", result: "loss", pl: -4 },
+  ],
+  ml: [
+    { game: "KC @ WSH", direction: "WSH", odds: "-135", stake: 0, sources: "XGB 95.8% · Sharp 52% gap · 4th straight day", type: "paper", result: "pending", pl: 0 },
+    { game: "SF @ ATL", direction: "ATL", odds: "-134", stake: 0, sources: "XGB 93.5% · Con 93.5% · suspended game", type: "paper", result: "pending", pl: 0 },
+    { game: "DET @ HOU", direction: "HOU", odds: "-100", stake: 0, sources: "XGB 82.7% · Con 82.7%", type: "paper", result: "pending", pl: 0 },
+  ],
+  hitParlay: {
+    stake: 8,
+    odds: "",
+    payout: 0,
+    type: "money",
+    result: "pending",
+    pl: 0,
+    legs: [
+      { player: "Samad Taylor", team: "SD", rate: "88.9%", l10: "8/9", split: "vsRHP .348 · batting 2nd", result: "pending" },
+      { player: "Alec Burleson", team: "STL", rate: "85%", l10: "10/10", split: "vsRHP .330 · xwOBA .388", result: "pending" },
+      { player: "James Wood", team: "WSH", rate: "80%", l10: "9/10", split: "vsRHP .293 · vs Avila ERA 6.19", result: "pending" },
+    ],
+  },
+  sgp: { stake: 0, odds: "", type: "paper", result: "pending", pl: 0, legs: [] },
+  totalPL: -4,
+};
+
 export const SEED_SHARP = [
   {
     date: "Jun 14",
