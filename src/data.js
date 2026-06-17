@@ -83,9 +83,12 @@ export const TODAY_CARD = {
     { game: "NYM @ CIN", homeTeam: "CIN", awayTeam: "NYM", pick: "YRFI", conf: "manual", stake: 4, type: "money", result: "loss", pl: -4 },
   ],
   ml: [
-    { game: "KC @ WSH", direction: "WSH", odds: "-135", stake: 0, sources: "XGB 95.8% · Sharp 52% gap · 4th straight day", type: "paper", result: "pending", pl: 0 },
-    { game: "SF @ ATL", direction: "ATL", odds: "-134", stake: 0, sources: "XGB 93.5% · Con 93.5% · suspended game", type: "paper", result: "pending", pl: 0 },
-    { game: "DET @ HOU", direction: "HOU", odds: "-100", stake: 0, sources: "XGB 82.7% · Con 82.7%", type: "paper", result: "pending", pl: 0 },
+    { game: "KC @ WSH", direction: "WSH", odds: "-135", stake: 0, sources: "XGB 95.8% · Sharp 52% gap · 4th straight day", type: "paper", result: "loss", pl: 0 },
+    { game: "SF @ ATL", direction: "ATL", odds: "-134", stake: 0, sources: "XGB 93.5% · Con 93.5% · suspended game", type: "paper", result: "loss", pl: 0 },
+    { game: "DET @ HOU", direction: "HOU", odds: "-100", stake: 0, sources: "XGB 82.7% · Con 82.7%", type: "paper", result: "win", pl: 0 },
+    { game: "BAL @ SEA", direction: "BAL", odds: "+115", stake: 0, sources: "XGB 82% · Con 82% · Sharp 37% gap · Bradish ERA 4.30 · Rutschman lineup", type: "paper", result: "pending", pl: 0 },
+    { game: "PIT @ ATH", direction: "PIT", odds: "-124", stake: 0, sources: "XGB 93.9% · Con 93.9% · Sharp 20% gap · Ashcraft ERA 3.30", type: "paper", result: "pending", pl: 0 },
+    { game: "CLE @ MIL", direction: "MIL", odds: "-122", stake: 0, sources: "XGB 79.4% · Con 79.4% · Williams ERA 3.32 9-3 · Sproat ERA 5.67", type: "paper", result: "pending", pl: 0 },
   ],
   hitParlay: {
     stake: 8,
