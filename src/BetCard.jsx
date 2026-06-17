@@ -83,6 +83,8 @@ function QuickGrade({ result, onChange }) {
     </div>
   )
 }
+
+function TypeToggle({ type, onChange }) {
   const isMoney = type === 'money'
   return (
     <div style={{ display:'flex', gap:3, flexShrink:0 }}>
