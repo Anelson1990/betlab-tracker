@@ -64,6 +64,56 @@ export const RESULT_CONFIG = {
   P: { label: "PAPER", color: "#60a5fa", bg: "rgba(96,165,250,.15)",  border: "#1e40af" },
 };
 
+export const SEED_SHARP = [
+  {
+    date: "Jun 14",
+    picks: [
+      { id: "1", game: "KC @ WSH", sharpPick: "WSH -136", sharpOdds: "-136", gap: 76, confirms: "confirms", result: "win" },
+      { id: "2", game: "MIN @ TEX", sharpPick: "TEX -125", sharpOdds: "-125", gap: 40, confirms: "conflicts", result: "loss" },
+      { id: "3", game: "SD @ BAL", sharpPick: "SD +120", sharpOdds: "+120", gap: 34, confirms: "confirms", result: "win" },
+      { id: "4", game: "ATL @ NYM", sharpPick: "ATL +108", sharpOdds: "+108", gap: 11, confirms: "confirms", result: "loss" },
+      { id: "5", game: "DET @ CLE", sharpPick: "DET -110", sharpOdds: "-110", gap: 2, confirms: "neutral", result: "loss" },
+    ]
+  },
+  {
+    date: "Jun 15",
+    picks: [
+      { id: "1", game: "KC @ WSH", sharpPick: "WSH -135", sharpOdds: "-135", gap: 61, confirms: "confirms", result: "win" },
+      { id: "2", game: "NYM @ CIN", sharpPick: "CIN -136", sharpOdds: "-136", gap: 41, confirms: "confirms", result: "win" },
+      { id: "3", game: "TB @ LAD", sharpPick: "TB +158", sharpOdds: "+158", gap: 45, confirms: "neutral", result: "loss" },
+      { id: "4", game: "DET @ HOU", sharpPick: "DET +105", sharpOdds: "+105", gap: 24, confirms: "conflicts", result: "loss" },
+      { id: "5", game: "MIN @ TEX", sharpPick: "MIN +135", sharpOdds: "+135", gap: 19, confirms: "confirms", result: "win" },
+      { id: "6", game: "PHI @ MIL", sharpPick: "MIL +110", sharpOdds: "+110", gap: 7, confirms: "conflicts", result: "win" },
+    ]
+  },
+  {
+    date: "Jun 16",
+    picks: [
+      { id: "1", game: "KC @ WSH", sharpPick: "WSH -136", sharpOdds: "-136", gap: 76, confirms: "confirms", result: "win" },
+      { id: "2", game: "MIN @ TEX", sharpPick: "TEX -125", sharpOdds: "-125", gap: 40, confirms: "conflicts", result: "loss" },
+      { id: "3", game: "LAA @ ARI", sharpPick: "ARI -105", sharpOdds: "-105", gap: 27, confirms: "neutral", result: "win" },
+      { id: "4", game: "DET @ HOU", sharpPick: "HOU -166", sharpOdds: "-166", gap: 24, confirms: "neutral", result: "win" },
+      { id: "5", game: "BAL @ SEA", sharpPick: "BAL +135", sharpOdds: "+135", gap: 23, confirms: "neutral", result: "loss" },
+      { id: "6", game: "CLE @ MIL", sharpPick: "MIL -150", sharpOdds: "-150", gap: 14, confirms: "neutral", result: "win" },
+      { id: "7", game: "NYM @ CIN", sharpPick: "CIN even", sharpOdds: "even", gap: 3, confirms: "confirms", result: "win" },
+    ]
+  },
+  {
+    date: "Jun 17",
+    picks: [
+      { id: "1", game: "LAA @ ARI", sharpPick: "ARI -170", sharpOdds: "-170", gap: 53, confirms: "neutral", result: "pending" },
+      { id: "2", game: "KC @ WSH", sharpPick: "WSH -135", sharpOdds: "-135", gap: 52, confirms: "confirms", result: "pending" },
+      { id: "3", game: "BAL @ SEA", sharpPick: "BAL +116", sharpOdds: "+116", gap: 37, confirms: "neutral", result: "pending" },
+      { id: "4", game: "CLE @ MIL", sharpPick: "CLE +106", sharpOdds: "+106", gap: 36, confirms: "neutral", result: "pending" },
+      { id: "5", game: "MIA @ PHI", sharpPick: "MIA +107", sharpOdds: "+107", gap: 32, confirms: "confirms", result: "pending" },
+      { id: "6", game: "PIT @ ATH", sharpPick: "PIT -124", sharpOdds: "-124", gap: 25, confirms: "neutral", result: "pending" },
+      { id: "7", game: "NYM @ CIN", sharpPick: "NYM -130", sharpOdds: "-130", gap: 14, confirms: "conflicts", result: "pending" },
+      { id: "8", game: "SD @ STL", sharpPick: "STL -125", sharpOdds: "-125", gap: 6, confirms: "neutral", result: "pending" },
+      { id: "9", game: "DET @ HOU", sharpPick: "DET -110", sharpOdds: "-110", gap: 1, confirms: "neutral", result: "pending" },
+    ]
+  },
+];
+
 export const CHECKLIST = [
   { id: "weather",  step: 1,  label: "Weather",      desc: "Wind 10mph+? Direction? Dome? Temp extremes? Flag any game with 10mph+ blowing in/out." },
   { id: "umpire",   step: 2,  label: "Umpire",       desc: "Wide or tight zone? ABS challenge system impact? Check covers.com/umpires." },

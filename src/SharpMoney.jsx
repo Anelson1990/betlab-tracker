@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { SEED_SHARP } from './data.js'
 
 const STORAGE_KEY = 'betlab-sharp-v2'
 const MLB_API = 'https://statsapi.mlb.com/api/v1'
@@ -47,7 +48,14 @@ function findGame(games, abbr) {
 }
 
 function loadData() {
-  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : { days: [] } } catch { return { days: [] } }
+  try {
+    const s = localStorage.getItem(STORAGE_KEY)
+    const stored = s ? JSON.parse(s) : { days: [] }
+    // Merge seed data — seed wins for dates not in localStorage
+    const storedDates = new Set(stored.days.map(d => d.date))
+    const seedDays = SEED_SHARP.filter(d => !storedDates.has(d.date))
+    return { days: [...seedDays, ...stored.days] }
+  } catch { return { days: SEED_SHARP } }
 }
 
 function saveData(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {} }
