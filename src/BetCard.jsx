@@ -61,7 +61,28 @@ function Badge({ result, onClick, small }) {
   )
 }
 
-function TypeToggle({ type, onChange }) {
+function QuickGrade({ result, onChange }) {
+  const btns = [
+    { r:'win',     label:'✅', activeColor:'#4ade80', activeBg:'rgba(74,222,128,.2)',  activeBorder:'#14532d' },
+    { r:'loss',    label:'❌', activeColor:'#f87171', activeBg:'rgba(248,113,113,.2)', activeBorder:'#7f1d1d' },
+    { r:'void',    label:'🔄', activeColor:'#94a3b8', activeBg:'rgba(148,163,184,.2)', activeBorder:'#334155' },
+    { r:'pending', label:'⏳', activeColor:'#fbbf24', activeBg:'rgba(251,191,36,.2)',  activeBorder:'#713f12' },
+    { r:'paper',   label:'📋', activeColor:'#60a5fa', activeBg:'rgba(96,165,250,.2)',  activeBorder:'#1e40af' },
+  ]
+  return (
+    <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+      {btns.map(b => (
+        <button key={b.r} onClick={()=>onChange(b.r)} style={{
+          padding:'3px 7px', borderRadius:4,
+          border:`1px solid ${result===b.r ? b.activeBorder : '#1a1a30'}`,
+          background: result===b.r ? b.activeBg : '#0c0c1a',
+          fontSize:'.65rem', cursor:'pointer',
+          opacity: result===b.r ? 1 : 0.4,
+        }}>{b.label}</button>
+      ))}
+    </div>
+  )
+}
   const isMoney = type === 'money'
   return (
     <div style={{ display:'flex', gap:3, flexShrink:0 }}>
@@ -445,7 +466,7 @@ export default function BetCard({ bankroll, onCardSaved }) {
             </div>
           </div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:8, borderTop:'1px solid #1a1a2e' }}>
-            <Badge result={card.potd.result} onClick={()=>updPOTD('result',cycle(card.potd.result))} />
+            <QuickGrade result={card.potd.result} onChange={v=>updPOTD('result',v)} />
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:card.potd.pl>=0?'#4ade80':'#f87171' }}>
               {card.potd.type==='paper'?'📋 Paper':`${card.potd.pl>=0?'+':''}$${card.potd.pl.toFixed(2)}`}
             </div>
@@ -466,12 +487,11 @@ export default function BetCard({ bankroll, onCardSaved }) {
                 </div>
                 <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                   <TypeToggle type={r.type||'money'} onChange={v=>updRFI(i,'type',v)} />
-                  <Badge result={r.result} onClick={()=>updRFI(i,'result',cycle(r.result))} small />
                   {editing && delBtn(()=>delRFI(i))}
                 </div>
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between' }}>
-                <div style={{ fontSize:'.5rem', color:'#404060' }}>Win: +${calcPL('win',r.stake,'-110','money').toFixed(2)} · Loss: -${r.stake}</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <QuickGrade result={r.result} onChange={v=>updRFI(i,'result',v)} />
                 <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:r.pl>=0?'#4ade80':'#f87171' }}>
                   {r.type==='paper'?'📋 Paper':`${r.pl>=0?'+':''}$${r.pl.toFixed(2)}`}
                 </div>
@@ -511,7 +531,6 @@ export default function BetCard({ bankroll, onCardSaved }) {
                 </div>
                 <div style={{ display:'flex', gap:4, alignItems:'center' }}>
                   <TypeToggle type={m.type||'paper'} onChange={v=>updML(i,'type',v)} />
-                  <Badge result={m.result} onClick={()=>updML(i,'result',cycle(m.result))} small />
                   {editing && delBtn(()=>delML(i))}
                 </div>
               </div>
@@ -522,8 +541,8 @@ export default function BetCard({ bankroll, onCardSaved }) {
                   <input value={m.stake||''} onChange={e=>updML(i,'stake',parseFloat(e.target.value)||0)} placeholder="Stake" type="number" style={{ background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:4, padding:'3px 6px', fontSize:'.62rem', color:'#f0f0f8', outline:'none' }} />
                 </div>
               )}
-              <div style={{ display:'flex', justifyContent:'space-between' }}>
-                <div style={{ fontSize:'.5rem', color:'#404060' }}>Win: +${calcPL('win',m.stake,m.odds,'money').toFixed(2)} · Loss: -${m.stake}</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <QuickGrade result={m.result} onChange={v=>updML(i,'result',v)} />
                 <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:m.pl>=0?'#4ade80':'#f87171' }}>
                   {m.type==='paper'?'📋 Paper':`${m.pl>=0?'+':''}$${m.pl.toFixed(2)}`}
                 </div>
@@ -575,10 +594,10 @@ export default function BetCard({ bankroll, onCardSaved }) {
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:6, paddingTop:6, borderTop:'1px solid #1a2a1a' }}>
               <div>
-                <div style={{ fontSize:'.5rem', color:'#404060' }}>
+                <div style={{ fontSize:'.5rem', color:'#404060', marginBottom:4 }}>
                   ${card.hitParlay.stake} staked{card.hitParlay.odds?` · ${card.hitParlay.odds}`:''}{card.hitParlay.payout?` · Payout $${card.hitParlay.payout}`:''}
                 </div>
-                <Badge result={card.hitParlay.result} onClick={()=>recalc({...card,hitParlay:{...card.hitParlay,result:cycle(card.hitParlay.result)}})} small />
+                <QuickGrade result={card.hitParlay.result} onChange={v=>recalc({...card,hitParlay:{...card.hitParlay,result:v}})} />
               </div>
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:card.hitParlay.pl>=0?'#4ade80':'#f87171' }}>
                 {card.hitParlay.type==='paper'?'📋 Paper':`${card.hitParlay.pl>=0?'+':''}$${card.hitParlay.pl.toFixed(2)}`}
