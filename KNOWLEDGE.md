@@ -1,0 +1,297 @@
+# BetLab Knowledge Base
+*Updated after each session — pull this before running the daily checklist*
+
+---
+
+## 🎯 POTD Rules
+
+- **3+ model sources required** — XGB + Consensus minimum. MC F5 or LGB Moderate as 3rd source preferred.
+- **LGB conflict = no POTD** — if LGB fires opposite direction skip as POTD. Can still paper track.
+- **ATL rule** — never POTD ATL unless LGB agrees direction. ATL has burned us Jun 12, Jun 14, Jun 17.
+- **Juice threshold** — -150 max for POTD. Nuclear juice (-170+) = SGP only.
+- **Plus money POTD** — when XGB+Con both fire and sharp money confirms on plus money = highest value play.
+- **Deep dive required** — verify starting pitcher on MLB.com BEFORE confirming. Research last 5 starts, FIP, xwOBA, TTO splits.
+- **Times through order** — check 2nd TTO OPS. If 2nd TTO OPS .800+ pitcher gets hit hard second time through = flag.
+- **Opener/SPOT starters** — always verify on MLB.com. Model may use wrong ERA if SP changed. Senga Jun 16 lesson: research said rehab but MLB.com confirmed starting.
+- **Never use memory for SP** — always verify on MLB.com lineup page same day.
+
+---
+
+## 🎲 RFI Rules
+
+### Qualification thresholds
+- **RFI RB v2.3** — 63%+ to qualify. Dead zone 65-74% = skip unless other signals present.
+- **MC YRFI** — 65%+ threshold. STRONG AGREE only.
+- **POI YRFI** — ⚠️ Monitor status. Do not bet until double-grade bug fixed and WR verified.
+
+### Manual override conditions (qualify without model)
+- Both SP ERA 5.00+ AND hitter-friendly park AND POI YRFI 70%+ = qualify
+- Wind 20mph+ blowing OUT = boosts YRFI lean even with sharp starter
+- **Both teams YRFI streak 5+/7 games** = manual YRFI candidate regardless of model
+- NYM @ CIN at Great American = historically both teams score in 1st regularly (Jun 2026 pattern)
+
+### SPOT starter rule
+- Under 5 GS = auto-skip RFI RB. But check FI R/G manually before fully skipping.
+- Houser L5 lesson Jun 17: L5 NRFI 1/5 = giving up 1st inning runs 80% of last 5 = strong YRFI even with moderate ERA
+
+### Weather + RFI
+- 20mph+ blowing out = override even sharp starter (SD @ STL Jun 17: 20.8mph, Rodriguez ERA 2.16 — still YRFI)
+- 12mph+ blowing in = NRFI lean
+- Dome = no weather factor
+
+### Suspended games
+- YRFI/NRFI cannot be bet if game resumes after 1st inning already completed
+
+### Umpire edge
+- Run impact 1.20+ = run-positive lean toward YRFI
+- Run impact 0.80- = run-negative lean toward NRFI
+- Check covers.com/umpires daily
+
+---
+
+## 💰 Sharp Money Rules
+
+### Gap thresholds
+- 10-19% = slight lean, data only
+- 20-29% = signal — note direction
+- 30-39% = strong — confirms or conflicts model
+- 40-49% = very strong — follow unless model strongly conflicts
+- 50%+ = massive — almost always follow
+
+### Key principles
+- **Sharp + model agree = strongest signal** (WSH series Jun 14-16: 61-76% gaps, models agreed, won 3 straight)
+- **Sharp conflicts model = flag, don't auto-follow** — wait for data sample to determine which wins
+- **Sharp on plus money underdog** = strongest sharp signal type
+- **Same team 3+ consecutive days** = sharps have intel, pay attention
+- **Public pick** = <10% gap, no edge either direction
+- Do NOT add sharp money rules until Stats tab shows 50+ graded picks per group
+
+### WSH series lesson Jun 14-16
+WSH had 61%, 61%, 76% sharp gaps across 3 straight days. Won all 3. When sharps are this consistent on one team all series = follow until proven wrong.
+
+---
+
+## ⚡ Hit Prop Rules
+
+### Before adding any player to parlay
+1. Player must be on today's model output — no memory picks
+2. Verify in confirmed lineup on MLB.com — batting position confirmed
+3. Pull Savant data — xBA, xwOBA, exit velocity, hard hit %
+4. Check handedness split — vsRHP or vsLHP must be positive
+5. Check L10 — 8/10+ preferred, 7/10 minimum
+6. Check pitcher matchup — who are they facing, pitcher's opposing BA by handedness
+
+### Qualification standards
+- **Double Lock (85%+)** — model rate 85%+, L10 8/10+, split confirmed ✅ = include
+- **Hot (80%)** — model rate 80%+, L10 7/10+, split must be positive = include with caution
+- **Below 80%** — paper track only, never real money parlay leg
+
+### Name confusion rule
+- Always use FULL names — Jung Hoo Lee ≠ Josh Jung (different player, different team, different league)
+- Verify team abbreviation matches the game in today's lineup
+
+### Josh Jung flag
+- Josh Jung has burned us Jun 11 ❌, Jun 15 ❌ — 2 misses out of 3 uses
+- Do not add automatically — require Savant current form check before including
+- His model rate looks good historically but recent form has underperformed
+
+### Savant red flags
+- Hard hit % below 30% = contact hitter, lower ceiling but can still hit props
+- xwOBA below .300 = weak underlying contact, reduce confidence
+- xBA significantly above current BA = regression incoming, could go either way
+
+### Parlay construction
+- 3 legs max for real money
+- All 3 must clear 80%+ rate
+- Different games preferred — same game correlated legs are acceptable but note the risk
+- New callup players — paper track only until model has 10+ graded appearances
+
+---
+
+## 🏟️ Pitcher Research Framework
+
+### Deep dive checklist for every POTD candidate
+1. ERA + FIP + WHIP — FIP more predictive than ERA
+2. Last 5 starts results — look for trend up or down
+3. xwOBA allowed — elite <.300, concerning >.360
+4. Hard hit % allowed — elite <35%, concerning >45%
+5. K% — elite 28%+, low <18% means hitters making contact
+6. Times through order (TTO) splits — 2nd TTO OPS .800+ = red flag
+7. FI R/G — first inning runs allowed per game (from RFI model)
+8. Home/Away splits — some pitchers dramatically different
+9. Rest days — 4 days rest vs 5+ can matter for some pitchers
+10. Verify DATE of any article used — must be current season 2026
+
+### Pitcher deep dive sources (verify date before using)
+- MLB.com gamelog — official, always current ✅
+- Baseball Savant — Statcast data, filter to 2026 ✅
+- ESPN gamelog — current season stats ✅
+- Avoid: older articles that may reference prior seasons
+
+### SPOT starter rules
+- Under 3 starts = complete unknown, skip ML unless other signals very strong
+- 3-5 starts = small sample, check FIP not ERA
+- Debut pitchers = wildcard, can go either way — factor in offense matchup
+
+---
+
+## 📊 Model Calibration Notes
+
+### Consensus F5 — recovered
+Was negative ROI, now +11.5% ROI on 52 bets. Use when firing with XGB F5.
+
+### LGB Moderate only
+LGB Strong retired at -18.2% ROI. Only trust LGB Moderate 65-70% tier.
+
+### MC F5 Total — underused
++$212 profit on 177 bets. When XGB F5 Total agrees = strong signal. Check daily.
+
+### XGB F5 Total vs MC F5 Total
+When BOTH fire same direction (STRONG AGREE) = bet. When they conflict = display only.
+COL @ ATH Jun 14: XGB 98.6% OVER + MC 72% OVER = 23-9 final. Lesson: both agreeing is the signal.
+
+### Model confidence dead zones
+- LGB 70%+ = retired, never bet
+- POI YRFI = monitor, do not bet
+- RFI RB 65-74% = dead zone, skip
+
+---
+
+## 🏟️ Bullpen Rules (NEW — Jun 17 2026)
+
+### Check before every ML bet and parlay
+- Is team's closer on IL? = committee situation, higher variance
+- Any key reliever used 3 straight days? = unavailable
+- Starter expected IP — if SPOT or debut expect bullpen heavily
+- Source: rotowire.com/baseball/closers.php (free, no login)
+
+### Bullpen fatigue signals
+- 30+ pitches last 2 days = limited availability
+- 3 consecutive days used = likely unavailable
+- Team bullpen ERA last 7 days vs season ERA — if much worse = fatigued
+
+### Key Jun 17 findings
+- CHC closer Daniel Palencia on 15-Day IL = committee situation
+- CHC save rate 52.6% = 26th in MLB = weak bullpen
+- MIL closer committee (Uribe/Megill) = variance in close games
+
+### Bullpen + parlay rule
+- If starter ERA < 3.00 and leading by 3+ after 5 innings = bullpen risk minimal
+- If game is within 1 run after 5 innings + weak bullpen = flag leg
+
+---
+
+## 🎯 SGP / Parlay Rules
+
+### SGP construction
+- ML + correlated K prop = same game, pitcher dominates = correlated ✅
+- ML + hit prop same team = correlated ✅
+- ML -150+ = SGP only, never standalone
+- Target combined odds +150 to +300 for SGP
+
+### ML Parlay rules
+- Max 4 legs for off card parlay
+- All legs must have XGB + Consensus agreement
+- Nuclear juice (-180+) dilutes parlay value — only include if other legs provide plus money
+- Keep stake small — $5-15 max on parlays
+- Off card parlays must be tracked on card
+
+### Recovery parlay rule
+- Only fires after 2+ red days
+- Max 1 unit stake
+- 3 correlated legs only
+- Track in chat not card
+
+---
+
+## 📋 Daily Checklist Enhancements
+
+### Step 3.5 — Bullpen Check (NEW)
+After confirming ML picks:
+- Check rotowire.com/baseball/closers.php for any parlay team
+- Flag any team with closer on IL or committee situation
+- Check if starter expected to go deep or need bullpen early
+
+### Step 7 — POTD Deep Dive (ENHANCED)
+For top 2 POTD candidates:
+- Pull last 5 starts from MLB.com gamelog
+- Check TTO splits (2nd time through OPS)
+- Verify starter on MLB.com same day before confirming
+- Check team last 7 days W-L record at home/away
+
+### Step 8 — Hit Props (ENHANCED)
+Before building parlay:
+1. Model output only — no memory additions
+2. MLB.com lineup confirmed
+3. Savant xBA + xwOBA + exit velo pulled
+4. Handedness split confirmed positive
+5. Pitcher matchup researched
+
+---
+
+## 🏦 Staking Rules
+
+### Current bankroll tiers
+- Under $50 — POTD $10, hit parlay $5, RFI $5
+- $50-$100 — POTD $15, hit parlay $8, RFI $8
+- $100-$200 — POTD $20, hit parlay $10, RFI $10
+- Over $200 — reassess with new tier system
+
+### Off card rule
+- Card is the card. No off card bets.
+- Exception: YRFI identified during session with strong manual signal — max $5-10
+- All off card bets must be logged on tracker immediately
+- Off card bets have caused bankroll tracking issues — always tell Claude exact amount placed
+
+### POTD stake rule
+- Always tell Claude the actual stake placed
+- Model stake is a suggestion — actual stake must be communicated for accurate tracking
+
+---
+
+## 📈 Sharp Money vs Model Consensus Tracking
+
+### Current findings (Jun 14-17, small sample)
+- Sharp confirms models = strongest signal
+- Sharp conflicts models = wait for data, don't auto-follow either
+- 50%+ gaps = rare and powerful (WSH 76% Jun 16 = biggest seen)
+- Sharp on plus money underdog = best value signal
+
+### Do NOT add rules yet for
+- Specific gap % thresholds for betting
+- Sharp vs public win rate by park
+- Sharp underdog vs favorite split
+*Need 50+ graded picks per group first*
+
+---
+
+## 🗓️ Session Rules
+
+### Morning protocol (when Nelson says "good morning")
+1. Check date/time with user_time_v0
+2. Confirm today's date and slate
+3. Check overnight results still pending
+4. Confirm bankroll
+5. Fetch KNOWLEDGE.md from GitHub
+6. Begin checklist
+
+### When models are dropped
+1. Fetch KNOWLEDGE.md first
+2. Run 12-step checklist applying all rules
+3. Deep dive top POTD candidates
+4. Verify lineups on MLB.com before any pick
+5. Build card JSON
+6. End of session: update data.js + KNOWLEDGE.md + push
+
+### End of session push
+1. Add completed card to SEED_CARDS in data.js
+2. Update SEED_MODELS with latest ROI numbers
+3. Add today's sharp picks to SEED_SHARP with results
+4. Update TODAY_CARD with next day's picks if built
+5. Add new lessons to KNOWLEDGE.md
+6. One GitHub push covers everything
+
+---
+
+*Last updated: Jun 17, 2026*
+*Bankroll: $113.53 (pending PIT ML parlay result)*
