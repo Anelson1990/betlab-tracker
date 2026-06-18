@@ -4,6 +4,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import BetCard from './BetCard.jsx'
 import ChecklistTab from './Checklist.jsx'
 import SharpMoney from './SharpMoney.jsx'
+import Knowledge from './Knowledge.jsx'
 
 const STORAGE_KEY = 'betlab-tracker-cards-v1'
 const BR_KEY = 'betlab-bankroll-v1'
@@ -92,6 +93,7 @@ export default function App() {
     ['cards','📋 Cards'],
     ['models','📊 Models'],
     ['analytics','📈 Stats'],
+    ['knowledge','📖 Learn'],
   ]
 
   return (
@@ -303,6 +305,9 @@ export default function App() {
           })}
         </div>
       )}
+
+      {/* KNOWLEDGE TAB */}
+      {tab === 'knowledge' && <Knowledge />}
 
       {/* ANALYTICS TAB */}
       {tab === 'analytics' && (
