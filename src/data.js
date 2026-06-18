@@ -159,7 +159,7 @@ export const CHECKLIST = [
   { id: "weather",  step: 1,  label: "Weather",      desc: "Wind 10mph+? Direction? Dome? Temp extremes? Flag any game with 10mph+ blowing in/out." },
   { id: "umpire",   step: 2,  label: "Umpire",       desc: "Wide or tight zone? ABS challenge system impact? Check covers.com/umpires." },
   { id: "injuries", step: 3,  label: "Injuries",     desc: "Any lineup scratches? SP changes? Games still awaiting lineups?" },
-  { id: "rfi",      step: 4,  label: "RFI Check",    desc: "RFI RB v2.3 63%+? MC YRFI 65%+? Both agree = stronger signal. Dead zone 65-74% = skip. SPOT flag = check ERA." },
+  { id: "rfi",      step: 4,  label: "RFI Check",    desc: "Pull oddlyspecificstats.com matchups first. L10 NRFI 70%+ both pitchers = NRFI. ❄️ streak + L10 <60% = YRFI. Cross with RFI RB 63%+ or MC YRFI 65%+. Dead zone 65-74% = skip." },
   { id: "ml",       step: 5,  label: "ML Check",     desc: "XGB F5 ML fires? Consensus agrees? LGB Moderate? MC F5 ML? Sharp 20%+ against = skip. Juice -150+ = SGP only." },
   { id: "sharp",    step: 6,  label: "Sharp Money",  desc: "Tickets% vs Money% gap. 20%+ = reverse signal. 30%+ = strong. 40%+ = very strong. Plus money underdog 30%+ = value." },
   { id: "potd",     step: 7,  label: "POTD",         desc: "Highest confidence minus money. 3+ sources. Juice under -150. ALL models agree direction. LGB conflict = no POTD." },

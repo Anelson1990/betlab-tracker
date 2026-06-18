@@ -45,7 +45,7 @@
 ### Umpire edge
 - Run impact 1.20+ = run-positive lean toward YRFI
 - Run impact 0.80- = run-negative lean toward NRFI
-- Check covers.com/umpires daily
+- Check oddlyspecificstats.com/umpires daily — run impact data
 
 ---
 
@@ -295,3 +295,45 @@ Before building parlay:
 
 *Last updated: Jun 17, 2026*
 *Bankroll: $113.53 (pending PIT ML parlay result)*
+
+---
+
+## 🔗 Daily Sources
+
+### RFI Research (Step 4)
+- **oddlyspecificstats.com** — PRIMARY RFI source
+  - Matchups tab: today's NRFI% by pitcher · L10 · location split · streak 🔥/❄️
+  - Umpires tab: run impact per umpire (replaces covers.com/umpires)
+  - Ballparks tab: park NRFI rates
+  - Pitchers tab: career NRFI leaderboard
+  - Paste today's matchup data each morning alongside Doinksports
+
+### How to read OddlySpecificStats
+- 🔥x5 = NRFI streak of 5 games — pitcher holding 1st inning clean
+- ❄️x3 = YRFI streak of 3 games — pitcher giving up 1st inning runs
+- L10 = last 10 starts NRFI rate — most predictive recent form
+- Location = home vs away NRFI split
+- 2025+ = recent seasons rate
+
+### NRFI qualification using OddlySpecificStats
+- Both pitchers L10 70%+ AND both career 70%+ = strong NRFI candidate
+- One pitcher ❄️ streak + L10 below 60% = YRFI lean on that side
+- Aaron Nola 🔥x8 L10 90% = elite NRFI arm — never bet YRFI against Nola
+- Messick 🔥x14 = historically elite streak — track until it breaks
+
+### Sharp Money
+- covers.com or scoresandodds.com — tickets% vs money% gap
+- Paste full slate each morning
+
+### Bullpen
+- rotowire.com/baseball/closers.php — closer status and IL
+
+### Hit Props
+- Baseball Savant — xBA · xwOBA · exit velo · hard hit%
+- Lineup confirmation — MLB.com
+
+### POTD Research
+- MLB.com gamelog — current season stats verified
+- Baseball Savant — pitcher Statcast data
+
+*Last updated: Jun 18, 2026*
