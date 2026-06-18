@@ -7,7 +7,8 @@ import SharpMoney from './SharpMoney.jsx'
 import Knowledge from './Knowledge.jsx'
 
 const STORAGE_KEY = 'betlab-tracker-cards-v1'
-const BR_KEY = 'betlab-bankroll-v1'
+const BR_KEY = 'betlab-bankroll-v2'
+const DEFAULT_ACCOUNTS = { dk: 150.97, b365: 30.00, pp: 30.00 }
 
 function loadCards() {
   try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : SEED_CARDS } catch { return SEED_CARDS }
@@ -39,20 +40,21 @@ export default function App() {
   const [modelFilter, setModelFilter] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [editingBR, setEditingBR] = useState(false)
-  const [brInput, setBrInput] = useState('')
-  const [manualBR, setManualBR] = useState(() => {
-    try { const s = localStorage.getItem(BR_KEY); return s ? parseFloat(s) : null } catch { return null }
+  const [editingAcct, setEditingAcct] = useState(null)
+  const [acctInput, setAcctInput] = useState('')
+  const [accounts, setAccounts] = useState(() => {
+    try { const s = localStorage.getItem(BR_KEY); return s ? JSON.parse(s) : DEFAULT_ACCOUNTS } catch { return DEFAULT_ACCOUNTS }
   })
 
   useEffect(() => { saveCards(cards) }, [cards])
 
-  const saveBR = () => {
-    const val = parseFloat(brInput)
-    if (!val) return
-    setManualBR(val)
-    try { localStorage.setItem(BR_KEY, val.toString()) } catch {}
-    setEditingBR(false); setBrInput('')
+  const saveAcct = () => {
+    const val = parseFloat(acctInput)
+    if (!val || !editingAcct) return
+    const updated = { ...accounts, [editingAcct]: val }
+    setAccounts(updated)
+    try { localStorage.setItem(BR_KEY, JSON.stringify(updated)) } catch {}
+    setEditingAcct(null); setAcctInput('')
   }
 
   const toggle = id => setExpanded(e => ({ ...e, [id]: !e[id] }))
@@ -75,7 +77,7 @@ export default function App() {
   const potdWins = realCards.filter(c => c.potdResult === 'W').length
   const potdLoss = realCards.filter(c => c.potdResult === 'L').length
   const potdVoid = realCards.filter(c => c.potdResult === 'V').length
-  const latestBR = manualBR !== null ? manualBR : (cards.length ? cards[cards.length-1].bankroll : 40)
+  const latestBR = Object.values(accounts).reduce((a,b) => a+b, 0)
   const totalPL = cards.reduce((a,c) => a+c.pl, 0)
   const activeModels = models.filter(m => m.status === 'active')
   const filteredModels = modelFilter === 'all' ? models : models.filter(m => m.status === modelFilter)
@@ -108,20 +110,28 @@ export default function App() {
             <span style={{ background:'linear-gradient(135deg,#fff,#7070a0)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}> Tracker</span>
           </div>
           <div style={{ textAlign:'right' }}>
-            {editingBR ? (
-              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                <input value={brInput} onChange={e=>setBrInput(e.target.value)} placeholder={latestBR.toFixed(2)} type="number"
-                  style={{ width:80, background:'#0c0c1a', border:'1px solid #2563eb', borderRadius:5, padding:'4px 8px', fontSize:'.78rem', color:'#f0f0f8', outline:'none', textAlign:'right' }}
-                  onKeyDown={e=>e.key==='Enter'&&saveBR()} autoFocus />
-                <button onClick={saveBR} style={{ padding:'4px 8px', background:'#2563eb', border:'none', borderRadius:5, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, color:'#fff' }}>✓</button>
-                <button onClick={()=>setEditingBR(false)} style={{ padding:'4px 6px', background:'#1a1a30', border:'none', borderRadius:5, fontSize:'.65rem', color:'#505070' }}>✕</button>
-              </div>
-            ) : (
-              <div onClick={()=>{setBrInput(latestBR.toFixed(2));setEditingBR(true)}} style={{ cursor:'pointer' }}>
-                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.4rem', color:'#4ade80', lineHeight:1 }}>${latestBR.toFixed(2)}</div>
-                <div style={{ fontSize:'.38rem', letterSpacing:'.1em', textTransform:'uppercase', color:'#404060' }}>Tap to edit</div>
-              </div>
-            )}
+            <div style={{ textAlign:'right' }}>
+              {[['dk','DK','#60a5fa'],['b365','B365','#4ade80'],['pp','PP','#f97316']].map(([key,label,color]) => (
+                <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4, marginBottom:2 }}>
+                  <div style={{ fontSize:'.38rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', width:20 }}>{label}</div>
+                  {editingAcct === key ? (
+                    <div style={{ display:'flex', gap:2 }}>
+                      <input value={acctInput} onChange={e=>setAcctInput(e.target.value)} type="number"
+                        style={{ width:60, background:'#0c0c1a', border:`1px solid ${color}`, borderRadius:4, padding:'2px 4px', fontSize:'.62rem', color:'#f0f0f8', outline:'none', textAlign:'right' }}
+                        onKeyDown={e=>e.key==='Enter'&&saveAcct()} autoFocus />
+                      <button onClick={saveAcct} style={{ padding:'2px 5px', background:'#2563eb', border:'none', borderRadius:3, fontSize:'.55rem', color:'#fff' }}>✓</button>
+                      <button onClick={()=>setEditingAcct(null)} style={{ padding:'2px 4px', background:'#1a1a30', border:'none', borderRadius:3, fontSize:'.55rem', color:'#505070' }}>✕</button>
+                    </div>
+                  ) : (
+                    <div onClick={()=>{setAcctInput(accounts[key].toFixed(2));setEditingAcct(key)}} style={{ cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:700, color }}>
+                      ${accounts[key].toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.1rem', color:'#4ade80', lineHeight:1, borderTop:'1px solid #1a1a30', paddingTop:2, marginTop:2 }}>${latestBR.toFixed(2)}</div>
+              <div style={{ fontSize:'.32rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060' }}>Total · tap to edit</div>
+            </div>
           </div>
         </div>
 
@@ -180,7 +190,7 @@ export default function App() {
             notes: `POTD:${c.potd.result} · RFI:${c.rfi.length} · ML:${c.ml.length} · Parlay:${c.hitParlay.result}`,
           }
           setCards(prev => [...prev, newCard])
-          if (manualBR !== null) { const nb = manualBR+(c.totalPL||0); setManualBR(nb); try{localStorage.setItem(BR_KEY,nb.toString())}catch{} }
+          const nb = accounts.dk + (c.totalPL||0); const upd = {...accounts, dk: nb}; setAccounts(upd); try{localStorage.setItem(BR_KEY,JSON.stringify(upd))}catch{}
         }} />
       )}
 
