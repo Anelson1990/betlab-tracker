@@ -103,9 +103,14 @@ export const TODAY_CARD = {
       { player: "James Wood", team: "WSH", rate: "80%", l10: "9/10", split: "vsRHP .293 · vs Avila ERA 6.19", result: "pending" },
     ],
   },
-  sgp: { stake: 0, odds: "", type: "paper", result: "pending", pl: 0, legs: [] },
+  sgp: { stake: 13, odds: "+608", payout: 95.92, type: "money", result: "pending", pl: 0, legs: [
+    { player: "CHC ML", team: "CHC", prop: "ML", rate: "XGB+Con 88%", note: "vs Sullivan debut · 7-1 T4 ✅" },
+    { player: "NYY ML", team: "NYY", prop: "ML", rate: "XGB+Con 92.3%", note: "Rodón ERA 3.00 · 9-3 B5 ✅" },
+    { player: "MIL ML", team: "MIL", prop: "ML", rate: "XGB+Con 79.4%", note: "Williams ERA 3.32 · 7-4 T5 ✅" },
+    { player: "PIT ML", team: "PIT", prop: "ML", rate: "XGB+Con 93.9%", note: "Ashcraft ERA 3.30 · 9:40PM ⏳" },
+  ]},
   totalPL: -4,
-  notes: "⚠️ CARRYOVER: Jun 16 hit parlay (Taylor ✅ Burleson ✅ Lee ⏳) still live — suspended game resumes 2PM. Lee needs 1 hit to cash.",
+  notes: "⚠️ OFF CARD: 4-leg ML parlay $13 · +608 · pays $95.92 · CHC/NYY/MIL locked · PIT pending 9:40PM",
 };
 
 export const SEED_SHARP = [
