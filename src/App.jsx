@@ -79,7 +79,10 @@ export default function App() {
   const activeModels = models.filter(m => m.status === 'active')
   const filteredModels = modelFilter === 'all' ? models : models.filter(m => m.status === modelFilter)
   const bankrollData = cards.filter(c => c.bankroll > 0).map(c => ({ date:c.date, br:c.bankroll }))
-  const topModels = [...activeModels].sort((a,b) => b.roi - a.roi).slice(0, 8)
+  const topModels = [...activeModels].sort((a,b) => b.roi - a.roi).slice(0, 8).map(m => ({
+    ...m,
+    wr: m.bets ? Math.round((m.wins/m.bets)*100) : 0
+  }))
   const GOAL = 300
 
   const tabs = [

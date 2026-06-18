@@ -259,11 +259,11 @@ export default function SharpMoney() {
                         <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{pick.sharpPick}</div>
                         <div style={{ fontSize:'.46rem', color:'#505070' }}>{pick.game} · {pick.gap}% gap {pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}</div>
                       </div>
-                      <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
                         <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:g.color }}>{pick.gap}%</div>
-                        <button onClick={()=>setResult(today, pick.id, cycle(pick.result))} style={{ padding:'3px 8px', borderRadius:5, border:'1px solid #1a1a30', background:'#0c0c1a', fontSize:'.6rem', color:RC[pick.result]?.color||'#fbbf24', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>
-                          {RC[pick.result]?.label||'⏳'}
-                        </button>
+                        <button onClick={()=>setResult(today, pick.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${pick.result==='win'?'#14532d':'#1a2a1a'}`, background:pick.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.65rem', opacity:pick.result==='win'?1:0.4 }}>✅</button>
+                        <button onClick={()=>setResult(today, pick.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${pick.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:pick.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.65rem', opacity:pick.result==='loss'?1:0.4 }}>❌</button>
+                        <button onClick={()=>setResult(today, pick.id, 'pending')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${pick.result==='pending'?'#713f12':'#1a2a1a'}`, background:pick.result==='pending'?'rgba(251,191,36,.2)':'#0c0c1a', fontSize:'.65rem', opacity:pick.result==='pending'?1:0.4 }}>⏳</button>
                         <button onClick={()=>deletePick(today, pick.id)} style={{ padding:'3px 6px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.55rem' }}>✕</button>
                       </div>
                     </div>
