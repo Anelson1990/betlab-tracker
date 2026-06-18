@@ -9,6 +9,7 @@ export const SEED_CARDS = [
   { id: "0614", date: "Jun 14", potd: "ATL ML +108",        potdResult: "L", potdPL: -10,   rfi: "0-0", ml: "3-2", hitParlay: "W", staked: 15,    pl: -2.68,  bankroll: 37.32, notes: "ATL 1-8 loss. Hit parlay +146 cashed early. SD/MIL/NYY paper wins. COL 23-9 OVER missed." },
   { id: "0615", date: "Jun 15", potd: "CIN ML -136",        potdResult: "W", potdPL: 18.38, rfi: "0-0", ml: "4-1", hitParlay: "L", staked: 30,    pl: 95.38,  bankroll: 121.22,notes: "Burns 12-0 Cy Young. ML parlay $5→$87 cashed (PHI/WSH/CIN/STL/CHC/ATH). Hit parlay lost PCA only." },
   { id: "0616", date: "Jun 16", potd: "WSH ML -136", potdResult: "W", potdPL: 11.03, rfi: "0-0", ml: "3-2", hitParlay: "W", staked: 35, pl: -21.45, bankroll: 62.78, notes: "WSH +$11.03 · Hit parlay +$7.32 · 6-leg parlay -$10 · CIN YRFI off card +$9.57 · CHC SGP -$5 · other off card bets. Lee HR cashed suspended game. Net -$21.45 due to off card losses." },
+  { id: "0617", date: "Jun 17", potd: "MIA ML +107", potdResult: "W", potdPL: 26.75, rfi: "1-1", ml: "3-2", hitParlay: "L", staked: 50, pl: 118.19, bankroll: 180.97, notes: "MIA 12-4 POTD +$26.75 · MIA YRFI +$7.27 · CIN YRFI -$4 · Hit parlay -$8 · Lee HR carryover +$7.32 · 4-leg parlay cashed $90.97 · PCA live -$10 off card. Knowledge base built. Bullpen rules added." },
 ];
 
 export const SEED_MODELS = [
@@ -68,49 +69,40 @@ export const TODAY_CARD = {
   date: "Jun 17",
   bankroll: 62.78,
   potd: {
-    pick: "MIA ML +107",
-    game: "MIA @ PHI",
-    direction: "MIA",
-    odds: "+107",
-    stake: 15,
-    type: "money",
+    pick: "MIA ML +107", game: "MIA @ PHI", direction: "MIA", odds: "+107",
+    stake: 25, type: "money",
     sources: "XGB 87.0% · Con 87.0% · Sharp 32% gap · Alcantara ERA 4.25 · Painter ERA 6.43 1-7",
-    analysis: "Alcantara 6-4 ERA 4.25 WHIP 1.22 vs Painter 1-7 ERA 6.43 12 HRs allowed. MIA on 6-game win streak. Sharp money 32% gap on MIA plus money. NBC Sports model also on MIA. Painter K rate 17th percentile relying on worst defense in league.",
-    result: "pending", pl: 0,
+    analysis: "Alcantara 6-4 ERA 4.25 vs Painter 1-7 ERA 6.43 12 HRs. MIA 6-game streak. 32% sharp gap. Final: MIA 12-4.",
+    result: "win", pl: 26.75,
   },
   rfi: [
-    { game: "MIA @ PHI", homeTeam: "PHI", awayTeam: "MIA", pick: "YRFI", conf: "63.4", stake: 8, type: "money", result: "pending", pl: 0 },
+    { game: "MIA @ PHI", homeTeam: "PHI", awayTeam: "MIA", pick: "YRFI", conf: "63.4", stake: 8, type: "money", result: "win", pl: 7.27 },
     { game: "NYM @ CIN", homeTeam: "CIN", awayTeam: "NYM", pick: "YRFI", conf: "manual", stake: 4, type: "money", result: "loss", pl: -4 },
   ],
   ml: [
-    { game: "KC @ WSH", direction: "WSH", odds: "-135", stake: 0, sources: "XGB 95.8% · Sharp 52% gap · 4th straight day", type: "paper", result: "loss", pl: 0 },
-    { game: "SF @ ATL", direction: "ATL", odds: "-134", stake: 0, sources: "XGB 93.5% · Con 93.5% · suspended game", type: "paper", result: "loss", pl: 0 },
+    { game: "KC @ WSH", direction: "WSH", odds: "-135", stake: 0, sources: "XGB 95.8% · Sharp 52%", type: "paper", result: "loss", pl: 0 },
+    { game: "SF @ ATL", direction: "ATL", odds: "-134", stake: 0, sources: "XGB 93.5% · Con 93.5%", type: "paper", result: "loss", pl: 0 },
     { game: "DET @ HOU", direction: "HOU", odds: "-100", stake: 0, sources: "XGB 82.7% · Con 82.7%", type: "paper", result: "win", pl: 0 },
-    { game: "BAL @ SEA", direction: "BAL", odds: "+115", stake: 0, sources: "XGB 82% · Con 82% · Sharp 37% gap · Bradish ERA 4.30 · Rutschman lineup", type: "paper", result: "pending", pl: 0 },
-    { game: "PIT @ ATH", direction: "PIT", odds: "-124", stake: 0, sources: "XGB 93.9% · Con 93.9% · Sharp 20% gap · Ashcraft ERA 3.30", type: "paper", result: "pending", pl: 0 },
-    { game: "CLE @ MIL", direction: "MIL", odds: "-122", stake: 0, sources: "XGB 79.4% · Con 79.4% · Williams ERA 3.32 9-3 · Sproat ERA 5.67", type: "paper", result: "pending", pl: 0 },
+    { game: "BAL @ SEA", direction: "BAL", odds: "+115", stake: 0, sources: "XGB 82% · Sharp 37%", type: "paper", result: "pending", pl: 0 },
+    { game: "PIT @ ATH", direction: "PIT", odds: "-124", stake: 0, sources: "XGB 93.9% · Ashcraft ERA 3.30", type: "paper", result: "win", pl: 0 },
+    { game: "CLE @ MIL", direction: "MIL", odds: "-122", stake: 0, sources: "XGB 79.4% · Williams ERA 3.32", type: "paper", result: "win", pl: 0 },
   ],
   hitParlay: {
-    stake: 8,
-    odds: "",
-    payout: 0,
-    type: "money",
-    result: "pending",
-    pl: 0,
+    stake: 8, odds: "", payout: 0, type: "money", result: "loss", pl: -8,
     legs: [
-      { player: "Samad Taylor", team: "SD", rate: "88.9%", l10: "8/9", split: "vsRHP .348 · batting 2nd", result: "pending" },
-      { player: "Alec Burleson", team: "STL", rate: "85%", l10: "10/10", split: "vsRHP .330 · xwOBA .388", result: "pending" },
-      { player: "James Wood", team: "WSH", rate: "80%", l10: "9/10", split: "vsRHP .293 · vs Avila ERA 6.19", result: "pending" },
+      { player: "Samad Taylor", team: "SD", rate: "88.9%", l10: "8/9", split: "vsRHP .348", result: "pending" },
+      { player: "Alec Burleson", team: "STL", rate: "85%", l10: "10/10", split: "vsRHP .330", result: "pending" },
+      { player: "James Wood", team: "WSH", rate: "80%", l10: "9/10", split: "vsRHP .293", result: "loss" },
     ],
   },
-  sgp: { stake: 13, odds: "+608", payout: 95.92, type: "money", result: "pending", pl: 0, legs: [
-    { player: "CHC ML", team: "CHC", prop: "ML", rate: "XGB+Con 88%", note: "vs Sullivan debut · 7-1 T4 ✅" },
-    { player: "NYY ML", team: "NYY", prop: "ML", rate: "XGB+Con 92.3%", note: "Rodón ERA 3.00 · 9-3 B5 ✅" },
-    { player: "MIL ML", team: "MIL", prop: "ML", rate: "XGB+Con 79.4%", note: "Williams ERA 3.32 · 7-4 T5 ✅" },
-    { player: "PIT ML", team: "PIT", prop: "ML", rate: "XGB+Con 93.9%", note: "Ashcraft ERA 3.30 · 9:40PM ⏳" },
+  sgp: { stake: 13, odds: "+608", payout: 90.97, type: "money", result: "win", pl: 77.97, legs: [
+    { player: "CHC ML", team: "CHC", prop: "ML", rate: "XGB+Con 88%", note: "8-5 final ✅" },
+    { player: "NYY ML", team: "NYY", prop: "ML", rate: "XGB+Con 92.3%", note: "10-5 final ✅" },
+    { player: "MIL ML", team: "MIL", prop: "ML", rate: "XGB+Con 79.4%", note: "9-4 final ✅" },
+    { player: "PIT ML", team: "PIT", prop: "ML", rate: "XGB+Con 93.9%", note: "5-0 cashed ✅" },
   ]},
-  totalPL: -4,
-  notes: "⚠️ OFF CARD: 4-leg ML parlay $13 · +608 · pays $95.92 · CHC/NYY/MIL locked · PIT pending 9:40PM",
+  totalPL: 99.99,
+  notes: "MIA 12-4 POTD ✅ +$26.75 · MIA YRFI ✅ +$7.27 · CIN YRFI ❌ · Hit parlay ❌ · Lee HR carryover +$7.32 · 4-leg parlay cashed $90.97 +$77.97 · PCA live -$10 off card",
 };
 
 export const SEED_SHARP = [
