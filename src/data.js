@@ -154,6 +154,37 @@ export const SEED_MODELS = [
   { name: "RB ML",         bets: 103, wins: 50,  profit: -95.22,  roi: -9.2,  status: "retired", note: "Retired. Negative ROI confirmed." },
 ];
 
+export const MODEL_COLORS = {
+  'MC YRFI':       '#4ade80',
+  'Hit Locks':     '#f97316',
+  'Consensus ML':  '#fbbf24',
+  'LGB Moderate':  '#a78bfa',
+  'Consensus F5':  '#38bdf8',
+  'XGB F5 ML':     '#60a5fa',
+  'Hit Standalone':'#fb923c',
+  'NRFI RB v2.3':  '#34d399',
+  'MC F5 Total':   '#818cf8',
+  'Hit Parlay':    '#f472b6',
+  'MC F5 ML':      '#94a3b8',
+  'POI YRFI':      '#ef4444',
+  'LGB Strong':    '#6b7280',
+  'RB ML':         '#4b5563',
+}
+
+export const STATUS_CONFIG = {
+  active:  { label: 'Active',  color: '#4ade80', bg: 'rgba(74,222,128,.1)',  border: '#14532d' },
+  monitor: { label: 'Monitor', color: '#fbbf24', bg: 'rgba(251,191,36,.1)', border: '#713f12' },
+  display: { label: 'Display', color: '#60a5fa', bg: 'rgba(96,165,250,.1)', border: '#1e40af' },
+  retired: { label: 'Retired', color: '#6b7280', bg: 'rgba(107,114,128,.1)', border: '#374151' },
+}
+
+export const RESULT_CONFIG = {
+  W: { label: 'Win',   color: '#4ade80', bg: 'rgba(74,222,128,.15)',  border: '#14532d' },
+  L: { label: 'Loss',  color: '#f87171', bg: 'rgba(248,113,113,.15)', border: '#7f1d1d' },
+  P: { label: 'Paper', color: '#60a5fa', bg: 'rgba(96,165,250,.15)',  border: '#1e40af' },
+  V: { label: 'Void',  color: '#94a3b8', bg: 'rgba(148,163,184,.15)', border: '#334155' },
+}
+
 export const CHECKLIST = [
   { id: "weather",   step: 1,  label: "Weather Check",   desc: "Check Doinksports weather. Flag wind 15mph+ blowing out = YRFI. Blowing in = NRFI. Rain 60%+ = skip. Dome = no weather." },
   { id: "umpire",    step: 2,  label: "Umpire Check",    desc: "Check oddlyspecificstats.com/umpires. Run impact 1.20+ = run-positive YRFI lean. 0.80- = NRFI lean." },
