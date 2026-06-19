@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { TODAY_CARD } from './data.js'
 
-const CARD_KEY = 'betlab-daily-card-v1'
+const CARD_KEY = 'betlab-daily-card-v2'
 const HISTORY_KEY = 'betlab-card-history-v1'
 const MLB_API = 'https://statsapi.mlb.com/api/v1'
 
@@ -157,15 +157,17 @@ export default function BetCard({ bankroll, onCardSaved }) {
     try {
       const s = localStorage.getItem(CARD_KEY)
       const stored = s ? JSON.parse(s) : null
-      // Always use TODAY_CARD if dates match — seed wins
-      if (stored && stored.date === TODAY_CARD.date) {
-        // Merge results from localStorage but keep seed structure
-        setCard({ ...TODAY_CARD, ...stored, date: TODAY_CARD.date })
-      } else {
+      // If stored date doesn't match today's seed — always load fresh seed
+      if (!stored || stored.date !== TODAY_CARD.date) {
         setCard(TODAY_CARD)
         localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD))
+      } else {
+        setCard(stored)
       }
-    } catch { setCard(TODAY_CARD) }
+    } catch {
+      setCard(TODAY_CARD)
+      localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD))
+    }
   }, [])
 
   // Auto-grade on load when card has pending picks and games may be finished
