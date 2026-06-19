@@ -124,14 +124,14 @@ export const SEED_SHARP = [
   {
     date: "Jun 18",
     picks: [
-      { id: "1", game: "SF @ ATL", sharpPick: "ATL -138", sharpOdds: "-138", gap: 71, confirms: "neutral", result: "pending" },
-      { id: "2", game: "NYM @ PHI", sharpPick: "PHI -120", sharpOdds: "-120", gap: 54, confirms: "neutral", result: "pending" },
+      { id: "1", game: "SF @ ATL", sharpPick: "ATL -138", sharpOdds: "-138", gap: 71, confirms: "neutral", result: "skip" },
+      { id: "2", game: "NYM @ PHI", sharpPick: "PHI -120", sharpOdds: "-120", gap: 54, confirms: "neutral", result: "loss" },
       { id: "3", game: "MIN @ TEX", sharpPick: "MIN -114", sharpOdds: "-114", gap: 52, confirms: "confirms", result: "win" },
-      { id: "4", game: "STL @ KC", sharpPick: "STL -102", sharpOdds: "-102", gap: 36, confirms: "confirms", result: "pending" },
+      { id: "4", game: "STL @ KC", sharpPick: "STL -102", sharpOdds: "-102", gap: 36, confirms: "confirms", result: "loss" },
       { id: "5", game: "TOR @ BOS", sharpPick: "BOS -122", sharpOdds: "-122", gap: 18, confirms: "conflicts", result: "pending" },
       { id: "6", game: "CLE @ MIL", sharpPick: "MIL -148", sharpOdds: "-148", gap: 14, confirms: "neutral", result: "pending" },
       { id: "7", game: "CWS @ NYY", sharpPick: "NYY -167", sharpOdds: "-167", gap: 5, confirms: "neutral", result: "pending" },
-      { id: "8", game: "BAL @ SEA", sharpPick: "SEA -138", sharpOdds: "-138", gap: 8, confirms: "conflicts", result: "pending" },
+      { id: "8", game: "BAL @ SEA", sharpPick: "SEA -138", sharpOdds: "-138", gap: 8, confirms: "conflicts", result: "loss" },
       { id: "9", game: "LAA @ ATH", sharpPick: "ATH -135", sharpOdds: "-135", gap: 1, confirms: "neutral", result: "pending" },
     ]
   },
