@@ -51,10 +51,10 @@ function loadData() {
   try {
     const s = localStorage.getItem(STORAGE_KEY)
     const stored = s ? JSON.parse(s) : { days: [] }
-    // Merge seed data — seed wins for dates not in localStorage
-    const storedDates = new Set(stored.days.map(d => d.date))
-    const seedDays = SEED_SHARP.filter(d => !storedDates.has(d.date))
-    return { days: [...seedDays, ...stored.days] }
+    // Seed dates always win — merge stored days that aren't in seed
+    const seedDates = new Set(SEED_SHARP.map(d => d.date))
+    const extraDays = stored.days.filter(d => !seedDates.has(d.date))
+    return { days: [...SEED_SHARP, ...extraDays] }
   } catch { return { days: SEED_SHARP } }
 }
 

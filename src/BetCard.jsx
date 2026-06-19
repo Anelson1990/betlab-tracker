@@ -156,11 +156,11 @@ export default function BetCard({ bankroll, onCardSaved }) {
   useEffect(() => {
     try {
       const s = localStorage.getItem(CARD_KEY)
-      if (s) {
-        const stored = JSON.parse(s)
-        // If stored card is from today use it, otherwise load TODAY_CARD
-        if (stored.date === TODAY_CARD.date) { setCard(stored) }
-        else { setCard(TODAY_CARD); localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD)) }
+      const stored = s ? JSON.parse(s) : null
+      // Always use TODAY_CARD if dates match — seed wins
+      if (stored && stored.date === TODAY_CARD.date) {
+        // Merge results from localStorage but keep seed structure
+        setCard({ ...TODAY_CARD, ...stored, date: TODAY_CARD.date })
       } else {
         setCard(TODAY_CARD)
         localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD))
