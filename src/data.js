@@ -186,19 +186,34 @@ export const SEED_SHARP = [
       { id: "9", game: "LAA @ ATH", sharpPick: "ATH -135", sharpOdds: "-135", gap: 1, confirms: "neutral", result: "pending" },
     ]
   },
+  {
+    date: "Jun 19",
+    picks: [
+      { id: "1", game: "BOS @ SEA", sharpPick: "SEA -110", sharpOdds: "-110", gap: 55, confirms: "neutral", result: "pending" },
+      { id: "2", game: "PIT @ COL", sharpPick: "PIT -136", sharpOdds: "-136", gap: 65, confirms: "confirms", result: "pending" },
+      { id: "3", game: "MIL @ ATL", sharpPick: "ATL +145", sharpOdds: "+145", gap: 54, confirms: "conflicts", result: "pending" },
+      { id: "4", game: "STL @ KC", sharpPick: "STL -120", sharpOdds: "-120", gap: 52, confirms: "confirms", result: "pending" },
+      { id: "5", game: "WSH @ TB", sharpPick: "TB -154", sharpOdds: "-154", gap: 43, confirms: "confirms", result: "pending" },
+      { id: "6", game: "CWS @ DET", sharpPick: "DET -200", sharpOdds: "-200", gap: 41, confirms: "neutral", result: "pending" },
+      { id: "7", game: "MIN @ ARI", sharpPick: "ARI -168", sharpOdds: "-168", gap: 38, confirms: "neutral", result: "pending" },
+      { id: "8", game: "SD @ TEX", sharpPick: "TEX -160", sharpOdds: "-160", gap: 24, confirms: "conflicts", result: "pending" },
+      { id: "9", game: "CLE @ HOU", sharpPick: "HOU -124", sharpOdds: "-124", gap: 20, confirms: "confirms", result: "pending" },
+      { id: "10", game: "BAL @ LAD", sharpPick: "LAD -205", sharpOdds: "-205", gap: 2, confirms: "neutral", result: "pending" },
+    ]
+  },
 ];
 
 export const SEED_MODELS = [
   { name: "MC YRFI",       bets: 33,  wins: 24,  profit: 118.80,  roi: 36.0,  status: "active",  note: "Best ROI. 65%+ threshold. STRONG AGREE only. No dead zone." },
-  { name: "Hit Locks",     bets: 31,  wins: 25,  profit: 132.25,  roi: 42.7,  status: "active",  note: "Best prop signal. 80.6% WR. 85%+ rate · lineup confirmed · Savant verified before adding." },
-  { name: "Consensus ML",  bets: 102, wins: 64,  profit: 176.52,  roi: 17.3,  status: "active",  note: "Primary ML signal. Must agree with XGB. 62.7% WR. Sharp 20%+ against = skip." },
+  { name: "Hit Locks",     bets: 33,  wins: 27,  profit: 147.63,  roi: 44.7,  status: "active",  note: "Best prop signal. 81.8% WR. 85%+ rate · lineup confirmed · Savant verified before adding." },
+  { name: "Consensus ML",  bets: 106, wins: 66,  profit: 173.91,  roi: 16.4,  status: "active",  note: "Primary ML signal. Must agree with XGB. 62.3% WR. Sharp 20%+ against = skip." },
   { name: "LGB Moderate",  bets: 33,  wins: 20,  profit: 44.00,   roi: 13.3,  status: "active",  note: "65-70% tier only. LGB Strong retired -18.2% ROI. Check every pick." },
-  { name: "Consensus F5",  bets: 61,  wins: 37,  profit: 81.74,   roi: 13.4,  status: "active",  note: "Recovered to +13.4% ROI. Use when firing with XGB F5." },
-  { name: "XGB F5 ML",     bets: 162, wins: 99,  profit: 230.87,  roi: 14.3,  status: "active",  note: "Best ML model. 61.1% WR. Must agree with Consensus." },
-  { name: "Hit Standalone", bets: 142, wins: 98, profit: 313.62,  roi: 22.1,  status: "active",  note: "70%+ WR. 80%+ rate only. SGP legs preferred." },
-  { name: "NRFI RB v2.3",  bets: 128, wins: 80,  profit: 216.00,  roi: 16.9,  status: "active",  note: "63%+ only. Dead zone 65-74% = skip. Use oddlyspecificstats.com L10 + streak." },
-  { name: "MC F5 Total",   bets: 185, wins: 107, profit: 150.90,  roi: 8.2,   status: "active",  note: "⚠️ Dropped from 12% to 8.2% ROI after Jun 17. Monitor closely." },
-  { name: "Hit Parlay",    bets: 80,  wins: 47,  profit: 31.43,   roi: 3.9,   status: "monitor", note: "3-leg max 80%+. Lineup confirmed + Savant verified before building. PrizePicks flex preferred." },
+  { name: "Consensus F5",  bets: 65,  wins: 39,  profit: 79.13,   roi: 12.2,  status: "active",  note: "Recovered to +12.2% ROI. Use when firing with XGB F5." },
+  { name: "XGB F5 ML",     bets: 166, wins: 101, profit: 228.26,  roi: 13.8,  status: "active",  note: "Best ML model. 60.8% WR. Must agree with Consensus." },
+  { name: "Hit Standalone", bets: 150, wins: 103, profit: 322.07, roi: 21.5,  status: "active",  note: "68.7% WR. 80%+ rate only. SGP legs preferred." },
+  { name: "NRFI RB v2.3",  bets: 131, wins: 83,  profit: 242.10,  roi: 18.5,  status: "active",  note: "63%+ only. Dead zone 65-74% = skip. Use oddlyspecificstats.com L10 + streak + first 5 batters." },
+  { name: "MC F5 Total",   bets: 189, wins: 109, profit: 148.30,  roi: 7.8,   status: "active",  note: "⚠️ Dropped from 12% to 7.8% ROI. Monitor closely." },
+  { name: "Hit Parlay",    bets: 85,  wins: 52,  profit: 69.88,   roi: 8.2,   status: "active",  note: "61.2% WR improving. PrizePicks flex preferred. 3-leg max 80%+." },
   { name: "MC F5 ML",      bets: 189, wins: 102, profit: 17.40,   roi: 0.9,   status: "active",  note: "54% WR. Use only when STRONG AGREE fires with XGB." },
   { name: "POI YRFI",      bets: 178, wins: 83,  profit: -227.90, roi: -12.8, status: "monitor", note: "⚠️ Monitor only. Do not bet until double-grade bug fixed." },
   { name: "LGB Strong",    bets: 16,  wins: 7,   profit: -29.10,  roi: -18.2, status: "retired", note: "Retired. 43.8% WR. Only use LGB Moderate 65-70% tier." },
