@@ -17,7 +17,58 @@ export const SEED_CARDS = [
 ];
 
 export const TODAY_CARD = {
-  date: "Jun 18",
+  date: "Jun 19",
+  bankroll: 195.00,
+  potd: {
+    pick: "PIT ML -140",
+    game: "PIT @ COL",
+    direction: "PIT",
+    odds: "-140",
+    stake: 20,
+    type: "money",
+    sources: "XGB 91.5% · Con 91.5% · Sharp 65% gap · Chandler ERA 4.76 · Freeland ERA 7.98 1-7",
+    analysis: "Bubba Chandler ERA 4.76 solid — 2 ER or less last 2 starts. Kyle Freeland ERA 7.98 WHIP 1.71 1-7 — one of worst in NL. 88% sharp money 65% gap confirms. PIT bullpen ERA 2.63. B365 auto-cashout if PIT up 5.",
+    result: "pending", pl: 0,
+  },
+  rfi: [],
+  ml: [
+    { game: "CIN @ NYY", direction: "NYY", odds: "-275", stake: 0, sources: "XGB 97.4% · Con 97.4% · Schlittler ERA 1.82", type: "paper", result: "pending", pl: 0 },
+    { game: "WSH @ TB", direction: "TB", odds: "-154", stake: 0, sources: "XGB 92.1% · Con 92.1% · Sharp 43% · FRESH bullpen", type: "paper", result: "pending", pl: 0 },
+    { game: "MIL @ ATL", direction: "MIL", odds: "-170", stake: 0, sources: "XGB 92.4% · no LGB · ATL rule skip", type: "paper", result: "pending", pl: 0 },
+    { game: "STL @ KC", direction: "STL", odds: "-120", stake: 0, sources: "XGB 93.8% · Sharp 52% · McGreevy ERA 2.99", type: "paper", result: "pending", pl: 0 },
+    { game: "CLE @ HOU", direction: "HOU", odds: "-124", stake: 0, sources: "XGB 84.8% · Con 84.8% · Imai ERA 6.43", type: "paper", result: "pending", pl: 0 },
+  ],
+  hitParlay: {
+    stake: 25,
+    odds: "flex",
+    payout: 47.50,
+    type: "prizepicks_protected",
+    result: "pending",
+    pl: 0,
+    notes: "Protected — get $25 bonus bets back if loses",
+    legs: [
+      { player: "Paul Goldschmidt", team: "NYY", rate: "95%", l10: "10/10", split: "vsRHP .240 · L10 elite", result: "pending" },
+      { player: "Jung Hoo Lee", team: "SF", rate: "85%", l10: "7/10", split: "vsRHP .335 · vs Bachar", result: "pending" },
+      { player: "Bryan Reynolds", team: "PIT", rate: "80%", l10: "9/10", split: "vsLHP .322 · vs Freeland ERA 7.98", result: "pending" },
+    ],
+  },
+  sgp: {
+    stake: 10,
+    odds: "+600",
+    payout: 70,
+    type: "money",
+    result: "pending",
+    pl: 0,
+    notes: "STL @ KC SGP on B365 · 50% boost",
+    legs: [
+      { player: "STL @ KC YRFI", team: "STL", prop: "YRFI", rate: "57.8%", note: "Lugo concussion rust · McGreevy FI R/G 0.556" },
+      { player: "McGreevy O4.0 Ks", team: "STL", prop: "Ks", rate: "80%", note: "K9 5.88 · achievable not lock" },
+      { player: "Alec Burleson O0.5 hits", team: "STL", prop: "hits", rate: "85%", note: "L10 9/10 · vsRHP .327 · bats 3rd" },
+    ],
+  },
+  totalPL: 0,
+  notes: "F5 parlay: PIT+STL+TB $20 B365 +428 boosted 30% pays $131.60 · No off card bets 🫡 · Witt Jr. knee injury may limit KC · Lugo returning from concussion IL",
+};
   bankroll: 210.97,
   potd: {
     pick: "MIN ML -114",
