@@ -337,3 +337,35 @@ Before building parlay:
 - Baseball Savant — pitcher Statcast data
 
 *Last updated: Jun 18, 2026*
+
+---
+
+## 📅 Jun 18 Lessons
+
+### New personal rules (Nelson)
+- **No buddy POTD picks** — card only, checklist only. Friend's PHI pick cost $10.97.
+- **Hold when up early** — MIN F5 cashed +$22 in the morning. Everything after gave it back. If up early and nothing screaming from data — bank it and walk away.
+
+### Nola streak ended
+- Nola 🔥x8 L10 90% — ended tonight with 3 runs in 1st inning.
+- Lesson: streaks are powerful signals but not guarantees. Wind blowing in did not help.
+- Update: Nola streak now ❄️x1. Reset tracking.
+
+### STL @ KC blowout
+- Models 77.9% + sharp 36% gap on STL but KC scored 12 runs.
+- Both bullpens 🔴 TAXED — once Liberatore struggled KC offense had a field day.
+- B365 auto-cashout only fires if team goes UP 5 — doesn't protect against blowout losses.
+- Lesson: 🔴 TAXED bullpens on BOTH sides = higher variance game. Size down or skip.
+
+### PrizePicks flex validation
+- Goldschmidt vsLHP .400 ✅ · Witt vsLHP .338 ✅ · Soto vsRHP .306 ✅
+- All 3 hit · flex paid $18 on $10
+- Lesson: When 2 of 3 picks are below 80% threshold → flex not power play.
+- Lesson: When all 3 are 85%+ → power play.
+
+### MC F5 Total monitoring
+- Dropped from 12.0% to 8.2% ROI after Jun 17 went 1-7.
+- Keep watching — one bad day may not be a trend but worth flagging.
+
+*Last updated: Jun 18, 2026*
+*Bankroll: DK $120 · B365 $37 · PP $38 = $195.00*
