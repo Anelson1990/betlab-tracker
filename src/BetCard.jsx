@@ -154,20 +154,7 @@ export default function BetCard({ bankroll, onCardSaved }) {
   const [hitForm, setHitForm] = useState({ player:'', team:'', rate:'', l10:'', split:'' })
 
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(CARD_KEY)
-      const stored = s ? JSON.parse(s) : null
-      // If stored date doesn't match today's seed — always load fresh seed
-      if (!stored || stored.date !== TODAY_CARD.date) {
-        setCard(TODAY_CARD)
-        localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD))
-      } else {
-        setCard(stored)
-      }
-    } catch {
-      setCard(TODAY_CARD)
-      localStorage.setItem(CARD_KEY, JSON.stringify(TODAY_CARD))
-    }
+    setCard(TODAY_CARD)
   }, [])
 
   // Auto-grade on load when card has pending picks and games may be finished
