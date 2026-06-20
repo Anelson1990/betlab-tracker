@@ -369,3 +369,34 @@ Before building parlay:
 
 *Last updated: Jun 18, 2026*
 *Bankroll: DK $120 · B365 $37 · PP $38 = $195.00*
+
+---
+
+## 📅 Jun 19 Lessons
+
+### SGP cashout rule — CRITICAL
+When 2 of 3 SGP legs lock early → cash out immediately. Don't wait for the 3rd leg.
+- STL SGP had YRFI ✅ + Burleson hit ✅ locked in 1st inning
+- Cashout showed $33 · walked away with nothing
+- McGreevy K9 5.88 = wrong prop for K total · too low strikeout rate
+- **Rule: Never use K props on pitchers with K9 below 7.0**
+
+### K prop pitcher threshold
+- K9 7.0+ = viable K prop candidate
+- K9 below 7.0 = avoid K props regardless of model rate
+- McGreevy K9 5.88 = should have been caught in research
+
+### Freeland ERA 7.98 lesson
+- Despite terrible ERA · COL still won 4-3
+- Park factor at Coors cuts both ways — PIT offense also suppressed
+- Chandler gave up 4 runs · ERA 4.76 not enough at Coors
+- Lesson: Coors Field adds variance to both sides · size down at Coors
+
+### Protected play validation
+- PP protected play worked as designed
+- Reynolds voided — didn't play · Goldschmidt 0 hits · Lee missed
+- Got $25 bonus bets back ✅
+- Protection is worth it when 2+ legs below 80% threshold
+
+*Last updated: Jun 19, 2026*
+*Bankroll: ~$145*
