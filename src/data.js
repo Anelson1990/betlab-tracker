@@ -109,60 +109,6 @@ export const TODAY_CARD = {
   totalPL: 0,
   notes: "F5 parlay: PIT+STL+TB $20 B365 +428 boosted 30% pays $131.60 · No off card bets 🫡 · Witt Jr. knee injury may limit KC · Lugo returning from concussion IL",
 };
-  bankroll: 210.97,
-  potd: {
-    pick: "MIN ML -114",
-    game: "MIN @ TEX",
-    direction: "MIN",
-    odds: "-114",
-    stake: 20,
-    type: "money",
-    sources: "XGB 95.7% · Con 95.7% · Sharp 52% gap · Ryan ERA 3.17 · Leiter ERA 4.86 · Series 2-0",
-    analysis: "Joe Ryan ERA 3.17 WHIP 1.00 92 Ks vs Leiter ERA 4.86. MIN leading series 2-0 outscoring TEX 16-4. MIN bullpen FRESH ERA 3.86 vs TEX TAXED ERA 7.71. 52% sharp gap confirms. Dome game. MIN won 9-2.",
-    result: "win", pl: 17.54,
-  },
-  rfi: [
-    { game: "MIN @ TEX", homeTeam: "TEX", awayTeam: "MIN", pick: "NRFI", conf: "manual", stake: 10, type: "money", result: "loss", pl: -10, notes: "Ryan ❄️x2 L10 50% — gave up first inning run" },
-    { game: "CLE @ MIL", homeTeam: "MIL", awayTeam: "CLE", pick: "NRFI", conf: "Messick 🔥x14", stake: 0, type: "paper", result: "win", pl: 0 },
-    { game: "NYM @ PHI", homeTeam: "PHI", awayTeam: "NYM", pick: "NRFI", conf: "Nola 🔥x8 L10 90%", stake: 0, type: "paper", result: "loss", pl: 0, notes: "Nola streak ended — 3 runs in 1st" },
-    { game: "STL @ KC", homeTeam: "KC", awayTeam: "STL", pick: "NRFI", conf: "Cameron 🔥x5 · Liberatore 🔥x5", stake: 0, type: "paper", result: "pending", pl: 0 },
-  ],
-  ml: [
-    { game: "BAL @ SEA", direction: "BAL", odds: "+133", stake: 0, sources: "XGB 80.6% · Con 80.6%", type: "paper", result: "win", pl: 0 },
-    { game: "STL @ KC", direction: "STL", odds: "-105", stake: 15, sources: "XGB 77.9% · Sharp 36% · B365 auto-cashout", type: "money", result: "loss", pl: -15, notes: "KC 12-4 blowout" },
-    { game: "NYM @ PHI", direction: "PHI", odds: "-120", stake: 0, sources: "Sharp 54% gap · no Consensus", type: "paper", result: "loss", pl: 0 },
-    { game: "SF @ ATL", direction: "ATL", odds: "-138", stake: 0, sources: "Sharp 71% gap · postponement", type: "paper", result: "void", pl: 0 },
-  ],
-  hitParlay: {
-    stake: 10.97,
-    odds: "+173",
-    payout: 30.03,
-    type: "money",
-    result: "loss",
-    pl: -10.97,
-    notes: "PHI lost by 2 — needed +1.5 RL · MIN leg ✅ PHI leg ❌",
-    legs: [
-      { player: "MIN ML", team: "MIN", rate: "95.7%", l10: "—", split: "Ryan ERA 3.17", result: "win" },
-      { player: "PHI +1.5 RL", team: "PHI", rate: "Sharp 54%", l10: "—", split: "Nola home", result: "loss" },
-    ],
-  },
-  sgp: {
-    stake: 10,
-    odds: "+552",
-    payout: 65.22,
-    type: "money",
-    result: "loss",
-    pl: -10,
-    notes: "NYM scored 3 in 1st killed parlay — Nola streak ended",
-    legs: [
-      { player: "CLE @ MIL NRFI", team: "CLE", prop: "NRFI", rate: "Messick 🔥x14", note: "✅ Cashed" },
-      { player: "NYM @ PHI NRFI", team: "NYM", prop: "NRFI", rate: "Nola 🔥x8", note: "❌ 3 runs scored" },
-      { player: "STL @ KC NRFI", team: "STL", prop: "NRFI", rate: "Cameron 🔥x5", note: "N/A — parlay dead" },
-    ],
-  },
-  totalPL: -15.97,
-  notes: "New rules: no buddy POTD picks · hold when up early · MIN F5 +$22 · PrizePicks 3/3 +$8 · losses from NRFI parlay/PHI RL/STL blowout. Bankroll DK $120 · B365 $37 · PP $38 = $195",
-};
 
 export const SEED_SHARP = [
   {
