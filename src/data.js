@@ -14,11 +14,65 @@ export const SEED_CARDS = [
   { id: "0616", date: "Jun 16", potd: "WSH ML -136",        potdResult: "W", potdPL: 11.03, rfi: "0-0", ml: "3-2", hitParlay: "W", staked: 35,    pl: -21.45, bankroll: 62.78, notes: "WSH 76% sharp. 6-leg parlay lost SD+CHC. CIN YRFI off card +$9.57. Lee HR carryover cashed." },
   { id: "0617", date: "Jun 17", potd: "MIA ML +107",        potdResult: "W", potdPL: 26.75, rfi: "1-1", ml: "3-2", hitParlay: "L", staked: 50,    pl: 118.19, bankroll: 180.97,notes: "MIA 12-4 +$26.75 · YRFI +$7.27 · 4-leg parlay $13→$90.97 · PCA live -$10 · Knowledge base built." },
   { id: "0618", date: "Jun 18", potd: "MIN ML -114",        potdResult: "W", potdPL: 17.54, rfi: "0-2", ml: "0-1", hitParlay: "W", staked: 75.97, pl: -15.97, bankroll: 195.00,notes: "MIN F5 +$22 · PrizePicks flex +$8 (Soto/Witt/Gold all hit) · NRFI parlay -$10 Nola streak ended · PHI RL -$10.97 lost by 2 · STL -$15 KC 12-4. New rules: no buddy POTD · hold when up early." },
-  { id: "0619", date: "Jun 19", potd: "PIT ML -140",        potdResult: "L", potdPL: -20,   rfi: "0-0", ml: "2-2", hitParlay: "L", staked: 55,    pl: -50,    bankroll: 145.00,notes: "Lost every bet. PIT lost 4-3 despite Freeland ERA 7.98. STL F5 lost. McGreevy 2 Ks killed SGP — should have cashed at $33. PP protected saves $25 bonus bets. Reynolds voided." },
+  { id: "0619", date: "Jun 19", potd: "PIT ML -140",        potdResult: "L", potdPL: -20,   rfi: "0-0", ml: "2-2", hitParlay: "L", staked: 55,    pl: -50,    bankroll: 145.00,notes: "Lost every bet. PIT lost 4-3 despite Freeland ERA 7.98. STL F5 lost. McGreevy 2 Ks killed SGP — should have cashed at $33. PP protected saves $25 bonus bets." },
+  { id: "0620", date: "Jun 20", potd: "MIA ML -144",        potdResult: "W", potdPL: 11.02, rfi: "1-0", ml: "0-1", hitParlay: "L", staked: 47,    pl: 1.71,   bankroll: 123.00,notes: "MIA cashed $31.02 — smart cashout at 6-2 T5 Meyer 7-0. NRFI +$7.69. PP killed by PCA no steal despite HR. HOU SGP lost 6-1 Cantillo shut down Yordan. PIT lost 2-1 sharp 73% wrong again." },
 ];
 
 export const TODAY_CARD = {
-  date: "Jun 19",
+  date: "Jun 20",
+  bankroll: 120.00,
+  potd: {
+    pick: "MIA ML -144",
+    game: "SF @ MIA",
+    direction: "MIA",
+    odds: "-144",
+    stake: 20,
+    type: "money",
+    sources: "LGB 67.3% · Sharp 72% gap · Max Meyer 7-0 ERA 2.75 · MIA bullpen FRESH",
+    analysis: "Max Meyer 7-0 ERA 2.75 vs McDonald ERA 4.64. MIA bullpen FRESH ERA 2.02. Smart cashout at 6-2 T5 — $31.02 payout.",
+    result: "win", pl: 11.02,
+  },
+  rfi: [
+    { game: "SD @ TEX", homeTeam: "TEX", awayTeam: "SD", pick: "NRFI", conf: "55.0%", stake: 10, type: "money", result: "win", pl: 7.69 },
+  ],
+  ml: [
+    { game: "CIN @ NYY", direction: "NYY", odds: "-200", stake: 0, sources: "LGB Strong 73% · XGB 75%", type: "paper", result: "win", pl: 0 },
+    { game: "CLE @ HOU", direction: "HOU", odds: "-124", stake: 0, sources: "XGB+MC · Arrighetti ERA 2.57", type: "paper", result: "loss", pl: 0 },
+    { game: "PIT @ COL", direction: "PIT", odds: "-210", stake: 0, sources: "Sharp 73% gap", type: "paper", result: "loss", pl: 0, notes: "PIT lost 2-1 — sharp wrong again at Coors" },
+  ],
+  hitParlay: {
+    stake: 10,
+    odds: "power",
+    payout: 125,
+    type: "prizepicks",
+    result: "loss",
+    pl: -10,
+    notes: "PCA no steal despite HR killed power play. Never bet SB prop on PCA again — too unpredictable.",
+    legs: [
+      { player: "PCA O0.5 SB", team: "CHC", rate: "—", l10: "—", split: "—", result: "loss" },
+      { player: "PCA O1.5 TB", team: "CHC", rate: "95%", l10: "10/10", split: "vsLHP .287", result: "win" },
+      { player: "Eldridge O0.5 hits", team: "SF", rate: "90%", l10: "9/10", split: "vsRHP .297", result: "pending" },
+      { player: "Lee O0.5 hits", team: "SF", rate: "85%", l10: "7/10", split: "vsRHP .337", result: "pending" },
+      { player: "Skenes O6.5 Ks", team: "PIT", rate: "—", l10: "—", split: "—", result: "pending" },
+    ],
+  },
+  sgp: {
+    stake: 7,
+    odds: "+305",
+    payout: 28.38,
+    type: "money",
+    result: "loss",
+    pl: -7,
+    notes: "Arrighetti 8 Ks ✅ · HOU lost 6-1 ❌ · Yordan 0 hits ❌ · Cantillo ERA 4.38 dominated",
+    legs: [
+      { player: "HOU ML", team: "HOU", prop: "ML", rate: "XGB+MC", note: "❌ Lost 6-1" },
+      { player: "Yordan O1.5 TB", team: "HOU", prop: "TB", rate: "80%", note: "❌ 0 hits" },
+      { player: "Arrighetti O5.0 Ks", team: "HOU", prop: "Ks", rate: "—", note: "✅ 8 Ks" },
+    ],
+  },
+  totalPL: 1.71,
+  notes: "Barely green +$1.71. B365 now empty — need reload for auto-cashout. PCA SB prop lesson: never bet stolen base — too unpredictable. PIT lost 2-1 at Coors sharp wrong again.",
+};
   bankroll: 195.00,
   potd: {
     pick: "PIT ML -140",
@@ -143,9 +197,24 @@ export const SEED_SHARP = [
       { id: "5", game: "WSH @ TB", sharpPick: "TB -154", sharpOdds: "-154", gap: 43, confirms: "confirms", result: "win" },
       { id: "6", game: "CWS @ DET", sharpPick: "DET -200", sharpOdds: "-200", gap: 41, confirms: "neutral", result: "pending" },
       { id: "7", game: "MIN @ ARI", sharpPick: "ARI -168", sharpOdds: "-168", gap: 38, confirms: "neutral", result: "pending" },
-      { id: "8", game: "SD @ TEX", sharpPick: "TEX -160", sharpOdds: "-160", gap: 24, confirms: "conflicts", result: "pending" },
-      { id: "9", game: "CLE @ HOU", sharpPick: "HOU -124", sharpOdds: "-124", gap: 20, confirms: "confirms", result: "pending" },
+      { id: "8", game: "SD @ TEX", sharpPick: "TEX -160", sharpOdds: "-160", gap: 24, confirms: "conflicts", result: "loss" },
+      { id: "9", game: "CLE @ HOU", sharpPick: "HOU -124", sharpOdds: "-124", gap: 20, confirms: "confirms", result: "loss" },
       { id: "10", game: "BAL @ LAD", sharpPick: "LAD -205", sharpOdds: "-205", gap: 2, confirms: "neutral", result: "pending" },
+    ]
+  },
+  {
+    date: "Jun 20",
+    picks: [
+      { id: "1", game: "PIT @ COL", sharpPick: "PIT -210", sharpOdds: "-210", gap: 73, confirms: "confirms", result: "loss" },
+      { id: "2", game: "NYM @ PHI", sharpPick: "PHI -188", sharpOdds: "-188", gap: 72, confirms: "neutral", result: "pending" },
+      { id: "3", game: "SF @ MIA", sharpPick: "MIA -144", sharpOdds: "-144", gap: 72, confirms: "confirms", result: "win" },
+      { id: "4", game: "BOS @ SEA", sharpPick: "SEA -120", sharpOdds: "-120", gap: 62, confirms: "neutral", result: "pending" },
+      { id: "5", game: "MIN @ ARI", sharpPick: "ARI -124", sharpOdds: "-124", gap: 38, confirms: "neutral", result: "pending" },
+      { id: "6", game: "SD @ TEX", sharpPick: "SD +115", sharpOdds: "+115", gap: 32, confirms: "confirms", result: "win" },
+      { id: "7", game: "TOR @ CHC", sharpPick: "CHC -130", sharpOdds: "-130", gap: 32, confirms: "neutral", result: "pending" },
+      { id: "8", game: "WSH @ TB", sharpPick: "TB -120", sharpOdds: "-120", gap: 32, confirms: "confirms", result: "pending" },
+      { id: "9", game: "CLE @ HOU", sharpPick: "HOU -124", sharpOdds: "-124", gap: 24, confirms: "confirms", result: "loss" },
+      { id: "10", game: "MIL @ ATL", sharpPick: "ATL -130", sharpOdds: "-130", gap: 22, confirms: "neutral", result: "pending" },
     ]
   },
 ];

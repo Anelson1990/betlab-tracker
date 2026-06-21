@@ -400,3 +400,35 @@ When 2 of 3 SGP legs lock early → cash out immediately. Don't wait for the 3rd
 
 *Last updated: Jun 19, 2026*
 *Bankroll: ~$145*
+
+---
+
+## 📅 Jun 20 Lessons
+
+### Never bet SB (stolen base) props
+- PCA steals bases constantly in real life but the ONE day you bet it he hit a HR instead
+- SB props are too unpredictable — situational, manager dependent, score dependent
+- Rule: No SB props ever. Period.
+
+### Cashout timing — MIA lesson
+- MIA 6-2 T5 with Meyer dealing — cashed $31.02 vs $33.88 full payout
+- $3 difference saved potential bullpen collapse risk
+- Rule: When up big in 5th+ innings with taxed bullpen on either side — cash out
+
+### Coors Field sharp money unreliable
+- PIT had 73% sharp gap Jun 19 and 65% Jun 20 — lost both
+- COL pitching has been underrated this season
+- Rule: Coors Field = reduce sharp money confidence by 1 tier · size down
+
+### Model SP ERA mismatch — ongoing issue
+- HOU showed SP ERA 5.72 but actual starter Arrighetti was ERA 2.57
+- CIN @ NYY model had wrong ERA data early in day
+- Rule: Always verify SP on MLB.com before confirming any pick — model ERA not reliable until lineups confirmed
+
+### B365 empty — auto-cashout protection gone
+- B365 at $0 — cannot use auto-cashout feature
+- Need to reload B365 before next session for ML protection
+- DK only = no auto-cashout = higher variance on ML bets
+
+*Last updated: Jun 20, 2026*
+*Bankroll: DK $110 · B365 $0 · PP $13 = $123*
