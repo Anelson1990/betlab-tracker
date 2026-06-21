@@ -16,10 +16,53 @@ export const SEED_CARDS = [
   { id: "0618", date: "Jun 18", potd: "MIN ML -114",        potdResult: "W", potdPL: 17.54, rfi: "0-2", ml: "0-1", hitParlay: "W", staked: 75.97, pl: -15.97, bankroll: 195.00,notes: "MIN F5 +$22 · PrizePicks flex +$8 (Soto/Witt/Gold all hit) · NRFI parlay -$10 Nola streak ended · PHI RL -$10.97 lost by 2 · STL -$15 KC 12-4. New rules: no buddy POTD · hold when up early." },
   { id: "0619", date: "Jun 19", potd: "PIT ML -140",        potdResult: "L", potdPL: -20,   rfi: "0-0", ml: "2-2", hitParlay: "L", staked: 55,    pl: -50,    bankroll: 145.00,notes: "Lost every bet. PIT lost 4-3 despite Freeland ERA 7.98. STL F5 lost. McGreevy 2 Ks killed SGP — should have cashed at $33. PP protected saves $25 bonus bets." },
   { id: "0620", date: "Jun 20", potd: "MIA ML -144",        potdResult: "W", potdPL: 11.02, rfi: "1-0", ml: "0-1", hitParlay: "L", staked: 47,    pl: 1.71,   bankroll: 123.00,notes: "MIA cashed $31.02 — smart cashout at 6-2 T5 Meyer 7-0. NRFI +$7.69. PP killed by PCA no steal despite HR. HOU SGP lost 6-1 Cantillo shut down Yordan. PIT lost 2-1 sharp 73% wrong again." },
+  { id: "0621", date: "Jun 21", potd: "CIN ML even",        potdResult: "W", potdPL: 0,     rfi: "0-0", ml: "0-0", hitParlay: "W", staked: 15,    pl: 0,      bankroll: 140.00,notes: "CIN ML Burns ERA 2.01 cashed. MIL OVER + DET UNDER parlay hit. PHI SGP F5+Schwarber+YRFI +283 boosted $15 pending." },
 ];
 
 export const TODAY_CARD = {
-  date: "Jun 20",
+  date: "Jun 21",
+  bankroll: 140.00,
+  potd: {
+    pick: "CIN ML even",
+    game: "CIN @ NYY",
+    direction: "CIN",
+    odds: "even",
+    stake: 0,
+    type: "money",
+    sources: "Burns ERA 2.01 · 8-1 · Rodríguez ERA 4.15 SPOT · 56% money on CIN quietly",
+    analysis: "Chase Burns ERA 2.01 8-1 vs Elmer Rodríguez ERA 4.15 0 starts. XGB had NYY — wrong ERA data. Burns at even money exceptional value. Cashed ✅",
+    result: "win", pl: 0,
+  },
+  rfi: [
+    { game: "CWS @ DET", homeTeam: "DET", awayTeam: "CWS", pick: "NRFI", conf: "62.8%", stake: 0, type: "paper", result: "pending", pl: 0, notes: "Martin 🔥x6 · Montero 🔥x13 · FRESH bullpen · 34% sharp" },
+  ],
+  ml: [
+    { game: "NYM @ PHI", direction: "PHI", odds: "-180", stake: 0, sources: "XGB+MC Consensus · Wheeler ERA 2.01 · 74% sharp gap", type: "paper", result: "pending", pl: 0 },
+    { game: "WSH @ TB", direction: "TB", odds: "-130", stake: 0, sources: "Martinez ERA 2.60 · 48% sharp · dome", type: "paper", result: "pending", pl: 0 },
+    { game: "SF @ MIA", direction: "SF", odds: "-140", stake: 0, sources: "Webb ERA 3.46 vs Gusto ERA 7.24 · 41% sharp", type: "paper", result: "pending", pl: 0 },
+  ],
+  hitParlay: {
+    stake: 0, odds: "", payout: 0, type: "paper", result: "pending", pl: 0,
+    notes: "MIL OVER + DET UNDER parlay hit ✅",
+    legs: [],
+  },
+  sgp: {
+    stake: 15,
+    odds: "+283",
+    payout: 57.45,
+    type: "money",
+    result: "pending",
+    pl: 0,
+    notes: "PHI F5 ML + Schwarber O0.5 hits + YRFI · boosted · first pitch 7:20PM",
+    legs: [
+      { player: "PHI F5 ML", team: "PHI", prop: "F5 ML", rate: "XGB+MC · Wheeler ERA 2.01", note: "vs Peterson ERA 5.91" },
+      { player: "Schwarber O0.5 hits", team: "PHI", prop: "hits", rate: "70% · L10 8/10", note: "vsLHP .292 · HR last night" },
+      { player: "NYM @ PHI YRFI", team: "PHI", prop: "YRFI", rate: "52.9%", note: "Peterson ERA 5.91 · PHI sub-.500 NRFI" },
+    ],
+  },
+  totalPL: 0,
+  notes: "CIN ML ✅ Burns ERA 2.01. MIL OVER + DET UNDER parlay ✅. PHI SGP $15 +283 pending 7:20PM. LGB broken today — 44 vs 38 feature mismatch. No SB props ever.",
+};
   bankroll: 120.00,
   potd: {
     pick: "MIA ML -144",
@@ -217,22 +260,40 @@ export const SEED_SHARP = [
       { id: "10", game: "MIL @ ATL", sharpPick: "ATL -130", sharpOdds: "-130", gap: 22, confirms: "neutral", result: "pending" },
     ]
   },
+  {
+    date: "Jun 21",
+    picks: [
+      { id: "1", game: "NYM @ PHI", sharpPick: "PHI -180", sharpOdds: "-180", gap: 74, confirms: "confirms", result: "pending" },
+      { id: "2", game: "PIT @ COL", sharpPick: "PIT -144", sharpOdds: "-144", gap: 51, confirms: "confirms", result: "pending" },
+      { id: "3", game: "WSH @ TB", sharpPick: "TB -130", sharpOdds: "-130", gap: 48, confirms: "confirms", result: "pending" },
+      { id: "4", game: "SF @ MIA", sharpPick: "SF -140", sharpOdds: "-140", gap: 41, confirms: "confirms", result: "pending" },
+      { id: "5", game: "CWS @ DET", sharpPick: "DET -115", sharpOdds: "-115", gap: 34, confirms: "confirms", result: "pending" },
+      { id: "6", game: "MIN @ ARI", sharpPick: "ARI -130", sharpOdds: "-130", gap: 28, confirms: "neutral", result: "pending" },
+      { id: "7", game: "LAA @ ATH", sharpPick: "ATH -130", sharpOdds: "-130", gap: 21, confirms: "neutral", result: "pending" },
+      { id: "8", game: "MIL @ ATL", sharpPick: "ATL -115", sharpOdds: "-115", gap: 22, confirms: "conflicts", result: "pending" },
+      { id: "9", game: "STL @ KC", sharpPick: "STL -124", sharpOdds: "-124", gap: 17, confirms: "confirms", result: "pending" },
+      { id: "10", game: "TOR @ CHC", sharpPick: "TOR -112", sharpOdds: "-112", gap: 16, confirms: "conflicts", result: "pending" },
+      { id: "11", game: "BOS @ SEA", sharpPick: "SEA -125", sharpOdds: "-125", gap: 16, confirms: "neutral", result: "pending" },
+      { id: "12", game: "CLE @ HOU", sharpPick: "CLE +120", sharpOdds: "+120", gap: 13, confirms: "conflicts", result: "pending" },
+    ]
+  },
 ];
 
 export const SEED_MODELS = [
   { name: "MC YRFI",       bets: 33,  wins: 24,  profit: 118.80,  roi: 36.0,  status: "active",  note: "Best ROI. 65%+ threshold. STRONG AGREE only. No dead zone." },
-  { name: "Hit Locks",     bets: 33,  wins: 27,  profit: 147.63,  roi: 44.7,  status: "active",  note: "Best prop signal. 81.8% WR. 85%+ rate · lineup confirmed · Savant verified before adding." },
-  { name: "Consensus ML",  bets: 106, wins: 66,  profit: 173.91,  roi: 16.4,  status: "active",  note: "Primary ML signal. Must agree with XGB. 62.3% WR. Sharp 20%+ against = skip." },
-  { name: "LGB Moderate",  bets: 33,  wins: 20,  profit: 44.00,   roi: 13.3,  status: "active",  note: "65-70% tier only. LGB Strong retired -18.2% ROI. Check every pick." },
-  { name: "Consensus F5",  bets: 65,  wins: 39,  profit: 79.13,   roi: 12.2,  status: "active",  note: "Recovered to +12.2% ROI. Use when firing with XGB F5." },
-  { name: "XGB F5 ML",     bets: 166, wins: 101, profit: 228.26,  roi: 13.8,  status: "active",  note: "Best ML model. 60.8% WR. Must agree with Consensus." },
-  { name: "Hit Standalone", bets: 150, wins: 103, profit: 322.07, roi: 21.5,  status: "active",  note: "68.7% WR. 80%+ rate only. SGP legs preferred." },
-  { name: "NRFI RB v2.3",  bets: 131, wins: 83,  profit: 242.10,  roi: 18.5,  status: "active",  note: "63%+ only. Dead zone 65-74% = skip. Use oddlyspecificstats.com L10 + streak + first 5 batters." },
-  { name: "MC F5 Total",   bets: 189, wins: 109, profit: 148.30,  roi: 7.8,   status: "active",  note: "⚠️ Dropped from 12% to 7.8% ROI. Monitor closely." },
-  { name: "Hit Parlay",    bets: 85,  wins: 52,  profit: 69.88,   roi: 8.2,   status: "active",  note: "61.2% WR improving. PrizePicks flex preferred. 3-leg max 80%+." },
-  { name: "MC F5 ML",      bets: 189, wins: 102, profit: 17.40,   roi: 0.9,   status: "active",  note: "54% WR. Use only when STRONG AGREE fires with XGB." },
-  { name: "POI YRFI",      bets: 178, wins: 83,  profit: -227.90, roi: -12.8, status: "monitor", note: "⚠️ Monitor only. Do not bet until double-grade bug fixed." },
-  { name: "LGB Strong",    bets: 16,  wins: 7,   profit: -29.10,  roi: -18.2, status: "retired", note: "Retired. 43.8% WR. Only use LGB Moderate 65-70% tier." },
+  { name: "Hit Locks",     bets: 41,  wins: 34,  profit: 191.46,  roi: 46.7,  status: "active",  note: "Best prop signal. 82.9% WR. 85%+ rate · lineup confirmed · Savant verified." },
+  { name: "LGB Moderate",  bets: 35,  wins: 22,  profit: 61.40,   roi: 17.5,  status: "active",  note: "🔥 Best active model 17.5% ROI. 62.9% WR. 65-70% tier only." },
+  { name: "Hit Standalone", bets: 169, wins: 116, profit: 362.04, roi: 21.4,  status: "active",  note: "68.6% WR. 80%+ rate only." },
+  { name: "Consensus ML",  bets: 115, wins: 69,  profit: 140.00,  roi: 12.2,  status: "active",  note: "Primary ML signal. XGB+MC must agree. 60.0% WR." },
+  { name: "XGB F5 ML",     bets: 181, wins: 107, profit: 190.43,  roi: 10.5,  status: "active",  note: "59.1% WR. Capped at 75%. Must agree with Consensus." },
+  { name: "Hit Parlay",    bets: 103, wins: 64,  profit: 102.16,  roi: 9.9,   status: "active",  note: "62.1% WR improving. PrizePicks flex preferred. 3-leg max 80%+." },
+  { name: "NRFI RB v2.3",  bets: 134, wins: 84,  profit: 230.80,  roi: 17.2,  status: "active",  note: "62.7% WR. Use combined v3.0 model. First 5 batters deep dive added." },
+  { name: "K Parlays",     bets: 63,  wins: 49,  profit: 23.17,   roi: 3.7,   status: "active",  note: "77.8% WR. Use at 80%+ rate. K9 7.0+ pitchers only." },
+  { name: "K Unders",      bets: 71,  wins: 51,  profit: 263.59,  roi: 37.1,  status: "active",  note: "🔥 Best K model. 71.8% WR. Underused — check daily." },
+  { name: "MC F5 Total",   bets: 200, wins: 112, profit: 94.40,   roi: 4.7,   status: "active",  note: "56.0% WR. Dropped from 8.2% to 4.7% — monitor." },
+  { name: "MC F5 ML",      bets: 190, wins: 102, profit: 7.40,    roi: 0.4,   status: "active",  note: "53.7% WR. Use only when STRONG AGREE fires with XGB." },
+  { name: "POI YRFI",      bets: 178, wins: 83,  profit: -227.90, roi: -12.8, status: "monitor", note: "⚠️ Monitor only. Do not bet." },
+  { name: "LGB Strong",    bets: 18,  wins: 7,   profit: -49.10,  roi: -27.3, status: "retired", note: "Retired. -27.3% ROI. Never use." },
   { name: "RB ML",         bets: 103, wins: 50,  profit: -95.22,  roi: -9.2,  status: "retired", note: "Retired. Negative ROI confirmed." },
 ];
 
