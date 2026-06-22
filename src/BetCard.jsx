@@ -373,7 +373,7 @@ export default function BetCard({ bankroll, onCardSaved }) {
       <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
           <div>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', color:'#f0f0f8', lineHeight:1 }}>{card.date}</div>
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.4rem', color:'#f0f0f8', lineHeight:1 }}>{card.date} <span style={{ fontSize:'.55rem', color:'#4ade80', fontFamily:"'Barlow Condensed',sans-serif", fontWeight:700 }}>TODAY</span></div>
             <div style={{ fontSize:'.42rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginTop:1 }}>
               Start ${card.bankroll.toFixed(2)} · Staked ${totalStaked.toFixed(2)}
             </div>
