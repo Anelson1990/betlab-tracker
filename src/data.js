@@ -116,57 +116,6 @@ export const TODAY_CARD = {
   totalPL: 1.71,
   notes: "Barely green +$1.71. B365 now empty — need reload for auto-cashout. PCA SB prop lesson: never bet stolen base — too unpredictable. PIT lost 2-1 at Coors sharp wrong again.",
 };
-  bankroll: 195.00,
-  potd: {
-    pick: "PIT ML -140",
-    game: "PIT @ COL",
-    direction: "PIT",
-    odds: "-140",
-    stake: 20,
-    type: "money",
-    sources: "XGB 91.5% · Con 91.5% · Sharp 65% gap · Chandler ERA 4.76 · Freeland ERA 7.98 1-7",
-    analysis: "Chandler gave up 4 runs. COL won 4-3 despite Freeland ERA 7.98. Sharp money confirmed but COL offense showed up.",
-    result: "loss", pl: -20,
-  },
-  rfi: [],
-  ml: [
-    { game: "CIN @ NYY", direction: "NYY", odds: "-275", stake: 0, sources: "XGB 97.4% · Schlittler 13 Ks", type: "paper", result: "win", pl: 0 },
-    { game: "WSH @ TB", direction: "TB", odds: "-154", stake: 0, sources: "XGB 92.1% · Sharp 43% · FRESH bullpen", type: "paper", result: "win", pl: 0 },
-    { game: "MIL @ ATL", direction: "MIL", odds: "-170", stake: 0, sources: "XGB 92.4% · no LGB · ATL rule skip", type: "paper", result: "pending", pl: 0 },
-    { game: "STL @ KC", direction: "STL", odds: "-120", stake: 0, sources: "XGB 93.8% · Sharp 52%", type: "paper", result: "loss", pl: 0 },
-    { game: "CLE @ HOU", direction: "HOU", odds: "-124", stake: 0, sources: "XGB 84.8% · Imai ERA 6.43", type: "paper", result: "pending", pl: 0 },
-  ],
-  hitParlay: {
-    stake: 25,
-    odds: "flex",
-    payout: 47.50,
-    type: "prizepicks_protected",
-    result: "loss",
-    pl: 0,
-    notes: "Protected — $25 bonus bets returned. Reynolds voided — didn't play. Goldschmidt 0 hits. Lee missed.",
-    legs: [
-      { player: "Paul Goldschmidt", team: "NYY", rate: "95%", l10: "10/10", split: "vsRHP .240", result: "loss" },
-      { player: "Jung Hoo Lee", team: "SF", rate: "85%", l10: "7/10", split: "vsRHP .335", result: "loss" },
-      { player: "Bryan Reynolds", team: "PIT", rate: "80%", l10: "9/10", split: "vsLHP .322", result: "void" },
-    ],
-  },
-  sgp: {
-    stake: 10,
-    odds: "+600",
-    payout: 70,
-    type: "money",
-    result: "loss",
-    pl: -10,
-    notes: "YRFI ✅ Burleson hit ✅ McGreevy only 2 Ks ❌ — should have cashed at $33 when 2 legs locked",
-    legs: [
-      { player: "STL @ KC YRFI", team: "STL", prop: "YRFI", rate: "57.8%", note: "✅ Burleson double scored" },
-      { player: "McGreevy O4.0 Ks", team: "STL", prop: "Ks", rate: "80%", note: "❌ Only 2 Ks — wrong prop for K9 5.88" },
-      { player: "Alec Burleson O0.5 hits", team: "STL", prop: "hits", rate: "85%", note: "✅ Double in 1st inning" },
-    ],
-  },
-  totalPL: -50,
-  notes: "Lost every bet. Cashout lesson — should have taken $33 SGP cashout when 2 legs locked early. McGreevy K rate too low for K prop. Freeland ERA 7.98 but COL still won 4-3. PP protected saves $25 bonus bets.",
-};
 
 export const SEED_SHARP = [
   {
