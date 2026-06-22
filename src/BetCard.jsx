@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { TODAY_CARD } from './data.js'
+import { TODAY_CARD } from './today.js'
 
 const CARD_KEY = 'betlab-daily-card-v2'
 const HISTORY_KEY = 'betlab-card-history-v1'

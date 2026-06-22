@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { SEED_SHARP } from './data.js'
+import { SEED_SHARP } from './sharp.js'
 
 const STORAGE_KEY = 'betlab-sharp-v2'
 const MLB_API = 'https://statsapi.mlb.com/api/v1'
