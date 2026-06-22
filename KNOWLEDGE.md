@@ -432,3 +432,29 @@ When 2 of 3 SGP legs lock early → cash out immediately. Don't wait for the 3rd
 
 *Last updated: Jun 20, 2026*
 *Bankroll: DK $110 · B365 $0 · PP $13 = $123*
+
+---
+
+## 📅 Jun 21 Lessons
+
+### RFI Combined v3.0 went 4-0 🔥
+Best RFI day ever. CWS@DET NRFI ✅ · MIL@ATL YRFI ✅ · plus 2 more.
+Montero 🔥x13 streak validated — elite signal.
+Combined model (RB + Poisson + XGB) more reliable than single model.
+
+### SGP correlation works
+PHI F5 + Schwarber hit + YRFI — all 3 correlated perfectly.
+Peterson ERA 5.91 + PHI home offense = YRFI + hits + F5 win all moved together.
+Key: identify the correlated chain before building SGP.
+
+### Burns ERA 2.01 at even money = massive value
+XGB had NYY — wrong SP ERA data again.
+Model SP ERA check rule confirmed — always verify on MLB.com.
+Even money on elite pitcher = best value bet type.
+
+### LGB broken — fix before next session
+Cache stale · 44 vs 38 feature mismatch.
+Run old LGB notebook to refresh 2026 cache before Jun 22.
+
+*Last updated: Jun 21, 2026*
+*Bankroll: DK $167.74 · B365 $0 · PP $13 = $180.74*
