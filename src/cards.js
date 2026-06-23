@@ -15,4 +15,6 @@ export const SEED_CARDS = [
   { id: "0619", date: "Jun 19", potd: "PIT ML -140",        potdResult: "L", potdPL: -20,   rfi: "0-0", ml: "2-2", hitParlay: "L", staked: 55,    pl: -50,    bankroll: 145.00, notes: "Lost every bet. McGreevy 2 Ks killed SGP. PP protected saves $25." },
   { id: "0620", date: "Jun 20", potd: "MIA ML -144",        potdResult: "W", potdPL: 11.02, rfi: "1-0", ml: "0-1", hitParlay: "L", staked: 47,    pl: 1.71,   bankroll: 123.00, notes: "MIA cashout $31.02. NRFI +$7.69. PCA no steal killed PP. HOU SGP lost." },
   { id: "0621", date: "Jun 21", potd: "CIN ML even",        potdResult: "W", potdPL: 0,     rfi: "4-0", ml: "2-0", hitParlay: "W", staked: 15,    pl: 40.74,  bankroll: 180.74, notes: "Burns ERA 2.01. RFI 4-0 best day. PHI SGP +283 cashed $57.45. LGB broken." },
+  { id: "0622", date: "Jun 22", potd: "CHC ML -124", potdResult: "V", potdPL: 0, rfi: "0-1", ml: "1-0", hitParlay: "V", staked: 43, pl: 5.16, bankroll: 185.90, notes: "CHC postponed void. STL SGP +269 cashed $36.90. ATL NRFI cashed. YRFI parlay -$10 MIL NRFI. PP refund." },
 ];
+// Appended Jun 22

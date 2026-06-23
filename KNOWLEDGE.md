@@ -458,3 +458,32 @@ Run old LGB notebook to refresh 2026 cache before Jun 22.
 
 *Last updated: Jun 21, 2026*
 *Bankroll: DK $167.74 · B365 $0 · PP $13 = $180.74*
+
+---
+
+## 📅 Jun 22 Lessons
+
+### Postponement contingency
+CHC @ NYM postponed — POTD void, YRFI leg void, PP 2 of 3 legs void.
+Always have a backup POTD in mind before locking. Tonight STL SGP filled the gap.
+
+### STL SGP correlation works again
+STL F5 + Herrera hit + Del Castillo hit all correlated — Pallante ERA 3.76 dominant.
+Same framework as PHI SGP Jun 21. Identify correlated chain before building.
+
+### MIL @ CIN YRFI miss
+Singer ERA 5.32 + wind blowing out + GABP = looked like YRFI.
+Umpire Tyler Jones NRFI% 66.7% was the flag we should have respected more.
+Rule: when ump NRFI% is above 60% — reduce YRFI confidence significantly.
+
+### ATL @ SD NRFI off card cashed
+Sharp instinct on ATL NRFI paid $25.90 on $14.64. 
+Both starters held the first inning cleanly.
+
+### New system live
+Split data.js into today.js + cards.js + sharp.js + models.js.
+today.js = full replace daily. Others = append only.
+No more orphaned blocks possible.
+
+*Last updated: Jun 22, 2026*
+*Bankroll: DK $167.74 · B365 $0 · PP $13 = $185.90*
