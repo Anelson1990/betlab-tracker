@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { SEED_CARDS, SEED_MODELS, MODEL_COLORS, STATUS_CONFIG, RESULT_CONFIG } from './data.js'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
+import TodayCard from './TodayCard.jsx'
 import BetCard from './BetCard.jsx'
 import ChecklistTab from './Checklist.jsx'
 import SharpMoney from './SharpMoney.jsx'
@@ -175,23 +176,9 @@ export default function App() {
 
       {/* TODAY TAB */}
       {tab === 'today' && (
-        <BetCard bankroll={latestBR} onCardSaved={c => {
-          const newCard = {
-            id: Date.now().toString(), date:c.date,
-            potd: c.potd.pick,
-            potdResult: c.potd.result==='win'?'W':c.potd.result==='loss'?'L':c.potd.result==='void'?'V':'P',
-            potdPL: c.potd.pl||0,
-            rfi: `${c.rfi.filter(r=>r.result==='win').length}-${c.rfi.filter(r=>r.result==='loss').length}`,
-            ml: `${c.ml.filter(m=>m.result==='win').length}-${c.ml.filter(m=>m.result==='loss').length}`,
-            hitParlay: c.hitParlay.result==='win'?'W':c.hitParlay.result==='loss'?'L':'P',
-            staked: (c.potd.type==='money'?c.potd.stake:0)+c.rfi.filter(r=>r.type==='money').reduce((a,r)=>a+(r.stake||0),0)+c.ml.filter(m=>m.type==='money').reduce((a,m)=>a+(m.stake||0),0)+(c.hitParlay.type==='money'?c.hitParlay.stake:0),
-            pl: c.totalPL||0,
-            bankroll: c.bankroll+(c.totalPL||0),
-            notes: `POTD:${c.potd.result} · RFI:${c.rfi.length} · ML:${c.ml.length} · Parlay:${c.hitParlay.result}`,
-          }
-          setCards(prev => [...prev, newCard])
-          const nb = accounts.dk + (c.totalPL||0); const upd = {...accounts, dk: nb}; setAccounts(upd); try{localStorage.setItem(BR_KEY,JSON.stringify(upd))}catch{}
-        }} />
+        <div style={{ padding:'10px 12px' }}>
+          <TodayCard accounts={accounts} />
+        </div>
       )}
 
       {/* CHECKLIST TAB */}
