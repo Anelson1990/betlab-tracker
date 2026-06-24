@@ -386,7 +386,7 @@ export default function TodayCard({ accounts }) {
               )}
             </div>
             <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.15em', textTransform:'uppercase' }}>
-              Nelson · BetLab v3
+              Nelson · BetLab v3.1 · grade-fix
             </div>
           </div>
           <div style={{ textAlign:'right' }}>
