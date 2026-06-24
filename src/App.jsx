@@ -256,13 +256,24 @@ export default function App() {
                 </div>
                 {isOpen && (
                   <div style={{ padding:'0 12px 10px', borderTop:'1px solid #111120' }}>
-                    {[['RFI Record',c.rfi||'—',null],['ML Record',c.ml||'—',null],['Hit Parlay',c.hitParlay==='W'?'✅ Win':c.hitParlay==='P'?'📋 Paper':'❌ Loss',c.hitParlay==='W'?'#4ade80':c.hitParlay==='P'?'#60a5fa':'#f87171'],['Total Staked',`$${c.staked.toFixed(2)}`,null],['Total P&L',`${c.pl>=0?'+':''}$${c.pl.toFixed(2)}`,c.pl>=0?'#4ade80':'#f87171'],['Bankroll End',`$${c.bankroll.toFixed(2)}`,'#fbbf24']].map(([lbl,val,col]) => (
+                    {[
+                      ['RFI Record',   c.rfi||'—',    null],
+                      ['ML Record',    c.ml||'—',     null],
+                      ['SGP/Parlay',   c.hitParlay==='W'?'✅ Win':c.hitParlay==='P'?'📋 Paper':'❌ Loss', c.hitParlay==='W'?'#4ade80':c.hitParlay==='P'?'#60a5fa':'#f87171'],
+                      ['Total Staked', `$${c.staked.toFixed(2)}`, null],
+                      ['Total P&L',    `${c.pl>=0?'+':''}$${c.pl.toFixed(2)}`, c.pl>=0?'#4ade80':'#f87171'],
+                      ['Bankroll End', `$${c.bankroll.toFixed(2)}`, '#fbbf24'],
+                    ].map(([lbl,val,col]) => (
                       <div key={lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0d0d1a' }}>
                         <span style={{ fontSize:'.52rem', letterSpacing:'.06em', textTransform:'uppercase', color:'#404060' }}>{lbl}</span>
                         <span style={{ fontSize:'.62rem', fontWeight:600, color:col||'#a0a0c0' }}>{val}</span>
                       </div>
                     ))}
-                    {c.notes && <div style={{ fontSize:'.56rem', color:'#505070', lineHeight:1.5, marginTop:6, paddingTop:6, borderTop:'1px solid #0d0d1a' }}>{c.notes}</div>}
+                    {c.notes && (
+                      <div style={{ fontSize:'.6rem', color:'#6060a0', lineHeight:1.6, marginTop:8, paddingTop:6, borderTop:'1px solid #0d0d1a' }}>
+                        {c.notes}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

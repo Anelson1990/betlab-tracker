@@ -153,6 +153,7 @@ export default function TodayCard({ accounts }) {
   const [saved, setSaved]       = useState(false)
   const [grading, setGrading]   = useState(false)
   const [gradeLog, setGradeLog] = useState([])
+  const [archiveConfirm, setArchiveConfirm] = useState(false)
 
   useEffect(() => {
     try {
@@ -612,40 +613,83 @@ export default function TodayCard({ accounts }) {
               )}
 
               {/* ARCHIVE BUTTON */}
-              <button onClick={()=>{
-                if (!window.confirm('Archive today\'s card to history?')) return
-                const rfiW = (card.rfi||[]).filter(b=>b.status==='win').length
-                const rfiL = (card.rfi||[]).filter(b=>b.status==='loss').length
-                const newCard = {
-                  id: card.date.replace(' ',''),
-                  date: card.date,
-                  potd: card.potd?.pick || 'NONE',
-                  potdResult: card.potd?.status==='win'?'W':card.potd?.status==='loss'?'L':card.potd?.status==='void'?'V':'P',
-                  potdPL: card.potd?.pl || 0,
-                  rfi: `${rfiW}-${rfiL}`,
-                  ml: `${(card.ml||[]).filter(b=>b.result==='win').length}-${(card.ml||[]).filter(b=>b.result==='loss').length}`,
-                  hitParlay: card.sgp?.status==='win'?'W':card.sgp?.status==='loss'?'L':'P',
-                  staked: totalStaked,
-                  pl: totalPL,
-                  bankroll: card.bankroll,
-                  notes: card.notes || '',
-                }
-                // Save to localStorage for cards tab to pick up
-                try {
-                  const key = 'betlab-tracker-cards-v1'
-                  const existing = JSON.parse(localStorage.getItem(key)||'[]')
-                  const filtered = existing.filter(c=>c.id!==newCard.id)
-                  localStorage.setItem(key, JSON.stringify([...filtered, newCard]))
-                } catch {}
-                alert('✅ Card archived to history!')
-              }}
-                style={{ width:'100%', padding:13, marginTop:12,
-                  background:`linear-gradient(135deg,${C.gold},#d97706)`,
-                  border:'none', borderRadius:10, color:'#000',
-                  fontWeight:800, fontSize:'.9rem', cursor:'pointer',
-                  letterSpacing:'.05em' }}>
-                🗂 ARCHIVE DAY TO HISTORY
-              </button>
+              {!archiveConfirm ? (
+                <button onClick={()=>setArchiveConfirm(true)}
+                  style={{ width:'100%', padding:13, marginTop:12,
+                    background:`linear-gradient(135deg,${C.gold},#d97706)`,
+                    border:'none', borderRadius:10, color:'#000',
+                    fontWeight:800, fontSize:'.9rem', cursor:'pointer',
+                    letterSpacing:'.05em' }}>
+                  🗂 ARCHIVE DAY TO HISTORY
+                </button>
+              ) : (
+                <div style={{ marginTop:12 }}>
+                  <div style={{ color:C.gold, fontSize:'.75rem', textAlign:'center',
+                    marginBottom:8, fontWeight:700 }}>
+                    Archive {card.date} to history?
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <button onClick={()=>{
+                      const rfiW = (card.rfi||[]).filter(b=>b.status==='win').length
+                      const rfiL = (card.rfi||[]).filter(b=>b.status==='loss').length
+                      const rfiN = (card.rfi||[]).filter(b=>b.stake>0).length
+                      const mlW  = (card.ml||[]).filter(b=>b.result==='win').length
+                      const mlL  = (card.ml||[]).filter(b=>b.result==='loss').length
+                      const allPL = [
+                        ...(card.rfi||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
+                        ...(card.props||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
+                        card.sgp?.stake>0 ? (card.sgp.pl||0) : 0,
+                        card.potd?.stake>0 ? (card.potd.pl||0) : 0,
+                      ].reduce((s,v)=>s+v,0)
+                      const totalS = [
+                        ...(card.rfi||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
+                        ...(card.props||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
+                        card.sgp?.stake>0 ? (card.sgp.stake||0) : 0,
+                        card.potd?.stake>0 ? (card.potd.stake||0) : 0,
+                      ].reduce((s,v)=>s+v,0)
+                      const newCard = {
+                        id: 'arc-'+Date.now(),
+                        date: card.date,
+                        potd: card.potd?.pick || 'NONE',
+                        potdResult: card.potd?.status==='win'?'W':card.potd?.status==='loss'?'L':card.potd?.status==='void'?'V':'P',
+                        potdPL: card.potd?.pl || 0,
+                        rfi: `${rfiW}-${rfiL}`,
+                        ml: `${mlW}-${mlL}`,
+                        hitParlay: card.sgp?.status==='win'?'W':card.sgp?.status==='loss'?'L':'P',
+                        staked: totalS,
+                        pl: allPL,
+                        bankroll: card.bankroll,
+                        notes: [
+                          card.potd?.pick ? `POTD: ${card.potd.pick} ${card.potd?.status==='win'?'✅':'❌'}` : '',
+                          rfiN>0 ? `RFI: ${rfiW}-${rfiL}` : '',
+                          card.sgp?.stake>0 ? `SGP: ${card.sgp.pick||'SGP'} ${card.sgp.status==='win'?'✅':'❌'}` : '',
+                          (card.ml||[]).length>0 ? `Paper: ${mlW}W-${mlL}L` : '',
+                          card.notes||'',
+                        ].filter(Boolean).join(' · '),
+                      }
+                      try {
+                        const key = 'betlab-tracker-cards-v1'
+                        const existing = JSON.parse(localStorage.getItem(key)||'[]')
+                        localStorage.setItem(key, JSON.stringify([...existing, newCard]))
+                      } catch(e) { console.error(e) }
+                      persist(EMPTY)
+                      setArchiveConfirm(false)
+                      setGradeLog(['✅ Card archived to history!'])
+                    }}
+                      style={{ padding:12, background:C.gold+'20',
+                        border:`1px solid ${C.gold}`, borderRadius:8,
+                        color:C.gold, fontWeight:800, fontSize:'.8rem', cursor:'pointer' }}>
+                      ✅ YES ARCHIVE
+                    </button>
+                    <button onClick={()=>setArchiveConfirm(false)}
+                      style={{ padding:12, background:'transparent',
+                        border:`1px solid ${C.border}`, borderRadius:8,
+                        color:C.dim, fontWeight:700, fontSize:'.8rem', cursor:'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
