@@ -584,8 +584,8 @@ export default function TodayCard({ accounts }) {
             </div>
           )}
 
-          {/* Session Summary */}
-          {totalStaked > 0 && (
+          {/* Session Summary + Archive */}
+          {true && (
             <div style={{ background:'linear-gradient(135deg,#0a0a18,#0e0e22)',
               border:`1px solid ${C.border}`, borderRadius:12, padding:14 }}>
               <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
@@ -610,6 +610,42 @@ export default function TodayCard({ accounts }) {
                   {card.notes}
                 </div>
               )}
+
+              {/* ARCHIVE BUTTON */}
+              <button onClick={()=>{
+                if (!window.confirm('Archive today\'s card to history?')) return
+                const rfiW = (card.rfi||[]).filter(b=>b.status==='win').length
+                const rfiL = (card.rfi||[]).filter(b=>b.status==='loss').length
+                const newCard = {
+                  id: card.date.replace(' ',''),
+                  date: card.date,
+                  potd: card.potd?.pick || 'NONE',
+                  potdResult: card.potd?.status==='win'?'W':card.potd?.status==='loss'?'L':card.potd?.status==='void'?'V':'P',
+                  potdPL: card.potd?.pl || 0,
+                  rfi: `${rfiW}-${rfiL}`,
+                  ml: `${(card.ml||[]).filter(b=>b.result==='win').length}-${(card.ml||[]).filter(b=>b.result==='loss').length}`,
+                  hitParlay: card.sgp?.status==='win'?'W':card.sgp?.status==='loss'?'L':'P',
+                  staked: totalStaked,
+                  pl: totalPL,
+                  bankroll: card.bankroll,
+                  notes: card.notes || '',
+                }
+                // Save to localStorage for cards tab to pick up
+                try {
+                  const key = 'betlab-tracker-cards-v1'
+                  const existing = JSON.parse(localStorage.getItem(key)||'[]')
+                  const filtered = existing.filter(c=>c.id!==newCard.id)
+                  localStorage.setItem(key, JSON.stringify([...filtered, newCard]))
+                } catch {}
+                alert('✅ Card archived to history!')
+              }}
+                style={{ width:'100%', padding:13, marginTop:12,
+                  background:`linear-gradient(135deg,${C.gold},#d97706)`,
+                  border:'none', borderRadius:10, color:'#000',
+                  fontWeight:800, fontSize:'.9rem', cursor:'pointer',
+                  letterSpacing:'.05em' }}>
+                🗂 ARCHIVE DAY TO HISTORY
+              </button>
             </div>
           )}
         </div>
