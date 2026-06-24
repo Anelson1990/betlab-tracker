@@ -66,6 +66,9 @@ export default function SharpMoney() {
   const [grading, setGrading] = useState(false)
   const [gradeLog, setGradeLog] = useState([])
   const [showAdd, setShowAdd] = useState(false)
+  const [showPaste, setShowPaste] = useState(false)
+  const [pasteInput, setPasteInput] = useState('')
+  const [pasteError, setPasteError] = useState('')
   const [editDate, setEditDate] = useState('')
   const [form, setForm] = useState({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
 
@@ -115,7 +118,23 @@ export default function SharpMoney() {
     save(updated)
   }
 
-  // Auto grade using MLB Stats API
+  const loadJSON = () => {
+    try {
+      const parsed = JSON.parse(pasteInput.trim())
+      if (!parsed.date || !parsed.picks) { setPasteError('JSON must have "date" and "picks" fields'); return }
+      const updated = JSON.parse(JSON.stringify(data))
+      const existing = updated.days.find(d => d.date === parsed.date)
+      if (existing) {
+        existing.picks = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
+      } else {
+        updated.days.push({ date: parsed.date, picks: parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i })) })
+      }
+      save(updated)
+      setPasteInput('')
+      setPasteError('')
+      setShowPaste(false)
+    } catch { setPasteError('Invalid JSON — check format') }
+  }
   const autoGrade = async (date) => {
     setGrading(true)
     const log = []
@@ -186,9 +205,14 @@ export default function SharpMoney() {
               {gradedPicks.length} graded · {gradedPicks.filter(p=>p.result==='win').length} wins · {gradedPicks.length ? Math.round((gradedPicks.filter(p=>p.result==='win').length/gradedPicks.length)*100) : 0}% overall WR
             </div>
           </div>
-          <button onClick={()=>setShowAdd(!showAdd)} style={{ padding:'6px 12px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#60a5fa' }}>
-            + Add
-          </button>
+          <div style={{ display:'flex', gap:4 }}>
+            <button onClick={()=>setShowAdd(!showAdd)} style={{ padding:'6px 12px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#60a5fa' }}>
+              + Add
+            </button>
+            <button onClick={()=>setShowPaste(!showPaste)} style={{ padding:'6px 12px', background:'rgba(74,222,128,.1)', border:'1px solid #14532d', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#4ade80' }}>
+              📋 Paste JSON
+            </button>
+          </div>
         </div>
 
         {/* View toggle */}
@@ -199,7 +223,22 @@ export default function SharpMoney() {
         </div>
       </div>
 
-      {/* ADD FORM */}
+      {/* PASTE JSON FORM */}
+      {showPaste && (
+        <div style={{ background:'#09090f', border:'1px solid #14532d', borderRadius:10, padding:12 }}>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#4ade80', marginBottom:8 }}>Paste Sharp JSON</div>
+          <textarea
+            value={pasteInput}
+            onChange={e=>setPasteInput(e.target.value)}
+            placeholder='{"date":"Jun 23","picks":[...]}'
+            style={{ width:'100%', minHeight:100, background:'#0c0c1a', border:'1px solid #1a1a2e', borderRadius:6, padding:8, color:'#e0e0f0', fontSize:'.72rem', fontFamily:'monospace', resize:'vertical', boxSizing:'border-box' }} />
+          {pasteError && <div style={{ color:'#f87171', fontSize:'.7rem', marginTop:4 }}>{pasteError}</div>}
+          <div style={{ display:'flex', gap:4, marginTop:8 }}>
+            <button onClick={loadJSON} style={{ flex:1, padding:8, background:'#4ade80', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#000' }}>⚡ Load Picks</button>
+            <button onClick={()=>{setShowPaste(false);setPasteInput('');setPasteError('')}} style={{ flex:1, padding:8, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
+          </div>
+        </div>
+      )}
       {showAdd && (
         <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
           <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Add Sharp Pick</div>
