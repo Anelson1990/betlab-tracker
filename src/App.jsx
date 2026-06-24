@@ -91,9 +91,9 @@ export default function App() {
 
   const tabs = [
     ['today','🎯 Today'],
-    ['checklist','☑️ Check'],
+    ['paper','📋 Paper'],
     ['sharp','💰 Sharp'],
-    ['cards','📋 Cards'],
+    ['cards','🗂 Cards'],
     ['models','📊 Models'],
     ['analytics','📈 Stats'],
     ['knowledge','📖 Learn'],
@@ -181,8 +181,54 @@ export default function App() {
         </div>
       )}
 
-      {/* CHECKLIST TAB */}
-      {tab === 'checklist' && <ChecklistTab />}
+      {/* PAPER BETS TAB */}
+      {tab === 'paper' && (
+        <div style={{ padding:'10px 12px' }}>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem',
+            fontWeight:800, letterSpacing:'.12em', textTransform:'uppercase',
+            color:'#505070', marginBottom:10 }}>
+            📋 Paper Picks — Today
+          </div>
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e',
+            borderRadius:10, padding:12, marginBottom:10 }}>
+            <div style={{ fontSize:'.6rem', color:'#404060', marginBottom:8,
+              letterSpacing:'.1em', textTransform:'uppercase' }}>
+              Paper picks track model performance without real money.
+              Grade them at end of day to build your stats.
+            </div>
+            {(() => {
+              try {
+                const s = localStorage.getItem('betlab-today-v3')
+                const c = s ? JSON.parse(s) : null
+                if (!c || !c.ml || c.ml.length === 0) {
+                  return <div style={{ color:'#404060', fontSize:'.75rem', textAlign:'center', padding:'20px 0' }}>
+                    No paper picks today — paste today\'s JSON on the Today tab
+                  </div>
+                }
+                return c.ml.map((b,i) => (
+                  <div key={i} style={{ background:'#0c0c1a', border:'1px solid #1a1a2e',
+                    borderLeft:`3px solid ${b.result==='win'?'#4ade80':b.result==='loss'?'#f87171':'#334155'}`,
+                    borderRadius:8, padding:'10px 12px', marginBottom:6 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <div>
+                        <div style={{ color:'#f0f0f8', fontSize:'.8rem', fontWeight:700 }}>
+                          {b.direction} · {b.game}
+                        </div>
+                        <div style={{ color:'#404060', fontSize:'.65rem', marginTop:2 }}>{b.sources}</div>
+                        <div style={{ color:'#60a5fa', fontSize:'.72rem', fontWeight:700, marginTop:2 }}>{b.odds}</div>
+                      </div>
+                      <div style={{ color:b.result==='win'?'#4ade80':b.result==='loss'?'#f87171':'#6060a0',
+                        fontSize:'1rem', fontWeight:700 }}>
+                        {b.result==='win'?'✅':b.result==='loss'?'❌':b.result==='void'?'🔄':'⏳'}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              } catch { return null }
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* SHARP MONEY TAB */}
       {tab === 'sharp' && <SharpMoney />}
