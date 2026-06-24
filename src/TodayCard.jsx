@@ -382,16 +382,26 @@ export default function TodayCard({ accounts }) {
         )}
       </div>
 
-      {/* PASTE BUTTON */}
-      <button onClick={()=>setPasteMode(p=>!p)}
-        style={{ width:'100%', padding:11, marginBottom:10,
-          background:pasteMode?C.accent+'15':'transparent',
-          border:`1px solid ${pasteMode?C.accent:C.border}`,
-          borderRadius:9, color:pasteMode?C.accent:C.dim,
-          fontWeight:700, fontSize:'.75rem', cursor:'pointer',
-          letterSpacing:'.08em', textTransform:'uppercase' }}>
-        {pasteMode ? '✕ Cancel' : "📋 Paste Today's JSON"}
-      </button>
+      {/* PASTE / DELETE BUTTONS */}
+      <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+        <button onClick={()=>setPasteMode(p=>!p)}
+          style={{ flex:1, padding:11,
+            background:pasteMode?C.accent+'15':'transparent',
+            border:`1px solid ${pasteMode?C.accent:C.border}`,
+            borderRadius:9, color:pasteMode?C.accent:C.dim,
+            fontWeight:700, fontSize:'.75rem', cursor:'pointer',
+            letterSpacing:'.08em', textTransform:'uppercase' }}>
+          {pasteMode ? '✕ Cancel' : "📋 Paste Today's JSON"}
+        </button>
+        {!isEmpty && (
+          <button onClick={()=>{ if(window.confirm('Clear today\'s card?')){ persist(EMPTY); setGradeLog([]) } }}
+            style={{ padding:'11px 14px', background:C.red+'10',
+              border:`1px solid ${C.red}30`, borderRadius:9,
+              color:C.red, fontWeight:700, fontSize:'.75rem', cursor:'pointer' }}>
+            🗑
+          </button>
+        )}
+      </div>
 
       {pasteMode && (
         <div style={{ marginBottom:12 }}>
