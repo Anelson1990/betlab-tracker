@@ -429,9 +429,47 @@ export default function TodayCard({ accounts }) {
             style={{ width:'100%', padding:12, marginTop:8,
               background:`linear-gradient(135deg,${C.accent},#22c55e)`,
               border:'none', borderRadius:8, color:'#000',
-              fontWeight:800, fontSize:'.85rem', cursor:'pointer' }}>
+              fontWeight:800, fontSize:'.85rem', cursor:'pointer', marginBottom:6 }}>
             ⚡ LOAD CARD
           </button>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+            <button onClick={()=>{
+              try {
+                const j = JSON.parse(jsonInput)
+                const paperCard = JSON.parse(JSON.stringify(j))
+                paperCard.ml = paperCard.ml || []
+                paperCard.ml.push({
+                  game: "Paper bet",
+                  direction: "DIRECTION",
+                  odds: "-110",
+                  sources: "Notes here",
+                  result: "pending"
+                })
+                setJsonInput(JSON.stringify(paperCard, null, 2))
+              } catch { alert('Invalid JSON') }
+            }}
+              style={{ padding:10, background:C.blue+'15',
+                border:`1px solid ${C.blue}40`, borderRadius:8,
+                color:C.blue, fontWeight:700, fontSize:'.75rem', cursor:'pointer' }}>
+              📋 ADD PAPER BET
+            </button>
+            <button onClick={()=>{
+              try {
+                const j = JSON.parse(jsonInput)
+                if (j.ml && j.ml.length > 0) {
+                  j.ml.pop()
+                  setJsonInput(JSON.stringify(j, null, 2))
+                } else {
+                  alert('No paper bets to delete')
+                }
+              } catch { alert('Invalid JSON') }
+            }}
+              style={{ padding:10, background:C.red+'15',
+                border:`1px solid ${C.red}40`, borderRadius:8,
+                color:C.red, fontWeight:700, fontSize:'.75rem', cursor:'pointer' }}>
+              🗑 DELETE LAST BET
+            </button>
+          </div>
         </div>
       )}
 

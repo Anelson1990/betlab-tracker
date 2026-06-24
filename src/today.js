@@ -1,20 +1,31 @@
 // BetLab Today Card — replaced completely each session
-// Last updated: Jun 23, 2026
+// Last updated: Jun 24, 2026
 export const TODAY_CARD = {
-  date: "Jun 23",
+  date: "Jun 24",
   bankroll: 185.90,
-  potd: null,
+  potd: {
+    pick: "MIL ML -130",
+    modelFire: "XGB 75% · LGB 62.4% · Consensus 68.7%",
+    game: "MIL @ CIN",
+    odds: "-130",
+    stake: 25,
+    payout: 19.23,
+    platform: "DK",
+    status: "pending",
+    pl: 0,
+    notes: "Drohan 3.40 ERA vs Lowder 4.82. Sharp 73% MIL. 2/3 agreement."
+  },
   rfi: [
-    { game:"HOU @ TOR", pick:"YRFI", conf:"63.8%", stake:10, payout:17.69, platform:"DK", status:"win", pl:7.69, notes:"Daughter's pick. Bieber ERA 9.82." },
+    { game:"BOS @ COL", pick:"YRFI", conf:"64.7%", stake:10, payout:12, platform:"DK", status:"pending", pl:0, notes:"Suarez 2.94 ERA vs Freeland 7.50. NRFI streak 5." },
+    { game:"CHC @ NYM", pick:"YRFI", conf:"63.4%", stake:10, payout:12, platform:"DK", status:"pending", pl:0, notes:"McLean NRFI streak 5. 90% sharp CHC ML." },
   ],
   sgp: null,
-  ml: [
-    { game:"BOS @ COL", direction:"BOS", odds:"-162", sources:"Gray ERA 3.12 vs Sullivan ERA 10.29. 91% sharp.", result:"pending" },
-    { game:"HOU @ TOR", direction:"HOU", odds:"+109", sources:"MC F5 91.2%. XGB 75%. Lambert vs Bieber ERA 9.82.", result:"win" },
-    { game:"MIL @ CIN", direction:"MIL", odds:"-106", sources:"XGB 75%. 70% sharp.", result:"win" },
-    { game:"CHC @ NYM", direction:"CHC", odds:"-107", sources:"XGB 75%. 75% sharp. Senga ERA 9.00.", result:"win" },
+  props: [
+    { pick:"Ohtani O5.5 Ks", stake:10, payout:11, platform:"PP", status:"pending", pl:0, notes:"80% rec, -110, +28% edge" },
+    { pick:"Alvarez O0.5 hits", stake:10, payout:12, platform:"PP", status:"pending", pl:0, notes:"90% rec, vs Yesavage RHP" },
+    { pick:"Ashcraft O4.5 Ks", stake:10, payout:9, platform:"PP", status:"pending", pl:0, notes:"90% rec, -150 tight but lock" },
   ],
-  props: [],
-  totalPL: -12.31,
-  notes: "BAL ML was not model confirmed — Rule #1 violation. Daughter 1-0 on YRFI. Paper HOU/MIL/CHC all won.",
+  ml: [],
+  totalPL: 0,
+  notes: "POTD MIL DK + 2 RFI (BOS/CHC YRFI 60%+) + 3 K props on PP. Total staked: $70.",
 };
