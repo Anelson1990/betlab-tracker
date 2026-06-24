@@ -509,8 +509,21 @@ export default function TodayCard({ accounts }) {
           {/* RFI */}
           {(card.rfi||[]).filter(b=>b.stake>0).length > 0 && (
             <div style={{ marginBottom:10 }}>
-              <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
-                textTransform:'uppercase', marginBottom:6 }}>🎲 RFI</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
+                  textTransform:'uppercase' }}>🎲 RFI</div>
+                <button onClick={()=>{
+                  const c = JSON.parse(JSON.stringify(card))
+                  c.rfi = c.rfi || []
+                  c.rfi.push({ game:"", pick:"YRFI", conf:"60%", stake:0, payout:0, platform:"DK", status:"pending", pl:0, notes:"" })
+                  persist(c)
+                }}
+                  style={{ padding:'4px 8px', background:C.blue+'15',
+                    border:`1px solid ${C.blue}40`, borderRadius:6,
+                    color:C.blue, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
+                  + PAPER BET
+                </button>
+              </div>
               {card.rfi.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK',
@@ -538,8 +551,21 @@ export default function TodayCard({ accounts }) {
           {/* Props */}
           {(card.props||[]).filter(b=>b.stake>0).length > 0 && (
             <div style={{ marginBottom:10 }}>
-              <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
-                textTransform:'uppercase', marginBottom:6 }}>⚾ PROPS</div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
+                  textTransform:'uppercase' }}>⚾ PROPS</div>
+                <button onClick={()=>{
+                  const c = JSON.parse(JSON.stringify(card))
+                  c.props = c.props || []
+                  c.props.push({ pick:"", stake:0, payout:0, platform:"PP", status:"pending", pl:0, notes:"" })
+                  persist(c)
+                }}
+                  style={{ padding:'4px 8px', background:C.blue+'15',
+                    border:`1px solid ${C.blue}40`, borderRadius:6,
+                    color:C.blue, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
+                  + PAPER BET
+                </button>
+              </div>
               {card.props.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, type:'Props', platform:b.platform||'PP' }}
@@ -550,11 +576,24 @@ export default function TodayCard({ accounts }) {
           )}
 
           {/* Paper picks */}
-          {(card.ml||[]).length > 0 && (
-            <div style={{ marginBottom:10 }}>
+          <div style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
               <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
-                textTransform:'uppercase', marginBottom:6 }}>📋 PAPER PICKS</div>
-              {card.ml.map((b,i) => (
+                textTransform:'uppercase' }}>📋 PAPER PICKS</div>
+              <button onClick={()=>{
+                const c = JSON.parse(JSON.stringify(card))
+                c.ml = c.ml || []
+                c.ml.push({ game:"", direction:"", odds:"-110", sources:"", result:"pending" })
+                persist(c)
+              }}
+                style={{ padding:'4px 8px', background:C.blue+'15',
+                  border:`1px solid ${C.blue}40`, borderRadius:6,
+                  color:C.blue, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
+                + PAPER BET
+              </button>
+            </div>
+            {(card.ml||[]).length > 0 ? (
+              card.ml.map((b,i) => (
                 <div key={i} style={{ background:C.muted, border:`1px solid ${C.border}`,
                   borderLeft:`3px solid ${sColor(b.result||'pending')}`,
                   borderRadius:8, padding:'10px 12px', marginBottom:6 }}>
@@ -589,9 +628,13 @@ export default function TodayCard({ accounts }) {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <div style={{ color:C.dim, fontSize:'.7rem', textAlign:'center', padding:'10px 0' }}>
+                No paper picks yet — tap + PAPER BET to add one
+              </div>
+            )}
+          </div>
 
           {/* Auto Grade Button */}
           <button onClick={autoGrade} disabled={grading}
