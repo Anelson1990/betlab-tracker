@@ -189,7 +189,129 @@ export default function TodayCard({ accounts }) {
     } catch { setJsonError('Invalid JSON — check format and try again') }
   }
 
-  const gradeItem = (type, idx, status) => {
+  const [grading, setGrading] = useState(false)
+  const [gradeLog, setGradeLog] = useState([])
+
+  const autoGrade = async () => {
+    if (!card.date) return
+    setGrading(true)
+    const log = []
+
+    // Parse date
+    const months = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' }
+    const parts = card.date.trim().split(' ')
+    const dateStr = `2026-${months[parts[0]]||'06'}-${(parts[1]||'01').padStart(2,'0')}`
+
+    log.push(`🔄 Fetching games for ${card.date}...`)
+    try {
+      const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${dateStr}&hydrate=linescore,team`)
+      const games = (await res.json())?.dates?.[0]?.games || []
+      log.push(`✅ Found ${games.length} games`)
+
+      const findGame = (teamStr) => {
+        if (!teamStr) return null
+        const t = teamStr.toUpperCase()
+        return games.find(g => {
+          const h = g.teams?.home?.team?.abbreviation?.toUpperCase()||''
+          const a = g.teams?.away?.team?.abbreviation?.toUpperCase()||''
+          const hn = g.teams?.home?.team?.teamName?.toUpperCase()||''
+          const an = g.teams?.away?.team?.teamName?.toUpperCase()||''
+          return h===t||a===t||hn.includes(t)||an.includes(t)||
+            g.teams?.home?.team?.name?.toUpperCase().includes(t)||
+            g.teams?.away?.team?.name?.toUpperCase().includes(t)
+        })
+      }
+
+      const getResult = (game, direction) => {
+        if (!game) return null
+        const st = game.status?.detailedState||''
+        if (!st.toLowerCase().includes('final')) return 'pending'
+        const hs = game.teams?.home?.score
+        const as = game.teams?.away?.score
+        if (hs===undefined||as===undefined) return null
+        const dir = direction?.toUpperCase()
+        const ha = game.teams?.home?.team?.abbreviation?.toUpperCase()||''
+        const aa = game.teams?.away?.team?.abbreviation?.toUpperCase()||''
+        const hn = game.teams?.home?.team?.teamName?.toUpperCase()||''
+        const an = game.teams?.away?.team?.teamName?.toUpperCase()||''
+        const isHome = ha===dir||hn.includes(dir)||game.teams?.home?.team?.name?.toUpperCase().includes(dir)
+        if (isHome) return hs > as ? 'win' : 'loss'
+        const isAway = aa===dir||an.includes(dir)||game.teams?.away?.team?.name?.toUpperCase().includes(dir)
+        if (isAway) return as > hs ? 'win' : 'loss'
+        return null
+      }
+
+      const updated = JSON.parse(JSON.stringify(card))
+
+      // Grade POTD
+      if (updated.potd?.stake > 0 && updated.potd?.status === 'pending') {
+        const g = findGame(updated.potd.direction || updated.potd.pick?.split(' ')[0])
+        const r = getResult(g, updated.potd.direction || updated.potd.pick?.split(' ')[0])
+        if (r && r !== 'pending') {
+          updated.potd.status = r
+          updated.potd.pl = r==='win'?(updated.potd.payout||0)-(updated.potd.stake||0):-(updated.potd.stake||0)
+          log.push(`${r==='win'?'✅':'❌'} POTD ${updated.potd.pick} → ${r.toUpperCase()}`)
+        } else {
+          log.push(`⏳ POTD ${updated.potd.pick}: not final yet`)
+        }
+      }
+
+      // Grade RFI
+      ;(updated.rfi||[]).forEach((b,i) => {
+        if (b.stake > 0 && b.status === 'pending') {
+          const g = findGame(b.game?.split('@')[0]?.trim()||b.game?.split('vs')[0]?.trim())
+            || findGame(b.game?.split('@')[1]?.trim())
+          if (!g) { log.push(`⏳ RFI ${b.game}: game not found`); return }
+          const st = g.status?.detailedState||''
+          if (!st.toLowerCase().includes('final')) { log.push(`⏳ RFI ${b.game}: not final yet`); return }
+          const hs = g.teams?.home?.score||0
+          const as = g.teams?.away?.score||0
+          const scored = hs > 0 || as > 0
+          // Check first inning score from linescore
+          const inning1h = g.linescore?.innings?.[0]?.home?.runs ?? null
+          const inning1a = g.linescore?.innings?.[0]?.away?.runs ?? null
+          let firstInningScored = false
+          if (inning1h !== null && inning1a !== null) {
+            firstInningScored = (inning1h + inning1a) > 0
+          } else {
+            firstInningScored = scored
+          }
+          const r = b.pick === 'YRFI'
+            ? (firstInningScored ? 'win' : 'loss')
+            : (!firstInningScored ? 'win' : 'loss')
+          updated.rfi[i].status = r
+          updated.rfi[i].pl = r==='win'?(b.payout||0)-(b.stake||0):-(b.stake||0)
+          log.push(`${r==='win'?'✅':'❌'} RFI ${b.pick} ${b.game} → ${r.toUpperCase()}`)
+        }
+      })
+
+      // Grade SGP
+      if (updated.sgp?.stake > 0 && updated.sgp?.status === 'pending') {
+        log.push(`⏳ SGP: grade manually — multi-leg`)
+      }
+
+      // Grade paper picks
+      ;(updated.ml||[]).forEach((b,i) => {
+        if (b.result === 'pending' || !b.result) {
+          const g = findGame(b.direction)
+          const r = getResult(g, b.direction)
+          if (r && r !== 'pending') {
+            updated.ml[i].result = r
+            log.push(`${r==='win'?'✅':'❌'} Paper ${b.direction} ${b.game} → ${r.toUpperCase()}`)
+          } else {
+            log.push(`⏳ Paper ${b.direction} ${b.game}: not final yet`)
+          }
+        }
+      })
+
+      persist(updated)
+      log.push('✅ Auto-grade complete')
+    } catch (e) {
+      log.push(`❌ Error: ${e.message}`)
+    }
+    setGradeLog(log)
+    setGrading(false)
+  }
     const c = { ...card }
     const payout = (item) => item.payout||0
     const stake  = (item) => item.stake||0
@@ -419,6 +541,35 @@ export default function TodayCard({ accounts }) {
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+
+          {/* Auto Grade Button */}
+          <button onClick={autoGrade} disabled={grading}
+            style={{ width:'100%', padding:12, marginBottom:10,
+              background:grading?C.muted:`linear-gradient(135deg,${C.blue},#2563eb)`,
+              border:'none', borderRadius:10, color:'#fff',
+              fontWeight:800, fontSize:'.85rem', cursor:grading?'not-allowed':'pointer',
+              letterSpacing:'.05em' }}>
+            {grading ? '🔄 GRADING...' : '⚡ AUTO GRADE CARD'}
+          </button>
+
+          {/* Grade Log */}
+          {gradeLog.length > 0 && (
+            <div style={{ background:C.bg, border:`1px solid ${C.border}`,
+              borderRadius:10, padding:12, marginBottom:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between',
+                alignItems:'center', marginBottom:8 }}>
+                <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.1em',
+                  textTransform:'uppercase' }}>Grade Log</div>
+                <button onClick={()=>setGradeLog([])}
+                  style={{ background:'none', border:'none', color:C.dim,
+                    fontSize:'.65rem', cursor:'pointer' }}>Clear</button>
+              </div>
+              {gradeLog.map((l,i) => (
+                <div key={i} style={{ color:l.startsWith('✅')?C.accent:l.startsWith('❌')?C.red:l.startsWith('⏳')?C.gold:C.dim,
+                  fontSize:'.72rem', marginBottom:3, lineHeight:1.4 }}>{l}</div>
               ))}
             </div>
           )}
