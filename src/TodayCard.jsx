@@ -69,6 +69,42 @@ function BetRow({ bet, onGrade }) {
         </div>
       </div>
 
+      {/* ALWAYS-VISIBLE GRADE BUTTONS */}
+      {bet.status==='pending' && onGrade && (
+        <div style={{ display:'grid',
+          gridTemplateColumns:bet.onPaperBet?'1fr 1fr 1fr 1fr 1fr':'1fr 1fr 1fr 1fr',
+          gap:6, padding:'0 14px 12px' }}>
+          {[
+            { label:'✅', st:'win',  color:C.accent },
+            { label:'❌', st:'loss', color:C.red },
+            { label:'🔄', st:'void', color:C.dim },
+          ].map(({ label, st, color }) => (
+            <button key={st} onClick={(e)=>{ e.stopPropagation(); onGrade(st) }}
+              style={{ padding:'9px 4px', background:color+'15',
+                border:`1px solid ${color}40`, borderRadius:8,
+                color, fontWeight:700, fontSize:'.8rem', cursor:'pointer' }}>
+              {label}
+            </button>
+          ))}
+          {bet.onPaperBet && (
+            <button onClick={(e)=>{ e.stopPropagation(); bet.onPaperBet() }}
+              style={{ padding:'9px 4px', background:C.blue+'15',
+                border:`1px solid ${C.blue}40`, borderRadius:8,
+                color:C.blue, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
+              📋
+            </button>
+          )}
+          {bet.onDelete && (
+            <button onClick={(e)=>{ e.stopPropagation(); bet.onDelete() }}
+              style={{ padding:'9px 4px', background:'transparent',
+                border:`1px solid ${C.border}`, borderRadius:8,
+                color:C.muted, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
+              🗑
+            </button>
+          )}
+        </div>
+      )}
+
       {open && (
         <div style={{ padding:'0 14px 14px', borderTop:`1px solid ${C.border}` }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, margin:'12px 0' }}>
@@ -112,31 +148,6 @@ function BetRow({ bet, onGrade }) {
           {bet.analysis && (
             <div style={{ color:C.text, fontSize:'.75rem', marginBottom:10, lineHeight:1.5 }}>
               {bet.analysis}
-            </div>
-          )}
-
-          {bet.status==='pending' && onGrade && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
-              {[
-                { label:'✅ WIN',  st:'win',  color:C.accent },
-                { label:'❌ LOSS', st:'loss', color:C.red },
-                { label:'🔄 VOID', st:'void', color:C.dim },
-              ].map(({ label, st, color }) => (
-                <button key={st} onClick={()=>onGrade(st)}
-                  style={{ padding:'10px 4px', background:color+'15',
-                    border:`1px solid ${color}40`, borderRadius:8,
-                    color, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
-                  {label}
-                </button>
-              ))}
-              {bet.onDelete && (
-                <button onClick={bet.onDelete}
-                  style={{ padding:'10px 4px', background:'transparent',
-                    border:`1px solid ${C.border}`, borderRadius:8,
-                    color:C.muted, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
-                  🗑 DEL
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -497,7 +508,8 @@ export default function TodayCard({ accounts }) {
               <div style={{ color:C.gold, fontSize:'.6rem', letterSpacing:'.12em',
                 textTransform:'uppercase', marginBottom:6 }}>🎯 PICK OF THE DAY</div>
               <BetRow
-                bet={{ ...card.potd, type:'POTD', platform:card.potd.platform||'DK' }}
+                bet={{ ...card.potd, type:'POTD', platform:card.potd.platform||'DK',
+                  onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.potd=null; persist(c) } }}
                 onGrade={(st) => {
                   const pl = st==='win'?(card.potd.payout||0)-(card.potd.stake||0):st==='loss'?-(card.potd.stake||0):0
                   persist({ ...card, potd:{ ...card.potd, status:st, pl } })
@@ -527,7 +539,8 @@ export default function TodayCard({ accounts }) {
               {card.rfi.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK',
-                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.rfi.splice(i,1); persist(c) } }}
+                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.rfi.splice(i,1); persist(c) },
+                    onPaperBet:()=>{ const c=JSON.parse(JSON.stringify(card)); c.ml=c.ml||[]; c.ml.push({game:b.game,direction:'',odds:'-110',sources:b.pick,result:'pending'}); persist(c) } }}
                   onGrade={st=>gradeItem('rfi',i,st)}
                 />
               ))}
@@ -568,7 +581,9 @@ export default function TodayCard({ accounts }) {
               </div>
               {card.props.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
-                  bet={{ ...b, type:'Props', platform:b.platform||'PP' }}
+                  bet={{ ...b, type:'Props', platform:b.platform||'PP',
+                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.props.splice(i,1); persist(c) },
+                    onPaperBet:()=>{ const c=JSON.parse(JSON.stringify(card)); c.ml=c.ml||[]; c.ml.push({game:'',direction:'',odds:'-110',sources:b.pick,result:'pending'}); persist(c) } }}
                   onGrade={st=>gradeItem('props',i,st)}
                 />
               ))}
