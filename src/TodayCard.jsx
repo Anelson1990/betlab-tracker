@@ -213,12 +213,10 @@ export default function TodayCard({ accounts }) {
 
   // Calculate session P&L
   const allBets = [
-    card.potd?.stake>0 ? { ...card.potd, type:'POTD', betType:'potd' } : null,
     ...(card.rfi||[]).map(b=>({ ...b, betType:'rfi', type:'RFI' })),
-    ...(card.ml||[]).map(b=>({ ...b, betType:'ml', type:'ML' })),
     ...(card.props||[]).map(b=>({ ...b, betType:'props', type:'Props' })),
     card.sgp?.stake>0 ? { ...card.sgp, type:'SGP', betType:'sgp' } : null,
-  ].filter(Boolean).filter(b=>b.type!=='paper'&&b.stake>0)
+  ].filter(Boolean).filter(b=>b.stake>0)
 
   const totalStaked = allBets.reduce((s,b)=>s+(b.stake||0),0)
   const totalPL     = allBets.reduce((s,b)=>s+(b.pl||0),0)
@@ -337,22 +335,6 @@ export default function TodayCard({ accounts }) {
       {/* ── TODAY'S CARD ── */}
       {!isEmpty && (
         <div>
-          {/* POTD */}
-          {card.potd?.pick && (
-            <div style={{ marginBottom:10 }}>
-              <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
-                textTransform:'uppercase', marginBottom:6, display:'flex',
-                alignItems:'center', gap:6 }}>
-                <span style={{ color:C.gold }}>🎯</span> PICK OF THE DAY
-              </div>
-              <BetRow
-                bet={{ ...card.potd, type:'POTD', betType:'potd',
-                  pick:card.potd.pick, platform:card.potd.platform||'DK' }}
-                onGrade={gradePotd}
-              />
-            </div>
-          )}
-
           {/* RFI */}
           {card.rfi?.filter(b=>b.stake>0).length > 0 && (
             <div style={{ marginBottom:10 }}>
@@ -411,19 +393,29 @@ export default function TodayCard({ accounts }) {
               </div>
               {card.ml.map((b,i) => (
                 <div key={i} style={{ background:C.muted, border:`1px solid ${C.border}`,
-                  borderRadius:8, padding:'10px 12px', marginBottom:6,
-                  display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div>
-                    <div style={{ color:C.text, fontSize:'.78rem', fontWeight:600 }}>
-                      {b.direction} {b.game}
+                  borderLeft:`3px solid ${statusColor(b.result||'pending')}`,
+                  borderRadius:8, padding:'10px 12px', marginBottom:6 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ color:C.text, fontSize:'.78rem', fontWeight:600 }}>
+                        {b.direction} {b.game}
+                      </div>
+                      <div style={{ color:C.dim, fontSize:'.65rem', marginTop:2 }}>{b.sources}</div>
+                      <div style={{ color:C.blue, fontWeight:700, fontSize:'.75rem', marginTop:2 }}>{b.odds}</div>
                     </div>
-                    <div style={{ color:C.dim, fontSize:'.65rem', marginTop:2 }}>{b.sources}</div>
-                  </div>
-                  <div style={{ textAlign:'right' }}>
-                    <div style={{ color:C.blue, fontWeight:700, fontSize:'.8rem' }}>{b.odds}</div>
-                    <div style={{ color:statusColor(b.result||'pending'),
-                      fontSize:'.7rem', marginTop:2 }}>
-                      {statusIcon(b.result||'pending')}
+                    <div style={{ display:'flex', gap:4, marginLeft:8 }}>
+                      {['win','loss','void'].map(st => (
+                        <button key={st} onClick={()=>{
+                          const updated = { ...card, ml: card.ml.map((x,j)=>j===i?{...x,result:st}:x) }
+                          persist(updated)
+                        }}
+                          style={{ padding:'5px 7px', borderRadius:6, border:'none',
+                            background:b.result===st?(st==='win'?C.accent:st==='loss'?C.red:C.dim)+'30':'transparent',
+                            color:b.result===st?(st==='win'?C.accent:st==='loss'?C.red:C.dim):C.muted,
+                            fontSize:'.7rem', cursor:'pointer', fontWeight:700 }}>
+                          {st==='win'?'✅':st==='loss'?'❌':'🔄'}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
