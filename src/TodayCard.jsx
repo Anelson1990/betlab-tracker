@@ -155,6 +155,32 @@ export default function TodayCard({ accounts }) {
   const loadJSON = () => {
     try {
       const parsed = JSON.parse(jsonInput.trim())
+
+      // ── RULE #1 ENFORCEMENT ──
+      // POTD must have modelFire field with real model data
+      if (parsed.potd && parsed.potd.stake > 0) {
+        if (!parsed.potd.modelFire || parsed.potd.modelFire.trim() === '') {
+          setJsonError('🚨 RULE #1 VIOLATION — POTD missing modelFire field. Add the model that fired (e.g. "XGB 75% · Consensus ✅") or move to paper.')
+          return
+        }
+        // Must contain XGB, Consensus, LGB, or MC
+        const mf = parsed.potd.modelFire.toUpperCase()
+        if (!mf.includes('XGB') && !mf.includes('CONSENSUS') && !mf.includes('LGB') && !mf.includes('MC')) {
+          setJsonError('🚨 RULE #1 VIOLATION — modelFire must reference a real model (XGB, Consensus, LGB, or MC). No made up bets.')
+          return
+        }
+      }
+
+      // RFI bets must also have model reference
+      if (parsed.rfi) {
+        for (const b of parsed.rfi) {
+          if (b.stake > 0 && (!b.conf || b.conf.trim() === '')) {
+            setJsonError(`🚨 RULE #1 VIOLATION — RFI bet on ${b.game} missing conf field. Add RFI model confidence.`)
+            return
+          }
+        }
+      }
+
       persist(parsed)
       setJsonError('')
       setPasteMode(false)
