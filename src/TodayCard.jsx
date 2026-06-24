@@ -30,7 +30,7 @@ function Pill({ label, color }) {
 }
 
 function BetRow({ bet, onGrade }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!!(bet.legs && bet.legs.length > 0))
   const pl = bet.status==='win'?(bet.payout||0)-(bet.stake||0):bet.status==='loss'?-(bet.stake||0):0
 
   return (
@@ -124,15 +124,34 @@ function BetRow({ bet, onGrade }) {
           {bet.legs && bet.legs.length > 0 && (
             <div style={{ marginBottom:10 }}>
               {bet.legs.map((leg,i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between',
-                  alignItems:'center', padding:'6px 0',
+                <div key={i} style={{ padding:'8px 0',
                   borderBottom:i<bet.legs.length-1?`1px solid ${C.border}`:'none' }}>
-                  <span style={{ color:C.text, fontSize:'.75rem', flex:1, paddingRight:8 }}>
-                    {sIcon(leg.result)} {leg.description||leg.player||leg.prop}
-                  </span>
-                  <span style={{ color:sColor(leg.result), fontSize:'.75rem', fontWeight:700 }}>
-                    {sLabel(leg.result)}
-                  </span>
+                  <div style={{ display:'flex', justifyContent:'space-between',
+                    alignItems:'center', marginBottom:6 }}>
+                    <span style={{ color:C.text, fontSize:'.75rem', flex:1, paddingRight:8 }}>
+                      {sIcon(leg.result)} {leg.description||leg.player||leg.prop}
+                    </span>
+                    <span style={{ color:sColor(leg.result), fontSize:'.72rem', fontWeight:700 }}>
+                      {sLabel(leg.result)}
+                    </span>
+                  </div>
+                  {bet.onGradeLeg && (
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                      {[
+                        { label:'✅', st:'win',  color:C.accent },
+                        { label:'❌', st:'loss', color:C.red },
+                        { label:'🔄', st:'void', color:C.dim },
+                      ].map(({ label, st, color }) => (
+                        <button key={st} onClick={(e)=>{ e.stopPropagation(); bet.onGradeLeg(i, st) }}
+                          style={{ padding:'5px 4px',
+                            background:leg.result===st?color+'30':color+'10',
+                            border:`1px solid ${color}40`, borderRadius:6,
+                            color, fontWeight:700, fontSize:'.7rem', cursor:'pointer' }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -568,7 +587,13 @@ export default function TodayCard({ accounts }) {
               <BetRow
                 bet={{ ...card.sgp, type:'SGP',
                   pick:card.sgp.pick||((card.sgp.legs?.length||0)+'-Leg SGP'),
-                  platform:card.sgp.platform||'B365' }}
+                  platform:card.sgp.platform||'B365',
+                  onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.sgp=null; persist(c) },
+                  onGradeLeg:(legIdx, st)=>{
+                    const c=JSON.parse(JSON.stringify(card))
+                    c.sgp.legs[legIdx].result = st
+                    persist(c)
+                  } }}
                 onGrade={gradeSgp}
               />
             </div>
