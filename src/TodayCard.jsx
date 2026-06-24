@@ -78,14 +78,22 @@ function BetRow({ bet, onGrade }) {
             { label:'✅', st:'win',  color:C.accent },
             { label:'❌', st:'loss', color:C.red },
             { label:'🔄', st:'void', color:C.dim },
-          ].map(({ label, st, color }) => (
-            <button key={st} onClick={(e)=>{ e.stopPropagation(); onGrade(st) }}
-              style={{ padding:'9px 4px', background:color+'15',
-                border:`1px solid ${color}40`, borderRadius:8,
-                color, fontWeight:700, fontSize:'.8rem', cursor:'pointer' }}>
-              {label}
-            </button>
-          ))}
+          ].map(({ label, st, color }) => {
+            const active = bet.status===st
+            return (
+              <button key={st} onClick={(e)=>{ e.stopPropagation(); onGrade(st) }}
+                style={{ padding:'9px 4px',
+                  background:active?color:color+'15',
+                  border:`2px solid ${active?color:color+'40'}`,
+                  borderRadius:8,
+                  color:active?'#000':color,
+                  fontWeight:800, fontSize:'.8rem', cursor:'pointer',
+                  boxShadow:active?`0 0 8px ${color}80`:'none',
+                  transform:active?'scale(1.02)':'none' }}>
+                {label}{active?' ✓':''}
+              </button>
+            )
+          })}
           {bet.onPaperBet && (
             <button onClick={(e)=>{ e.stopPropagation(); bet.onPaperBet() }}
               style={{ padding:'9px 4px', background:C.blue+'15',
@@ -141,15 +149,20 @@ function BetRow({ bet, onGrade }) {
                         { label:'✅', st:'win',  color:C.accent },
                         { label:'❌', st:'loss', color:C.red },
                         { label:'🔄', st:'void', color:C.dim },
-                      ].map(({ label, st, color }) => (
-                        <button key={st} onClick={(e)=>{ e.stopPropagation(); bet.onGradeLeg(i, st) }}
-                          style={{ padding:'5px 4px',
-                            background:leg.result===st?color+'30':color+'10',
-                            border:`1px solid ${color}40`, borderRadius:6,
-                            color, fontWeight:700, fontSize:'.7rem', cursor:'pointer' }}>
-                          {label}
-                        </button>
-                      ))}
+                      ].map(({ label, st, color }) => {
+                        const active = leg.result===st
+                        return (
+                          <button key={st} onClick={(e)=>{ e.stopPropagation(); bet.onGradeLeg(i, st) }}
+                            style={{ padding:'5px 4px',
+                              background:active?color:color+'10',
+                              border:`2px solid ${active?color:color+'40'}`, borderRadius:6,
+                              color:active?'#000':color,
+                              fontWeight:800, fontSize:'.7rem', cursor:'pointer',
+                              boxShadow:active?`0 0 6px ${color}80`:'none' }}>
+                            {label}{active?' ✓':''}
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
