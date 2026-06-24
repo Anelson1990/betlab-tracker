@@ -17,4 +17,4 @@ export const SEED_CARDS = [
   { id: "0621", date: "Jun 21", potd: "CIN ML even",        potdResult: "W", potdPL: 0,     rfi: "4-0", ml: "2-0", hitParlay: "W", staked: 15,    pl: 40.74,  bankroll: 180.74, notes: "Burns ERA 2.01. RFI 4-0 best day. PHI SGP +283 cashed $57.45. LGB broken." },
   { id: "0622", date: "Jun 22", potd: "CHC ML -124", potdResult: "V", potdPL: 0, rfi: "0-1", ml: "1-0", hitParlay: "V", staked: 43, pl: 5.16, bankroll: 185.90, notes: "CHC postponed void. STL SGP +269 cashed $36.90. ATL NRFI cashed. YRFI parlay -$10 MIL NRFI. PP refund." },
 ];
-// Appended Jun 22
+  { id: "0623", date: "Jun 23", potd: "NONE", potdResult: "P", potdPL: 0, rfi: "1-0", ml: "0-0", hitParlay: "P", staked: 10, pl: -12.31, bankroll: 185.90, notes: "BAL ML unverified -$20 Rule #1 violation. Daughter YRFI +$7.69. Paper HOU/MIL/CHC all won." },
