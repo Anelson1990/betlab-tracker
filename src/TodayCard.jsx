@@ -509,7 +509,14 @@ export default function TodayCard({ accounts }) {
                 textTransform:'uppercase', marginBottom:6 }}>🎯 PICK OF THE DAY</div>
               <BetRow
                 bet={{ ...card.potd, type:'POTD', platform:card.potd.platform||'DK',
-                  onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.potd=null; persist(c) } }}
+                  onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.potd=null; persist(c) },
+                  onPaperBet:()=>{
+                    const c=JSON.parse(JSON.stringify(card))
+                    c.ml=c.ml||[]
+                    c.ml.push({ game:c.potd.game||'', direction:c.potd.pick, odds:c.potd.odds||'', sources:c.potd.notes||'', result:'pending' })
+                    c.potd=null
+                    persist(c)
+                  } }}
                 onGrade={(st) => {
                   const pl = st==='win'?(card.potd.payout||0)-(card.potd.stake||0):st==='loss'?-(card.potd.stake||0):0
                   persist({ ...card, potd:{ ...card.potd, status:st, pl } })
@@ -540,7 +547,13 @@ export default function TodayCard({ accounts }) {
                 <BetRow key={i}
                   bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK',
                     onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.rfi.splice(i,1); persist(c) },
-                    onPaperBet:()=>{ const c=JSON.parse(JSON.stringify(card)); c.ml=c.ml||[]; c.ml.push({game:b.game,direction:'',odds:'-110',sources:b.pick,result:'pending'}); persist(c) } }}
+                    onPaperBet:()=>{
+                      const c=JSON.parse(JSON.stringify(card))
+                      c.ml=c.ml||[]
+                      c.ml.push({ game:b.game, direction:b.pick, odds:b.conf||'', sources:b.notes||'', result:'pending' })
+                      c.rfi.splice(i,1)
+                      persist(c)
+                    } }}
                   onGrade={st=>gradeItem('rfi',i,st)}
                 />
               ))}
@@ -583,7 +596,13 @@ export default function TodayCard({ accounts }) {
                 <BetRow key={i}
                   bet={{ ...b, type:'Props', platform:b.platform||'PP',
                     onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.props.splice(i,1); persist(c) },
-                    onPaperBet:()=>{ const c=JSON.parse(JSON.stringify(card)); c.ml=c.ml||[]; c.ml.push({game:'',direction:'',odds:'-110',sources:b.pick,result:'pending'}); persist(c) } }}
+                    onPaperBet:()=>{
+                      const c=JSON.parse(JSON.stringify(card))
+                      c.ml=c.ml||[]
+                      c.ml.push({ game:'', direction:b.pick, odds:'', sources:b.notes||'', result:'pending' })
+                      c.props.splice(i,1)
+                      persist(c)
+                    } }}
                   onGrade={st=>gradeItem('props',i,st)}
                 />
               ))}
