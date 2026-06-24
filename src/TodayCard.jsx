@@ -405,57 +405,6 @@ export default function TodayCard({ accounts }) {
             </div>
           )}
 
-          {/* Sharp picks */}
-          {card.sharp?.length > 0 && (
-            <div style={{ marginBottom:10 }}>
-              <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
-                textTransform:'uppercase', marginBottom:6, display:'flex',
-                justifyContent:'space-between', alignItems:'center' }}>
-                <span>💰 SHARP MONEY</span>
-                <span style={{ color:C.dim, fontSize:'.58rem' }}>{card.sharp.length} picks</span>
-              </div>
-              {card.sharp.map((s,i) => (
-                <div key={i} style={{ background:C.muted, border:`1px solid ${C.border}`,
-                  borderLeft:`3px solid ${s.gap>=50?C.accent:s.gap>=30?C.gold:C.dim}`,
-                  borderRadius:8, padding:'9px 12px', marginBottom:5 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ color:C.text, fontSize:'.75rem', fontWeight:600, marginBottom:4 }}>{s.game}</div>
-                      <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                        <span style={{ background:`${C.gold}15`, color:C.gold,
-                          fontSize:'.58rem', fontWeight:700, padding:'2px 6px',
-                          borderRadius:10 }}>{s.pick}</span>
-                        <span style={{ background:`${C.blue}15`, color:C.blue,
-                          fontSize:'.58rem', fontWeight:700, padding:'2px 6px',
-                          borderRadius:10 }}>{s.gap}% gap</span>
-                        <span style={{
-                          background:s.signal==='confirms'?`${C.accent}15`:s.signal==='conflicts'?`${C.red}15`:`${C.dim}20`,
-                          color:s.signal==='confirms'?C.accent:s.signal==='conflicts'?C.red:C.dim,
-                          fontSize:'.58rem', fontWeight:700, padding:'2px 6px', borderRadius:10 }}>
-                          {s.signal}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display:'flex', gap:4, marginLeft:8 }}>
-                      {['win','loss','void'].map(st => (
-                        <button key={st} onClick={()=>{
-                          const updated = { ...card, sharp: card.sharp.map((x,j)=>j===i?{...x,result:st}:x) }
-                          persist(updated)
-                        }}
-                          style={{ padding:'4px 6px', borderRadius:6, border:'none',
-                            background:s.result===st?(st==='win'?C.accent:st==='loss'?C.red:C.dim)+'30':'transparent',
-                            color:s.result===st?(st==='win'?C.accent:st==='loss'?C.red:C.dim):C.muted,
-                            fontSize:'.65rem', cursor:'pointer', fontWeight:700 }}>
-                          {st==='win'?'✅':st==='loss'?'❌':'🔄'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Session summary */}
           {totalStaked > 0 && (
             <div style={{ background:`linear-gradient(135deg,#0a0a18,#0e0e22)`,
