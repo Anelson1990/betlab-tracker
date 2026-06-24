@@ -116,7 +116,7 @@ function BetRow({ bet, onGrade }) {
           )}
 
           {bet.status==='pending' && onGrade && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
               {[
                 { label:'✅ WIN',  st:'win',  color:C.accent },
                 { label:'❌ LOSS', st:'loss', color:C.red },
@@ -129,6 +129,14 @@ function BetRow({ bet, onGrade }) {
                   {label}
                 </button>
               ))}
+              {bet.onDelete && (
+                <button onClick={bet.onDelete}
+                  style={{ padding:'10px 4px', background:'transparent',
+                    border:`1px solid ${C.border}`, borderRadius:8,
+                    color:C.muted, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
+                  🗑 DEL
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -466,7 +474,8 @@ export default function TodayCard({ accounts }) {
                 textTransform:'uppercase', marginBottom:6 }}>🎲 RFI</div>
               {card.rfi.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
-                  bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK' }}
+                  bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK',
+                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.rfi.splice(i,1); persist(c) } }}
                   onGrade={st=>gradeItem('rfi',i,st)}
                 />
               ))}
@@ -528,6 +537,16 @@ export default function TodayCard({ accounts }) {
                           {st==='win'?'✅':st==='loss'?'❌':'🔄'}
                         </button>
                       ))}
+                      <button onClick={()=>{
+                        const c = JSON.parse(JSON.stringify(card))
+                        c.ml.splice(i,1)
+                        persist(c)
+                      }}
+                        style={{ padding:'5px 7px', borderRadius:6, border:'none',
+                          background:'transparent', color:C.muted,
+                          fontSize:'.7rem', cursor:'pointer', fontWeight:700 }}>
+                        🗑
+                      </button>
                     </div>
                   </div>
                 </div>
