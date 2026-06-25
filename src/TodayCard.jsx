@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { parseCardDate, gradeSharpPicks } from './mlbUtils'
 
 const CARD_KEY = 'betlab-today-v3'
+const SHARP_KEY = 'betlab-sharp-v2'
 
 const C = {
   bg:'#07070f', card:'#0e0e1c', border:'#1a1a2e',
@@ -473,6 +475,32 @@ export default function TodayCard({ accounts, adjustAccount }) {
     return true
   }
 
+  // Grade today's sharp picks; clear the day from sharp card only if all settled. Returns status string.
+  const gradeAndClearSharp = async (dateLabel) => {
+    try {
+      const sd = JSON.parse(localStorage.getItem(SHARP_KEY)||'{"days":[]}')
+      const idx = (sd.days||[]).findIndex(d => d.date === dateLabel)
+      if (idx < 0) return ''
+      const pendingBefore = sd.days[idx].picks.filter(p=>p.result==='pending').length
+      if (pendingBefore > 0) {
+        const { picks } = await gradeSharpPicks(sd.days[idx].picks, parseCardDate(dateLabel))
+        sd.days[idx].picks = picks
+      }
+      const stillPending = sd.days[idx].picks.filter(p=>p.result==='pending').length
+      if (stillPending === 0 && sd.days[idx].picks.length > 0) {
+        // All graded — remove the day from the active sharp card (stays in stats/history aggregate)
+        const w = sd.days[idx].picks.filter(p=>p.result==='win').length
+        const l = sd.days[idx].picks.filter(p=>p.result==='loss').length
+        sd.days.splice(idx, 1)
+        localStorage.setItem(SHARP_KEY, JSON.stringify(sd))
+        return ` · sharp cleared (${w}-${l})`
+      } else {
+        localStorage.setItem(SHARP_KEY, JSON.stringify(sd))
+        return stillPending > 0 ? ` · ${stillPending} sharp still pending` : ''
+      }
+    } catch(e) { console.error(e); return '' }
+  }
+
   // ── AUTO GRADE ──
   const autoGrade = async (andArchive=false) => {
     if (!card.date) return
@@ -591,8 +619,9 @@ export default function TodayCard({ accounts, adjustAccount }) {
           log.push(`⚠️ ${pend.length+pendPaper.length} still pending — not archived. Grade manually then archive.`)
         } else {
           archiveCard(updated)
+          const sharpMsg = await gradeAndClearSharp(updated.date)
           persist(EMPTY)
-          log.push('🗂 Card archived & cleared!')
+          log.push('🗂 Card archived & cleared!' + sharpMsg)
         }
       }
     } catch (e) {
@@ -1164,11 +1193,12 @@ export default function TodayCard({ accounts, adjustAccount }) {
                     Archive {card.date} to history?
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <button onClick={()=>{
+                    <button onClick={async ()=>{
                       archiveCard(card)
+                      const sharpMsg = await gradeAndClearSharp(card.date)
                       persist(EMPTY)
                       setArchiveConfirm(false)
-                      setGradeLog(['✅ Card archived to Cards history!'])
+                      setGradeLog(['✅ Card archived to Cards history!' + sharpMsg])
                     }}
                       style={{ padding:12, background:C.gold+'20',
                         border:`1px solid ${C.gold}`, borderRadius:8,
