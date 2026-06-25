@@ -43,6 +43,7 @@ export default function App() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingAcct, setEditingAcct] = useState(null)
   const [acctInput, setAcctInput] = useState('')
+  const [paperArchived, setPaperArchived] = useState('')
   const [accounts, setAccounts] = useState(() => {
     try { const s = localStorage.getItem(BR_KEY); return s ? JSON.parse(s) : DEFAULT_ACCOUNTS } catch { return DEFAULT_ACCOUNTS }
   })
@@ -238,6 +239,35 @@ export default function App() {
               } catch { return null }
             })()}
           </div>
+
+          {/* Paper Archive Button */}
+          <button onClick={()=>{
+            try {
+              const c = JSON.parse(localStorage.getItem('betlab-today-v3')||'{}')
+              const graded = (c.ml||[]).filter(b=>b.result && b.result!=='pending')
+              if (graded.length === 0) { setPaperArchived('⚠️ No graded paper bets to archive'); return }
+              const pkey = 'betlab-paper-history-v1'
+              const papers = JSON.parse(localStorage.getItem(pkey)||'[]')
+              const seen = new Set(papers.map(p=>`${p.date}|${p.pick}|${p.game}|${p.result}`))
+              const toAdd = graded
+                .map(b=>({ date:c.date||'Today', pick:b.direction||b.sources||b.game||'Paper', game:b.game||'', odds:b.odds||'', result:b.result }))
+                .filter(p=>!seen.has(`${p.date}|${p.pick}|${p.game}|${p.result}`))
+              if (toAdd.length === 0) { setPaperArchived('✓ Already archived — no new paper bets'); return }
+              localStorage.setItem(pkey, JSON.stringify([...papers, ...toAdd]))
+              setPaperArchived(`✅ ${toAdd.length} paper bet${toAdd.length>1?'s':''} archived to Stats`)
+            } catch(e) { setPaperArchived('⚠️ Archive failed') }
+          }}
+            style={{ width:'100%', padding:12,
+              background:'linear-gradient(135deg,#60a5fa,#2563eb)',
+              border:'none', borderRadius:10, color:'#fff',
+              fontWeight:800, fontSize:'.85rem', cursor:'pointer', letterSpacing:'.05em' }}>
+            🗂 ARCHIVE PAPER BETS TO STATS
+          </button>
+          {paperArchived && (
+            <div style={{ textAlign:'center', fontSize:'.7rem', color:'#60a5fa', marginTop:8 }}>
+              {paperArchived}
+            </div>
+          )}
         </div>
       )}
 
@@ -434,7 +464,14 @@ export default function App() {
                 }))
               } catch { return [] }
             })()
-            const all = [...papers, ...live]
+            const merged = [...papers, ...live]
+            const seen = new Set()
+            const all = merged.filter(p => {
+              const key = `${p.date}|${p.pick}|${p.game}|${p.result}`
+              if (seen.has(key)) return false
+              seen.add(key)
+              return true
+            })
             const w = all.filter(p=>p.result==='win').length
             const l = all.filter(p=>p.result==='loss').length
             const v = all.filter(p=>p.result==='void').length

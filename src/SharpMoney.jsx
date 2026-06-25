@@ -316,7 +316,7 @@ export default function SharpMoney() {
 
           {todayPicks.length > 0 && (
             <button onClick={()=>autoGrade(today)} disabled={grading} style={{ width:'100%', padding:9, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:grading?'#404060':'#60a5fa', marginTop:4 }}>
-              {grading ? '⏳ Grading...' : '⚡ Auto Grade Today'}
+              {grading ? '⏳ Grading...' : '🗂 Grade & Archive Sharp Picks'}
             </button>
           )}
         </div>

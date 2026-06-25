@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
-import { parseCardDate, gradeSharpPicks } from './mlbUtils'
 
 const CARD_KEY = 'betlab-today-v3'
-const SHARP_KEY = 'betlab-sharp-v2'
 
 const C = {
   bg:'#07070f', card:'#0e0e1c', border:'#1a1a2e',
@@ -413,8 +411,70 @@ export default function TodayCard({ accounts, adjustAccount }) {
     persist(c)
   }
 
+  // ── ARCHIVE (reusable, takes a card snapshot) ──
+  const archiveCard = (src) => {
+    const cd = src || card
+    if (!cd || !cd.date) return false
+    const rfiW = (cd.rfi||[]).filter(b=>b.status==='win').length
+    const rfiL = (cd.rfi||[]).filter(b=>b.status==='loss').length
+    const rfiN = (cd.rfi||[]).filter(b=>b.stake>0).length
+    const mlW  = (cd.ml||[]).filter(b=>b.result==='win').length
+    const mlL  = (cd.ml||[]).filter(b=>b.result==='loss').length
+    const allPL = [
+      ...(cd.rfi||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
+      ...(cd.props||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
+      ...(cd.offcard||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
+      cd.sgp?.stake>0 ? (cd.sgp.pl||0) : 0,
+      cd.potd?.stake>0 ? (cd.potd.pl||0) : 0,
+    ].reduce((s,v)=>s+v,0)
+    const totalS = [
+      ...(cd.rfi||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
+      ...(cd.props||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
+      ...(cd.offcard||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
+      cd.sgp?.stake>0 ? (cd.sgp.stake||0) : 0,
+      cd.potd?.stake>0 ? (cd.potd.stake||0) : 0,
+    ].reduce((s,v)=>s+v,0)
+    const newCard = {
+      id: 'arc-'+Date.now(),
+      date: cd.date,
+      potd: cd.potd?.pick || 'NONE',
+      potdResult: cd.potd?.status==='win'?'W':cd.potd?.status==='loss'?'L':cd.potd?.status==='void'?'V':'P',
+      potdPL: cd.potd?.pl || 0,
+      rfi: `${rfiW}-${rfiL}`,
+      ml: `${mlW}-${mlL}`,
+      hitParlay: cd.sgp?.status==='win'?'W':cd.sgp?.status==='loss'?'L':'P',
+      staked: totalS,
+      pl: allPL,
+      bankroll: cd.bankroll,
+      notes: [
+        cd.potd?.pick ? `POTD: ${cd.potd.pick} ${cd.potd?.status==='win'?'✅':'❌'}` : '',
+        rfiN>0 ? `RFI: ${rfiW}-${rfiL}` : '',
+        cd.sgp?.stake>0 ? `SGP: ${cd.sgp.pick||'SGP'} ${cd.sgp.status==='win'?'✅':'❌'}` : '',
+        (cd.ml||[]).length>0 ? `Paper: ${mlW}W-${mlL}L` : '',
+        cd.notes||'',
+      ].filter(Boolean).join(' · '),
+    }
+    try {
+      const key = 'betlab-tracker-cards-v1'
+      const existing = JSON.parse(localStorage.getItem(key)||'[]')
+      localStorage.setItem(key, JSON.stringify([...existing, newCard]))
+    } catch(e) { console.error(e) }
+    // Save graded paper bets to paper history
+    try {
+      const pkey = 'betlab-paper-history-v1'
+      const papers = JSON.parse(localStorage.getItem(pkey)||'[]')
+      const seen = new Set(papers.map(p=>`${p.date}|${p.pick}|${p.game}|${p.result}`))
+      const toAdd = (cd.ml||[])
+        .filter(b=>b.result && b.result!=='pending')
+        .map(b=>({ date:cd.date, pick:b.direction||b.sources||b.game||'Paper', game:b.game||'', odds:b.odds||'', result:b.result }))
+        .filter(p=>!seen.has(`${p.date}|${p.pick}|${p.game}|${p.result}`))
+      if (toAdd.length) localStorage.setItem(pkey, JSON.stringify([...papers, ...toAdd]))
+    } catch(e) { console.error(e) }
+    return true
+  }
+
   // ── AUTO GRADE ──
-  const autoGrade = async () => {
+  const autoGrade = async (andArchive=false) => {
     if (!card.date) return
     setGrading(true)
     const log = []
@@ -516,6 +576,25 @@ export default function TodayCard({ accounts, adjustAccount }) {
 
       persist(updated)
       log.push('✅ Auto-grade complete')
+
+      if (andArchive) {
+        // Check everything that has stake is settled (not pending)
+        const pend = [
+          ...(updated.rfi||[]).filter(b=>b.stake>0),
+          ...(updated.props||[]).filter(b=>b.stake>0),
+          ...(updated.offcard||[]).filter(b=>b.stake>0),
+          ...(updated.sgp?.stake>0 ? [updated.sgp] : []),
+          ...(updated.potd?.stake>0 ? [updated.potd] : []),
+        ].filter(b => (b.status||'pending')==='pending')
+        const pendPaper = (updated.ml||[]).filter(b => !b.result || b.result==='pending')
+        if (pend.length > 0 || pendPaper.length > 0) {
+          log.push(`⚠️ ${pend.length+pendPaper.length} still pending — not archived. Grade manually then archive.`)
+        } else {
+          archiveCard(updated)
+          persist(EMPTY)
+          log.push('🗂 Card archived & cleared!')
+        }
+      }
     } catch (e) {
       log.push('❌ Error: ' + e.message)
     }
@@ -1004,13 +1083,21 @@ export default function TodayCard({ accounts, adjustAccount }) {
               </div>
             )}
           </div>
-          <button onClick={autoGrade} disabled={grading}
-            style={{ width:'100%', padding:12, marginBottom:10,
+          <button onClick={()=>autoGrade(false)} disabled={grading}
+            style={{ width:'100%', padding:12, marginBottom:8,
               background:grading?C.muted:`linear-gradient(135deg,${C.blue},#2563eb)`,
               border:'none', borderRadius:10, color:'#fff',
               fontWeight:800, fontSize:'.85rem',
               cursor:grading?'not-allowed':'pointer', letterSpacing:'.05em' }}>
             {grading ? '🔄 GRADING...' : '⚡ AUTO GRADE CARD'}
+          </button>
+          <button onClick={()=>autoGrade(true)} disabled={grading}
+            style={{ width:'100%', padding:12, marginBottom:10,
+              background:grading?C.muted:`linear-gradient(135deg,${C.gold},#d97706)`,
+              border:'none', borderRadius:10, color:'#000',
+              fontWeight:800, fontSize:'.85rem',
+              cursor:grading?'not-allowed':'pointer', letterSpacing:'.05em' }}>
+            {grading ? '🔄 GRADING...' : '⚡🗂 AUTO GRADE & ARCHIVE'}
           </button>
 
           {/* Grade Log */}
@@ -1077,84 +1164,11 @@ export default function TodayCard({ accounts, adjustAccount }) {
                     Archive {card.date} to history?
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <button onClick={async ()=>{
-                      const rfiW = (card.rfi||[]).filter(b=>b.status==='win').length
-                      const rfiL = (card.rfi||[]).filter(b=>b.status==='loss').length
-                      const rfiN = (card.rfi||[]).filter(b=>b.stake>0).length
-                      const mlW  = (card.ml||[]).filter(b=>b.result==='win').length
-                      const mlL  = (card.ml||[]).filter(b=>b.result==='loss').length
-                      const allPL = [
-                        ...(card.rfi||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
-                        ...(card.props||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
-                        card.sgp?.stake>0 ? (card.sgp.pl||0) : 0,
-                        card.potd?.stake>0 ? (card.potd.pl||0) : 0,
-                      ].reduce((s,v)=>s+v,0)
-                      const totalS = [
-                        ...(card.rfi||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
-                        ...(card.props||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
-                        card.sgp?.stake>0 ? (card.sgp.stake||0) : 0,
-                        card.potd?.stake>0 ? (card.potd.stake||0) : 0,
-                      ].reduce((s,v)=>s+v,0)
-                      const newCard = {
-                        id: 'arc-'+Date.now(),
-                        date: card.date,
-                        potd: card.potd?.pick || 'NONE',
-                        potdResult: card.potd?.status==='win'?'W':card.potd?.status==='loss'?'L':card.potd?.status==='void'?'V':'P',
-                        potdPL: card.potd?.pl || 0,
-                        rfi: `${rfiW}-${rfiL}`,
-                        ml: `${mlW}-${mlL}`,
-                        hitParlay: card.sgp?.status==='win'?'W':card.sgp?.status==='loss'?'L':'P',
-                        staked: totalS,
-                        pl: allPL,
-                        bankroll: card.bankroll,
-                        notes: [
-                          card.potd?.pick ? `POTD: ${card.potd.pick} ${card.potd?.status==='win'?'✅':'❌'}` : '',
-                          rfiN>0 ? `RFI: ${rfiW}-${rfiL}` : '',
-                          card.sgp?.stake>0 ? `SGP: ${card.sgp.pick||'SGP'} ${card.sgp.status==='win'?'✅':'❌'}` : '',
-                          (card.ml||[]).length>0 ? `Paper: ${mlW}W-${mlL}L` : '',
-                          card.notes||'',
-                        ].filter(Boolean).join(' · '),
-                      }
-                      try {
-                        const key = 'betlab-tracker-cards-v1'
-                        const existing = JSON.parse(localStorage.getItem(key)||'[]')
-                        localStorage.setItem(key, JSON.stringify([...existing, newCard]))
-                      } catch(e) { console.error(e) }
-                      // Save paper bets to dedicated paper archive for stats
-                      try {
-                        const pkey = 'betlab-paper-history-v1'
-                        const papers = JSON.parse(localStorage.getItem(pkey)||'[]')
-                        const todayPapers = (card.ml||[])
-                          .filter(b => b.result && b.result!=='pending')
-                          .map(b => ({
-                            date: card.date,
-                            pick: b.direction || b.sources || b.game || 'Paper',
-                            game: b.game||'',
-                            odds: b.odds||'',
-                            result: b.result,
-                          }))
-                        if (todayPapers.length) localStorage.setItem(pkey, JSON.stringify([...papers, ...todayPapers]))
-                      } catch(e) { console.error(e) }
-
-                      // Auto-grade today's pending sharp picks via MLB API
-                      let sharpMsg = ''
-                      try {
-                        const sd = JSON.parse(localStorage.getItem(SHARP_KEY)||'{"days":[]}')
-                        const dayIdx = (sd.days||[]).findIndex(d => d.date === card.date)
-                        if (dayIdx >= 0) {
-                          const pending = sd.days[dayIdx].picks.filter(p=>p.result==='pending').length
-                          if (pending > 0) {
-                            const { picks, graded } = await gradeSharpPicks(sd.days[dayIdx].picks, parseCardDate(card.date))
-                            sd.days[dayIdx].picks = picks
-                            localStorage.setItem(SHARP_KEY, JSON.stringify(sd))
-                            sharpMsg = ` · ${graded} sharp graded`
-                          }
-                        }
-                      } catch(e) { console.error(e) }
-
+                    <button onClick={()=>{
+                      archiveCard(card)
                       persist(EMPTY)
                       setArchiveConfirm(false)
-                      setGradeLog([`✅ Card archived to history!${sharpMsg}`])
+                      setGradeLog(['✅ Card archived to Cards history!'])
                     }}
                       style={{ padding:12, background:C.gold+'20',
                         border:`1px solid ${C.gold}`, borderRadius:8,
