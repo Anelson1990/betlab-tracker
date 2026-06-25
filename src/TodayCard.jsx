@@ -706,9 +706,10 @@ export default function TodayCard({ accounts, adjustAccount }) {
                 textTransform:'uppercase', marginBottom:6 }}>🎯 PICK OF THE DAY</div>
               <BetRow
                 bet={{ ...card.potd, type:'POTD', platform:card.potd.platform||'DK',
-                  onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.potd=null; persist(c) },
+                  onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); if (adjustAccount && c.potd?.stake>0 && (c.potd?.status||'pending')==='pending') adjustAccount(c.potd.platform||'dk', c.potd.stake); c.potd=null; persist(c) },
                   onPaperBet:()=>{
                     const c=JSON.parse(JSON.stringify(card))
+                    if (adjustAccount && c.potd.stake>0 && (c.potd.status||'pending')==='pending') adjustAccount(c.potd.platform||'dk', c.potd.stake)
                     c.ml=c.ml||[]
                     c.ml.push({ game:c.potd.game||'', direction:c.potd.pick, odds:c.potd.odds||'', sources:c.potd.notes||'', result:'pending' })
                     c.potd=null
@@ -744,9 +745,14 @@ export default function TodayCard({ accounts, adjustAccount }) {
               {card.rfi.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK',
-                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.rfi.splice(i,1); persist(c) },
+                    onDelete:()=>{
+                      const c=JSON.parse(JSON.stringify(card))
+                      if (adjustAccount && b.stake>0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', b.stake)
+                      c.rfi.splice(i,1); persist(c)
+                    },
                     onPaperBet:()=>{
                       const c=JSON.parse(JSON.stringify(card))
+                      if (adjustAccount && b.stake>0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', b.stake)
                       c.ml=c.ml||[]
                       c.ml.push({ game:b.game, direction:b.pick, odds:b.conf||'', sources:b.notes||'', result:'pending' })
                       c.rfi.splice(i,1)
@@ -799,9 +805,14 @@ export default function TodayCard({ accounts, adjustAccount }) {
               {card.props.filter(b=>b.stake>0).map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, type:'Props', platform:b.platform||'PP',
-                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.props.splice(i,1); persist(c) },
+                    onDelete:()=>{
+                      const c=JSON.parse(JSON.stringify(card))
+                      if (adjustAccount && b.stake>0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'pp', b.stake)
+                      c.props.splice(i,1); persist(c)
+                    },
                     onPaperBet:()=>{
                       const c=JSON.parse(JSON.stringify(card))
+                      if (adjustAccount && b.stake>0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'pp', b.stake)
                       c.ml=c.ml||[]
                       c.ml.push({ game:'', direction:b.pick, odds:'', sources:b.notes||'', result:'pending' })
                       c.props.splice(i,1)
