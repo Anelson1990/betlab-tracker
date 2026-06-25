@@ -31,7 +31,7 @@ function Pill({ label, color }) {
 
 function BetRow({ bet, onGrade }) {
   const [open, setOpen] = useState(!!(bet.legs && bet.legs.length > 0))
-  const pl = bet.status==='win'?(bet.payout||0)-(bet.stake||0):bet.status==='loss'?-(bet.stake||0):0
+  const pl = bet.status==='win'?(bet.payout||0):bet.status==='loss'?-(bet.stake||0):0
 
   return (
     <div style={{ background:C.muted, border:`1px solid ${C.border}`,
@@ -239,13 +239,13 @@ export default function TodayCard({ accounts }) {
   const gradeItem = (type, idx, status) => {
     const c = JSON.parse(JSON.stringify(card))
     const item = c[type][idx]
-    const pl = status==='win'?(item.payout||0)-(item.stake||0):status==='loss'?-(item.stake||0):0
+    const pl = status==='win'?(item.payout||0):status==='loss'?-(item.stake||0):0
     c[type][idx] = { ...item, status, pl }
     persist(c)
   }
 
   const gradeSgp = (status) => {
-    const pl = status==='win'?(card.sgp.payout||0)-(card.sgp.stake||0):status==='loss'?-(card.sgp.stake||0):0
+    const pl = status==='win'?(card.sgp.payout||0):status==='loss'?-(card.sgp.stake||0):0
     persist({ ...card, sgp:{ ...card.sgp, status, pl } })
   }
 
@@ -312,7 +312,7 @@ export default function TodayCard({ accounts }) {
         const r = getResult(g, updated.potd.direction || updated.potd.pick?.split(' ')[0])
         if (r && r !== 'pending') {
           updated.potd.status = r
-          updated.potd.pl = r==='win'?(updated.potd.payout||0)-(updated.potd.stake||0):-(updated.potd.stake||0)
+          updated.potd.pl = r==='win'?(updated.potd.payout||0):-(updated.potd.stake||0)
           log.push((r==='win'?'✅':'❌') + ' POTD ' + updated.potd.pick + ' → ' + r.toUpperCase())
         } else {
           log.push('⏳ POTD ' + updated.potd.pick + ': not final yet')
@@ -332,7 +332,7 @@ export default function TodayCard({ accounts }) {
           const scored = i1h !== null && i1a !== null ? (i1h + i1a) > 0 : (g.teams?.home?.score||0)+(g.teams?.away?.score||0) > 0
           const r = b.pick==='YRFI' ? (scored?'win':'loss') : (!scored?'win':'loss')
           updated.rfi[i].status = r
-          updated.rfi[i].pl = r==='win'?(b.payout||0)-(b.stake||0):-(b.stake||0)
+          updated.rfi[i].pl = r==='win'?(b.payout||0):-(b.stake||0)
           log.push((r==='win'?'✅':'❌') + ' RFI ' + b.pick + ' ' + b.game + ' → ' + r.toUpperCase())
         }
       })
@@ -550,7 +550,7 @@ export default function TodayCard({ accounts }) {
                     persist(c)
                   } }}
                 onGrade={(st) => {
-                  const pl = st==='win'?(card.potd.payout||0)-(card.potd.stake||0):st==='loss'?-(card.potd.stake||0):0
+                  const pl = st==='win'?(card.potd.payout||0):st==='loss'?-(card.potd.stake||0):0
                   persist({ ...card, potd:{ ...card.potd, status:st, pl } })
                 }}
               />
