@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { parseCardDate, gradeSharpPicks } from './mlbUtils'
 
 const CARD_KEY = 'betlab-today-v3'
+const SHARP_KEY = 'betlab-sharp-v2'
 
 const C = {
   bg:'#07070f', card:'#0e0e1c', border:'#1a1a2e',
@@ -1075,7 +1077,7 @@ export default function TodayCard({ accounts, adjustAccount }) {
                     Archive {card.date} to history?
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <button onClick={()=>{
+                    <button onClick={async ()=>{
                       const rfiW = (card.rfi||[]).filter(b=>b.status==='win').length
                       const rfiL = (card.rfi||[]).filter(b=>b.status==='loss').length
                       const rfiN = (card.rfi||[]).filter(b=>b.stake>0).length
@@ -1133,9 +1135,26 @@ export default function TodayCard({ accounts, adjustAccount }) {
                           }))
                         if (todayPapers.length) localStorage.setItem(pkey, JSON.stringify([...papers, ...todayPapers]))
                       } catch(e) { console.error(e) }
+
+                      // Auto-grade today's pending sharp picks via MLB API
+                      let sharpMsg = ''
+                      try {
+                        const sd = JSON.parse(localStorage.getItem(SHARP_KEY)||'{"days":[]}')
+                        const dayIdx = (sd.days||[]).findIndex(d => d.date === card.date)
+                        if (dayIdx >= 0) {
+                          const pending = sd.days[dayIdx].picks.filter(p=>p.result==='pending').length
+                          if (pending > 0) {
+                            const { picks, graded } = await gradeSharpPicks(sd.days[dayIdx].picks, parseCardDate(card.date))
+                            sd.days[dayIdx].picks = picks
+                            localStorage.setItem(SHARP_KEY, JSON.stringify(sd))
+                            sharpMsg = ` · ${graded} sharp graded`
+                          }
+                        }
+                      } catch(e) { console.error(e) }
+
                       persist(EMPTY)
                       setArchiveConfirm(false)
-                      setGradeLog(['✅ Card archived to history!'])
+                      setGradeLog([`✅ Card archived to history!${sharpMsg}`])
                     }}
                       style={{ padding:12, background:C.gold+'20',
                         border:`1px solid ${C.gold}`, borderRadius:8,
