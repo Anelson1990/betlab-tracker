@@ -358,24 +358,30 @@ export default function TodayCard({ accounts, adjustAccount }) {
     }
 
     // ── PARLAY DETECTION ──
-    const parlayLine = lines.find(l => /(\d+\s*[-\s]?(pick|leg|team)\s*parlay|parlay)/i.test(l))
+    const parlayLine = lines.find(l => /(\d+\s*[-\s]?(pick|leg|team)\s*parla[yv]|parla[yv])/i.test(l))
     if (parlayLine) {
-      // Extract leg lines: things that look like a pick (player hits, run line, totals, etc.)
-      // Skip header/summary/status lines.
-      const skip = /(parlay|wager|risk|stake|to pay|to win|return|payout|total|open|settled|cash ?out|bet ?slip|^over 0\.5, )/i
-      const legPatterns = [
-        /\d+\+?\s+[A-Z][a-zé'.-]+\s+[A-Z][a-zé'.-]+\s+(hits|hit|tb|bases|runs|rbis?|hr|home runs?|ks?|strikeouts?)/i, // "1+ Yandy Diaz Hits"
-        /(over|under|o|u)\s*[\d.]+\s*(runs?|1st inning|first inning|hits|tb)/i, // "Over 0.5 Runs - 1st Inning"
-        /[A-Z][a-zé'.-]+\s+[A-Z][a-zé'.-]+\s+(over|under|o|u)\s*[\d.]+/i, // "Player Over 1.5"
-      ]
+      // Lines to never treat as legs (headers/summary/status/noise)
+      const skip = /(parlay|wager|to ?pa[yv]|to ?win|return|payout|^total$|^open$|settled|cash ?out|bet ?slip|^over 0\.5,)/i
       const legs = []
-      for (const l of lines) {
+      for (let raw of lines) {
+        if (raw === parlayLine) continue  // skip the header line itself
+        let l = raw.replace(/[>•]/g,' ').replace(/\s{2,}/g,' ').trim()
+        if (!l || l.length < 4) continue
         if (skip.test(l)) continue
-        if (l.length < 4) continue
-        // Must match a leg pattern OR contain a player+stat
-        if (legPatterns.some(re => re.test(l))) {
-          const clean = l.replace(/^\s*[•\-–]\s*/, '').replace(/\s{2,}/g,' ').trim()
-          if (clean && !legs.includes(clean)) legs.push(clean)
+        if (/(pick|leg|team)\s*parla[yv]/i.test(l)) continue  // any parlay header variant
+        // A leg looks like one of:
+        //  - starts with a number+ then a name  ("1+ Yandy Diaz Hits")
+        //  - over/under/o/u + number            ("Over 0.5 Runs - 1st Inning")
+        //  - contains a stat keyword with a name
+        const isLeg =
+          /^\d+\+?\s+[A-Za-z]/.test(l) ||                                  // "1+ Yandy Diaz Hits"
+          /\b(over|under|o|u)\s*[\d.]+/i.test(l) ||                        // "Over 0.5 ..."
+          /\b(hits?|tb|total bases|runs?|rbis?|hr|home runs?|ks?|strikeouts?|bases)\b/i.test(l)
+        // Exclude bare numbers like "0.5" or junk like "KG"
+        const bareNum = /^[\d.]+$/.test(l)
+        const tooShort = l.replace(/[^A-Za-z]/g,'').length < 2
+        if (isLeg && !bareNum && !tooShort) {
+          if (!legs.includes(l)) legs.push(l)
         }
       }
 
