@@ -150,8 +150,10 @@ export default function SharpMoney() {
 
     for (const pick of updDay.picks) {
       if (pick.result !== 'pending') continue
-      // Extract team abbr from sharpPick (e.g. "WSH -136" → "WSH")
-      const teamAbbr = pick.sharpPick.split(' ')[0]
+      // Extract team abbr from sharpPick/bet/side (e.g. "WSH -136" → "WSH")
+      const nameField = pick.sharpPick || pick.bet || pick.side || ''
+      const teamAbbr = nameField.split(' ')[0]
+      if (!teamAbbr) { log.push(`⚠️ ${pick.game}: no pick name`); continue }
       const game = findGame(games, teamAbbr)
       if (!game) { log.push(`⚠️ ${pick.game}: game not found`); continue }
       if (game.status?.detailedState !== 'Final') { log.push(`⏳ ${pick.game}: not final yet`); continue }
@@ -295,8 +297,8 @@ export default function SharpMoney() {
                   <div key={pick.id} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:8, padding:'9px 10px', marginBottom:4 }}>
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{pick.sharpPick}</div>
-                        <div style={{ fontSize:'.46rem', color:'#505070' }}>{pick.game} · {pick.gap}% gap {pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}</div>
+                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{pick.sharpPick || pick.bet || pick.side || pick.game}</div>
+                        <div style={{ fontSize:'.46rem', color:'#505070' }}>{pick.game} · {pick.gap}% gap {pick.signal ? '· '+pick.signal : pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}</div>
                       </div>
                       <div style={{ display:'flex', gap:3, alignItems:'center' }}>
                         <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:g.color }}>{pick.gap}%</div>
@@ -347,7 +349,7 @@ export default function SharpMoney() {
                   return (
                     <div key={pick.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 12px', borderTop:'1px solid #0d0d1a' }}>
                       <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, color:g?.color||'#60a5fa', width:32 }}>{pick.gap}%</div>
-                      <div style={{ flex:1, fontSize:'.62rem', color:'#a0a0c0' }}>{pick.sharpPick} · {pick.game}</div>
+                      <div style={{ flex:1, fontSize:'.62rem', color:'#a0a0c0' }}>{pick.sharpPick || pick.bet || pick.side || '?'} · {pick.game}</div>
                       <div style={{ fontSize:'.6rem', color:RC[pick.result]?.color||'#fbbf24' }}>{RC[pick.result]?.label||'⏳'}</div>
                     </div>
                   )
