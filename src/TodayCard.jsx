@@ -71,8 +71,7 @@ function BetRow({ bet, onGrade }) {
 
       {/* ALWAYS-VISIBLE GRADE BUTTONS */}
       {onGrade && (
-        <div style={{ display:'grid',
-          gridTemplateColumns:bet.onPaperBet?'1fr 1fr 1fr 1fr 1fr 1fr':'1fr 1fr 1fr 1fr 1fr',
+        <div style={{ display:'flex', flexWrap:'wrap',
           gap:6, padding:'0 14px 12px' }}>
           {[
             { label:'✅', st:'win',  color:C.accent },
@@ -82,7 +81,7 @@ function BetRow({ bet, onGrade }) {
             const active = bet.status===st
             return (
               <button key={st} onClick={(e)=>{ e.stopPropagation(); onGrade(st) }}
-                style={{ padding:'9px 4px',
+                style={{ flex:'1 1 60px', padding:'9px 4px',
                   background:active?color:color+'15',
                   border:`2px solid ${active?color:color+'40'}`,
                   borderRadius:8,
@@ -96,7 +95,7 @@ function BetRow({ bet, onGrade }) {
           })}
           {bet.status!=='pending' && (
             <button onClick={(e)=>{ e.stopPropagation(); onGrade('pending') }}
-              style={{ padding:'9px 4px', background:C.gold+'15',
+              style={{ flex:'1 1 40px', padding:'9px 4px', background:C.gold+'15',
                 border:`1px solid ${C.gold}40`, borderRadius:8,
                 color:C.gold, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
               ↩
@@ -104,7 +103,7 @@ function BetRow({ bet, onGrade }) {
           )}
           {bet.onPaperBet && bet.status==='pending' && (
             <button onClick={(e)=>{ e.stopPropagation(); bet.onPaperBet() }}
-              style={{ padding:'9px 4px', background:C.blue+'15',
+              style={{ flex:'1 1 40px', padding:'9px 4px', background:C.blue+'15',
                 border:`1px solid ${C.blue}40`, borderRadius:8,
                 color:C.blue, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
               📋
@@ -112,7 +111,7 @@ function BetRow({ bet, onGrade }) {
           )}
           {bet.onDelete && (
             <button onClick={(e)=>{ e.stopPropagation(); bet.onDelete() }}
-              style={{ padding:'9px 4px', background:'transparent',
+              style={{ flex:'1 1 40px', padding:'9px 4px', background:'transparent',
                 border:`1px solid ${C.border}`, borderRadius:8,
                 color:C.muted, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
               🗑
