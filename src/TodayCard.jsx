@@ -205,6 +205,9 @@ export default function TodayCard({ accounts }) {
   const [gradeLog, setGradeLog] = useState([])
   const [archiveConfirm, setArchiveConfirm] = useState(false)
   const [undoStack, setUndoStack] = useState([])
+  const [offcardPaste, setOffcardPaste] = useState(false)
+  const [offcardText, setOffcardText] = useState('')
+  const [offcardError, setOffcardError] = useState('')
 
   useEffect(() => {
     try {
@@ -261,6 +264,64 @@ export default function TodayCard({ accounts }) {
     const pl = status==='win'?(item.payout||0):status==='loss'?-(item.stake||0):0
     c[type][idx] = { ...item, status, pl }
     persist(c)
+  }
+
+  // ── OFF-CARD SLIP PARSER ──
+  const parseOffcard = () => {
+    const text = offcardText.trim()
+    if (!text) { setOffcardError('Paste some bet slip text first'); return }
+
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    const bets = []
+
+    // Patterns: odds like -120 / +150, stakes like $10 or 10u, payouts like "to win $X" / "returns $X"
+    const oddsRe = /([+-]\d{3,4})/
+    const stakeRe = /(?:\$|stake[:\s]+\$?|risk[:\s]+\$?|wager[:\s]+\$?)(\d+(?:\.\d{1,2})?)/i
+    const winRe = /(?:to win|returns?|payout|win)[:\s]+\$?(\d+(?:\.\d{1,2})?)/i
+
+    for (const line of lines) {
+      // Skip header/footer noise
+      if (/^(bet ?slip|total|parlay|cash ?out|settled|open|date|placed)/i.test(line)) continue
+
+      const odds = (line.match(oddsRe) || [])[1] || ''
+      const stakeM = line.match(stakeRe)
+      const winM = line.match(winRe)
+      const stake = stakeM ? parseFloat(stakeM[1]) : 0
+
+      // payout = profit. If "to win" present use it; else compute from odds+stake
+      let payout = winM ? parseFloat(winM[1]) : 0
+      if (!payout && stake && odds) {
+        const o = parseInt(odds)
+        payout = o > 0 ? stake * (o/100) : stake / (Math.abs(o)/100)
+        payout = Math.round(payout * 100) / 100
+      }
+
+      // pick = line with odds/stake/win phrases stripped
+      let pick = line
+        .replace(oddsRe, '')
+        .replace(stakeRe, '')
+        .replace(winRe, '')
+        .replace(/\$[\d.]+/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/[•|–-]\s*$/, '')
+        .trim()
+
+      if (pick.length < 2) continue
+
+      bets.push({ pick, odds, stake, payout, platform:'DK', status:'pending', pl:0, notes:'parsed from slip' })
+    }
+
+    if (bets.length === 0) {
+      setOffcardError('Could not find any bets. Format: "Pick name -120 $10"')
+      return
+    }
+
+    const c = JSON.parse(JSON.stringify(card))
+    c.offcard = [...(c.offcard||[]), ...bets]
+    persist(c)
+    setOffcardText('')
+    setOffcardError('')
+    setOffcardPaste(false)
   }
 
   const gradeSgp = (status) => {
@@ -388,6 +449,7 @@ export default function TodayCard({ accounts }) {
   const allBets = [
     ...(card.rfi||[]).filter(b=>b.stake>0),
     ...(card.props||[]).filter(b=>b.stake>0),
+    ...(card.offcard||[]).filter(b=>b.stake>0),
     ...(card.sgp?.stake>0 ? [card.sgp] : []),
     ...(card.potd?.stake>0 ? [card.potd] : []),
   ]
@@ -735,7 +797,66 @@ export default function TodayCard({ accounts }) {
             )}
           </div>
 
-          {/* Auto Grade Button */}
+          {/* Off-card bets */}
+          <div style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <div style={{ color:C.gold, fontSize:'.6rem', letterSpacing:'.12em',
+                textTransform:'uppercase' }}>🎰 OFF-CARD BETS</div>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={()=>setOffcardPaste(p=>!p)}
+                  style={{ padding:'4px 8px', background:C.gold+'15',
+                    border:`1px solid ${C.gold}40`, borderRadius:6,
+                    color:C.gold, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
+                  📸 PARSE
+                </button>
+                <button onClick={()=>{
+                  const c = JSON.parse(JSON.stringify(card))
+                  c.offcard = c.offcard || []
+                  c.offcard.push({ pick:"", odds:"-110", stake:0, payout:0, platform:"DK", status:"pending", pl:0, notes:"" })
+                  persist(c)
+                }}
+                  style={{ padding:'4px 8px', background:C.gold+'15',
+                    border:`1px solid ${C.gold}40`, borderRadius:6,
+                    color:C.gold, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
+                  + BET
+                </button>
+              </div>
+            </div>
+
+            {offcardPaste && (
+              <div style={{ marginBottom:8 }}>
+                <textarea value={offcardText} onChange={e=>setOffcardText(e.target.value)}
+                  placeholder="Paste bet slip text from screenshot here... e.g. 'Aaron Judge O1.5 hits -120 $10'"
+                  style={{ width:'100%', minHeight:70, background:C.bg,
+                    border:`1px solid ${C.gold}40`, borderRadius:8, color:C.text,
+                    padding:10, fontSize:'.72rem', fontFamily:'monospace', resize:'vertical' }} />
+                <button onClick={parseOffcard}
+                  style={{ width:'100%', padding:10, marginTop:6,
+                    background:`linear-gradient(135deg,${C.gold},#d97706)`,
+                    border:'none', borderRadius:8, color:'#000',
+                    fontWeight:800, fontSize:'.78rem', cursor:'pointer' }}>
+                  ⚡ PARSE BETS
+                </button>
+                {offcardError && (
+                  <div style={{ color:C.red, fontSize:'.65rem', marginTop:4 }}>{offcardError}</div>
+                )}
+              </div>
+            )}
+
+            {(card.offcard||[]).length > 0 ? (
+              card.offcard.map((b,i) => (
+                <BetRow key={i}
+                  bet={{ ...b, type:'Off-Card', platform:b.platform||'DK',
+                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.offcard.splice(i,1); persist(c) } }}
+                  onGrade={st=>gradeItem('offcard',i,st)}
+                />
+              ))
+            ) : !offcardPaste && (
+              <div style={{ color:C.dim, fontSize:'.7rem', textAlign:'center', padding:'10px 0' }}>
+                No off-card bets — tap 📸 PARSE to scan a slip or + BET to add manually
+              </div>
+            )}
+          </div>
           <button onClick={autoGrade} disabled={grading}
             style={{ width:'100%', padding:12, marginBottom:10,
               background:grading?C.muted:`linear-gradient(135deg,${C.blue},#2563eb)`,
