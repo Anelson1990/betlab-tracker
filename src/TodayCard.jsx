@@ -195,7 +195,7 @@ function BetRow({ bet, onGrade }) {
   )
 }
 
-export default function TodayCard({ accounts }) {
+export default function TodayCard({ accounts, adjustAccount }) {
   const [card, setCard]         = useState(EMPTY)
   const [jsonInput, setJsonInput] = useState('')
   const [jsonError, setJsonError] = useState('')
@@ -251,6 +251,16 @@ export default function TodayCard({ accounts }) {
         }
       }
 
+      // Sportsbook-style: hold (deduct) every pending stake from its platform
+      if (adjustAccount) {
+        const holdBet = (b) => { if (b && b.stake > 0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', -(b.stake)) }
+        if (parsed.potd) holdBet(parsed.potd)
+        ;(parsed.rfi||[]).forEach(holdBet)
+        ;(parsed.props||[]).forEach(holdBet)
+        ;(parsed.offcard||[]).forEach(holdBet)
+        if (parsed.sgp) holdBet(parsed.sgp)
+      }
+
       persist(parsed)
       setJsonError('')
       setPasteMode(false)
@@ -260,9 +270,27 @@ export default function TodayCard({ accounts }) {
   }
 
   // ── GRADERS ──
+  // Sportsbook-style account math for a status transition.
+  // Stake is held (deducted) while pending. Win credits stake+profit. Push/void refunds stake.
+  const acctDelta = (bet, oldStatus, newStatus) => {
+    if (!adjustAccount || !bet || !(bet.stake > 0)) return
+    const stake = bet.stake || 0
+    const profit = bet.payout || 0
+    // value returned to account for a given status (relative to money already held out)
+    const credit = (st) => {
+      if (st === 'win')  return stake + profit  // get stake back + winnings
+      if (st === 'void') return stake           // refund stake (push)
+      if (st === 'loss') return 0               // lose the held stake
+      return 0                                   // pending = still held out
+    }
+    const delta = credit(newStatus) - credit(oldStatus)
+    if (delta !== 0) adjustAccount(bet.platform || 'dk', delta)
+  }
+
   const gradeItem = (type, idx, status) => {
     const c = JSON.parse(JSON.stringify(card))
     const item = c[type][idx]
+    acctDelta(item, item.status || 'pending', status)
     const pl = status==='win'?(item.payout||0):status==='loss'?-(item.stake||0):0
     c[type][idx] = { ...item, status, pl }
     persist(c)
@@ -341,6 +369,7 @@ export default function TodayCard({ accounts }) {
     if (!pick) { setOffcardError('Could not find a pick name. Use + ADD MANUALLY instead.'); return }
 
     const bet = { pick, odds, stake, payout:profit, platform:'DK', status:'pending', pl:0, notes:'parsed from slip' }
+    if (adjustAccount && stake > 0) adjustAccount('DK', -stake)
     const c = JSON.parse(JSON.stringify(card))
     c.offcard = [...(c.offcard||[]), bet]
     persist(c)
@@ -361,6 +390,7 @@ export default function TodayCard({ accounts }) {
       payout = Math.round(payout*100)/100
     }
     const bet = { pick:f.pick.trim(), odds:f.odds, stake, payout, platform:f.platform, status:'pending', pl:0, notes:'' }
+    if (adjustAccount && stake > 0) adjustAccount(f.platform, -stake)
     const c = JSON.parse(JSON.stringify(card))
     c.offcard = [...(c.offcard||[]), bet]
     persist(c)
@@ -370,6 +400,7 @@ export default function TodayCard({ accounts }) {
   }
 
   const gradeSgp = (status) => {
+    acctDelta(card.sgp, card.sgp.status || 'pending', status)
     const pl = status==='win'?(card.sgp.payout||0):status==='loss'?-(card.sgp.stake||0):0
     persist({ ...card, sgp:{ ...card.sgp, status, pl } })
   }
@@ -684,6 +715,7 @@ export default function TodayCard({ accounts }) {
                     persist(c)
                   } }}
                 onGrade={(st) => {
+                  acctDelta(card.potd, card.potd.status || 'pending', st)
                   const pl = st==='win'?(card.potd.payout||0):st==='loss'?-(card.potd.stake||0):0
                   persist({ ...card, potd:{ ...card.potd, status:st, pl } })
                 }}
@@ -945,7 +977,11 @@ export default function TodayCard({ accounts }) {
               card.offcard.map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, type:'Off-Card', platform:b.platform||'DK',
-                    onDelete:()=>{ const c=JSON.parse(JSON.stringify(card)); c.offcard.splice(i,1); persist(c) } }}
+                    onDelete:()=>{
+                      const c=JSON.parse(JSON.stringify(card))
+                      if (adjustAccount && b.stake>0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', b.stake)
+                      c.offcard.splice(i,1); persist(c)
+                    } }}
                   onGrade={st=>gradeItem('offcard',i,st)}
                 />
               ))

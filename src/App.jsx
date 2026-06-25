@@ -58,6 +58,17 @@ export default function App() {
     setEditingAcct(null); setAcctInput('')
   }
 
+  // Adjust a platform balance by a delta (sportsbook-style hold/credit)
+  const adjustAccount = (platform, delta) => {
+    const key = (platform||'dk').toLowerCase()
+    setAccounts(prev => {
+      const acctKey = prev[key] !== undefined ? key : 'dk'
+      const updated = { ...prev, [acctKey]: Math.round(((prev[acctKey]||0) + delta) * 100) / 100 }
+      try { localStorage.setItem(BR_KEY, JSON.stringify(updated)) } catch {}
+      return updated
+    })
+  }
+
   const toggle = id => setExpanded(e => ({ ...e, [id]: !e[id] }))
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -177,7 +188,7 @@ export default function App() {
       {/* TODAY TAB */}
       {tab === 'today' && (
         <div style={{ padding:'10px 12px' }}>
-          <TodayCard accounts={accounts} />
+          <TodayCard accounts={accounts} adjustAccount={adjustAccount} />
         </div>
       )}
 
