@@ -208,6 +208,8 @@ export default function TodayCard({ accounts }) {
   const [offcardPaste, setOffcardPaste] = useState(false)
   const [offcardText, setOffcardText] = useState('')
   const [offcardError, setOffcardError] = useState('')
+  const [offcardManual, setOffcardManual] = useState(false)
+  const [offcardForm, setOffcardForm] = useState({ pick:'', odds:'-110', stake:'', payout:'', platform:'DK' })
 
   useEffect(() => {
     try {
@@ -272,56 +274,99 @@ export default function TodayCard({ accounts }) {
     if (!text) { setOffcardError('Paste some bet slip text first'); return }
 
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-    const bets = []
+    const oddsRe = /([+-]\d{3,4})\b/
+    const moneyRe = /\$\s?(\d+(?:\.\d{1,2})?)/
 
-    // Patterns: odds like -120 / +150, stakes like $10 or 10u, payouts like "to win $X" / "returns $X"
-    const oddsRe = /([+-]\d{3,4})/
-    const stakeRe = /(?:\$|stake[:\s]+\$?|risk[:\s]+\$?|wager[:\s]+\$?)(\d+(?:\.\d{1,2})?)/i
-    const winRe = /(?:to win|returns?|payout|win)[:\s]+\$?(\d+(?:\.\d{1,2})?)/i
+    // Find odds (first +/- 3-4 digit number)
+    let odds = ''
+    for (const l of lines) {
+      const m = l.match(oddsRe)
+      if (m) { odds = m[1]; break }
+    }
 
-    for (const line of lines) {
-      // Skip header/footer noise
-      if (/^(bet ?slip|total|parlay|cash ?out|settled|open|date|placed)/i.test(line)) continue
+    // Find stake — look for "wager/risk/bet/stake" line, else first $ amount
+    let stake = 0
+    const stakeLine = lines.find(l => /(wager|risk|stake|bet amount)/i.test(l))
+    if (stakeLine) {
+      const m = stakeLine.match(moneyRe)
+      if (m) stake = parseFloat(m[1])
+    }
 
-      const odds = (line.match(oddsRe) || [])[1] || ''
-      const stakeM = line.match(stakeRe)
-      const winM = line.match(winRe)
-      const stake = stakeM ? parseFloat(stakeM[1]) : 0
+    // Find payout — "to pay/to win/returns/total payout"
+    let payout = 0
+    const payLine = lines.find(l => /(to pay|to win|return|payout|total payout)/i.test(l))
+    if (payLine) {
+      const m = payLine.match(moneyRe)
+      if (m) payout = parseFloat(m[1])
+    }
 
-      // payout = profit. If "to win" present use it; else compute from odds+stake
-      let payout = winM ? parseFloat(winM[1]) : 0
-      if (!payout && stake && odds) {
-        const o = parseInt(odds)
-        payout = o > 0 ? stake * (o/100) : stake / (Math.abs(o)/100)
-        payout = Math.round(payout * 100) / 100
+    // If we have payout as total return, convert to profit (subtract stake)
+    let profit = payout
+    if (payout && stake && payout > stake) profit = Math.round((payout - stake) * 100) / 100
+
+    // If no stake found, grab any $ amounts — smallest is usually stake, largest is payout
+    if (!stake) {
+      const amounts = []
+      for (const l of lines) {
+        const m = l.match(moneyRe)
+        if (m) amounts.push(parseFloat(m[1]))
       }
-
-      // pick = line with odds/stake/win phrases stripped
-      let pick = line
-        .replace(oddsRe, '')
-        .replace(stakeRe, '')
-        .replace(winRe, '')
-        .replace(/\$[\d.]+/g, '')
-        .replace(/\s{2,}/g, ' ')
-        .replace(/[•|–-]\s*$/, '')
-        .trim()
-
-      if (pick.length < 2) continue
-
-      bets.push({ pick, odds, stake, payout, platform:'DK', status:'pending', pl:0, notes:'parsed from slip' })
+      if (amounts.length >= 2) {
+        amounts.sort((a,b)=>a-b)
+        stake = amounts[0]
+        if (!profit) profit = Math.round((amounts[amounts.length-1] - stake) * 100) / 100
+      } else if (amounts.length === 1) {
+        stake = amounts[0]
+      }
     }
 
-    if (bets.length === 0) {
-      setOffcardError('Could not find any bets. Format: "Pick name -120 $10"')
-      return
+    // Compute profit from odds if still missing
+    if (!profit && stake && odds) {
+      const o = parseInt(odds)
+      profit = o > 0 ? stake * (o/100) : stake / (Math.abs(o)/100)
+      profit = Math.round(profit * 100) / 100
     }
 
+    // Pick name = the most "wordy" line (most letters, least likely to be a number/label)
+    let pick = ''
+    let bestScore = 0
+    for (const l of lines) {
+      if (/(wager|risk|stake|to pay|to win|return|payout|odds|bet ?slip|cash ?out|total)/i.test(l)) continue
+      const letters = (l.match(/[a-zA-Z]/g)||[]).length
+      if (letters > bestScore) { bestScore = letters; pick = l }
+    }
+    // Clean odds/$ out of pick
+    pick = pick.replace(oddsRe,'').replace(/\$\s?[\d.]+/g,'').replace(/\s{2,}/g,' ').trim()
+
+    if (!pick) { setOffcardError('Could not find a pick name. Use + ADD MANUALLY instead.'); return }
+
+    const bet = { pick, odds, stake, payout:profit, platform:'DK', status:'pending', pl:0, notes:'parsed from slip' }
     const c = JSON.parse(JSON.stringify(card))
-    c.offcard = [...(c.offcard||[]), ...bets]
+    c.offcard = [...(c.offcard||[]), bet]
     persist(c)
     setOffcardText('')
     setOffcardError('')
     setOffcardPaste(false)
+  }
+
+  const saveOffcardManual = () => {
+    const f = offcardForm
+    if (!f.pick.trim()) { setOffcardError('Enter a pick name'); return }
+    const stake = parseFloat(f.stake) || 0
+    let payout = parseFloat(f.payout) || 0
+    // compute payout from odds if blank
+    if (!payout && stake && f.odds) {
+      const o = parseInt(f.odds)
+      payout = o > 0 ? stake*(o/100) : stake/(Math.abs(o)/100)
+      payout = Math.round(payout*100)/100
+    }
+    const bet = { pick:f.pick.trim(), odds:f.odds, stake, payout, platform:f.platform, status:'pending', pl:0, notes:'' }
+    const c = JSON.parse(JSON.stringify(card))
+    c.offcard = [...(c.offcard||[]), bet]
+    persist(c)
+    setOffcardForm({ pick:'', odds:'-110', stake:'', payout:'', platform:'DK' })
+    setOffcardManual(false)
+    setOffcardError('')
   }
 
   const gradeSgp = (status) => {
@@ -803,22 +848,17 @@ export default function TodayCard({ accounts }) {
               <div style={{ color:C.gold, fontSize:'.6rem', letterSpacing:'.12em',
                 textTransform:'uppercase' }}>🎰 OFF-CARD BETS</div>
               <div style={{ display:'flex', gap:6 }}>
-                <button onClick={()=>setOffcardPaste(p=>!p)}
+                <button onClick={()=>{ setOffcardPaste(p=>!p); setOffcardManual(false) }}
                   style={{ padding:'4px 8px', background:C.gold+'15',
                     border:`1px solid ${C.gold}40`, borderRadius:6,
                     color:C.gold, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
                   📸 PARSE
                 </button>
-                <button onClick={()=>{
-                  const c = JSON.parse(JSON.stringify(card))
-                  c.offcard = c.offcard || []
-                  c.offcard.push({ pick:"", odds:"-110", stake:0, payout:0, platform:"DK", status:"pending", pl:0, notes:"" })
-                  persist(c)
-                }}
+                <button onClick={()=>{ setOffcardManual(m=>!m); setOffcardPaste(false) }}
                   style={{ padding:'4px 8px', background:C.gold+'15',
                     border:`1px solid ${C.gold}40`, borderRadius:6,
                     color:C.gold, fontWeight:700, fontSize:'.6rem', cursor:'pointer' }}>
-                  + BET
+                  ✏️ ADD
                 </button>
               </div>
             </div>
@@ -843,6 +883,64 @@ export default function TodayCard({ accounts }) {
               </div>
             )}
 
+            {offcardManual && (
+              <div style={{ marginBottom:8, background:C.bg,
+                border:`1px solid ${C.gold}40`, borderRadius:8, padding:10 }}>
+                <input value={offcardForm.pick}
+                  onChange={e=>setOffcardForm(f=>({...f,pick:e.target.value}))}
+                  placeholder="Pick — e.g. Athletics Live 1st 5 Innings"
+                  style={{ width:'100%', background:C.muted, border:`1px solid ${C.border}`,
+                    borderRadius:6, color:C.text, padding:9, fontSize:'.78rem', marginBottom:6 }} />
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:6 }}>
+                  <input value={offcardForm.odds}
+                    onChange={e=>setOffcardForm(f=>({...f,odds:e.target.value}))}
+                    placeholder="Odds +180"
+                    style={{ background:C.muted, border:`1px solid ${C.border}`,
+                      borderRadius:6, color:C.text, padding:9, fontSize:'.78rem' }} />
+                  <select value={offcardForm.platform}
+                    onChange={e=>setOffcardForm(f=>({...f,platform:e.target.value}))}
+                    style={{ background:C.muted, border:`1px solid ${C.border}`,
+                      borderRadius:6, color:C.text, padding:9, fontSize:'.78rem' }}>
+                    <option value="DK">DK</option>
+                    <option value="B365">B365</option>
+                    <option value="PP">PP</option>
+                    <option value="FD">FD</option>
+                    <option value="MGM">MGM</option>
+                  </select>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+                  <input value={offcardForm.stake} type="number" inputMode="decimal"
+                    onChange={e=>setOffcardForm(f=>({...f,stake:e.target.value}))}
+                    placeholder="Stake $"
+                    style={{ background:C.muted, border:`1px solid ${C.border}`,
+                      borderRadius:6, color:C.text, padding:9, fontSize:'.78rem' }} />
+                  <input value={offcardForm.payout} type="number" inputMode="decimal"
+                    onChange={e=>setOffcardForm(f=>({...f,payout:e.target.value}))}
+                    placeholder="To win $ (auto)"
+                    style={{ background:C.muted, border:`1px solid ${C.border}`,
+                      borderRadius:6, color:C.text, padding:9, fontSize:'.78rem' }} />
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={saveOffcardManual}
+                    style={{ flex:1, padding:10,
+                      background:`linear-gradient(135deg,${C.gold},#d97706)`,
+                      border:'none', borderRadius:8, color:'#000',
+                      fontWeight:800, fontSize:'.78rem', cursor:'pointer' }}>
+                    ✅ ADD BET
+                  </button>
+                  <button onClick={()=>{ setOffcardManual(false); setOffcardError('') }}
+                    style={{ padding:'10px 14px', background:'transparent',
+                      border:`1px solid ${C.border}`, borderRadius:8,
+                      color:C.dim, fontWeight:700, fontSize:'.78rem', cursor:'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+                {offcardError && (
+                  <div style={{ color:C.red, fontSize:'.65rem', marginTop:6 }}>{offcardError}</div>
+                )}
+              </div>
+            )}
+
             {(card.offcard||[]).length > 0 ? (
               card.offcard.map((b,i) => (
                 <BetRow key={i}
@@ -851,9 +949,9 @@ export default function TodayCard({ accounts }) {
                   onGrade={st=>gradeItem('offcard',i,st)}
                 />
               ))
-            ) : !offcardPaste && (
+            ) : (!offcardPaste && !offcardManual) && (
               <div style={{ color:C.dim, fontSize:'.7rem', textAlign:'center', padding:'10px 0' }}>
-                No off-card bets — tap 📸 PARSE to scan a slip or + BET to add manually
+                No off-card bets — 📸 PARSE a slip or ✏️ ADD manually
               </div>
             )}
           </div>
