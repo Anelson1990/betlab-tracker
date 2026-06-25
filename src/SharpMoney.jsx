@@ -135,10 +135,15 @@ export default function SharpMoney() {
       if (!parsed.date || !parsed.picks) { setPasteError('JSON must have "date" and "picks" fields'); return }
       const updated = JSON.parse(JSON.stringify(data))
       const existing = updated.days.find(d => d.date === parsed.date)
+      const withIds = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
       if (existing) {
-        existing.picks = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
+        // merge — dedupe by game + pick so re-pasting doesn't duplicate
+        const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}`
+        const seen = new Set(existing.picks.map(sig))
+        const adds = withIds.filter(p => !seen.has(sig(p)))
+        existing.picks = [...existing.picks, ...adds]
       } else {
-        updated.days.push({ date: parsed.date, picks: parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i })) })
+        updated.days.push({ date: parsed.date, picks: withIds })
       }
       save(updated)
       setPasteInput('')

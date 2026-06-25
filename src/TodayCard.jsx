@@ -253,9 +253,35 @@ export default function TodayCard({ accounts, adjustAccount }) {
         }
       }
 
-      // Sportsbook-style: hold (deduct) every pending stake from its platform
-      if (adjustAccount) {
-        const holdBet = (b) => { if (b && b.stake > 0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', -(b.stake)) }
+      // MERGE into existing card if same date — otherwise replace
+      let finalCard = parsed
+      const holdBet = (b) => { if (adjustAccount && b && b.stake > 0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', -(b.stake)) }
+      const sameDay = card && card.date && parsed.date && card.date === parsed.date
+
+      if (sameDay) {
+        const sig = (b) => `${b.game||''}|${b.pick||b.direction||''}|${b.stake||0}`
+        const mergeArr = (existing=[], incoming=[]) => {
+          const seen = new Set((existing||[]).map(sig))
+          const adds = (incoming||[]).filter(b => !seen.has(sig(b)))
+          adds.forEach(holdBet)  // only deduct newly-added bets
+          return [...(existing||[]), ...adds]
+        }
+        // POTD: only hold if new and different from existing
+        let potd = card.potd || null
+        if (parsed.potd && (!card.potd || sig(parsed.potd)!==sig(card.potd))) { holdBet(parsed.potd); potd = parsed.potd }
+        let sgp = card.sgp || null
+        if (parsed.sgp && (!card.sgp || sig(parsed.sgp)!==sig(card.sgp))) { holdBet(parsed.sgp); sgp = parsed.sgp }
+        finalCard = {
+          ...card, ...parsed,
+          potd, sgp,
+          rfi: mergeArr(card.rfi, parsed.rfi),
+          props: mergeArr(card.props, parsed.props),
+          offcard: mergeArr(card.offcard, parsed.offcard),
+          ml: mergeArr(card.ml, parsed.ml),
+          notes: parsed.notes || card.notes || '',
+        }
+      } else {
+        // fresh card — hold every pending stake
         if (parsed.potd) holdBet(parsed.potd)
         ;(parsed.rfi||[]).forEach(holdBet)
         ;(parsed.props||[]).forEach(holdBet)
@@ -263,7 +289,7 @@ export default function TodayCard({ accounts, adjustAccount }) {
         if (parsed.sgp) holdBet(parsed.sgp)
       }
 
-      persist(parsed)
+      persist(finalCard)
       setJsonError('')
       setPasteMode(false)
       setSaved(true)
