@@ -357,6 +357,46 @@ export default function TodayCard({ accounts, adjustAccount }) {
       profit = Math.round(profit * 100) / 100
     }
 
+    // ── PARLAY DETECTION ──
+    const parlayLine = lines.find(l => /(\d+\s*[-\s]?(pick|leg|team)\s*parlay|parlay)/i.test(l))
+    if (parlayLine) {
+      // Extract leg lines: things that look like a pick (player hits, run line, totals, etc.)
+      // Skip header/summary/status lines.
+      const skip = /(parlay|wager|risk|stake|to pay|to win|return|payout|total|open|settled|cash ?out|bet ?slip|^over 0\.5, )/i
+      const legPatterns = [
+        /\d+\+?\s+[A-Z][a-zé'.-]+\s+[A-Z][a-zé'.-]+\s+(hits|hit|tb|bases|runs|rbis?|hr|home runs?|ks?|strikeouts?)/i, // "1+ Yandy Diaz Hits"
+        /(over|under|o|u)\s*[\d.]+\s*(runs?|1st inning|first inning|hits|tb)/i, // "Over 0.5 Runs - 1st Inning"
+        /[A-Z][a-zé'.-]+\s+[A-Z][a-zé'.-]+\s+(over|under|o|u)\s*[\d.]+/i, // "Player Over 1.5"
+      ]
+      const legs = []
+      for (const l of lines) {
+        if (skip.test(l)) continue
+        if (l.length < 4) continue
+        // Must match a leg pattern OR contain a player+stat
+        if (legPatterns.some(re => re.test(l))) {
+          const clean = l.replace(/^\s*[•\-–]\s*/, '').replace(/\s{2,}/g,' ').trim()
+          if (clean && !legs.includes(clean)) legs.push(clean)
+        }
+      }
+
+      const legCount = (parlayLine.match(/(\d+)\s*[-\s]?(pick|leg|team)/i)||[])[1]
+      const bet = {
+        pick: legCount ? `${legCount}-Leg Parlay` : 'Parlay',
+        odds, stake, payout: profit,
+        platform:'DK', status:'pending', pl:0,
+        legs: legs.map(d => ({ description:d, result:'pending' })),
+        notes:'parsed parlay',
+      }
+      if (adjustAccount && stake > 0) adjustAccount('DK', -stake)
+      const c = JSON.parse(JSON.stringify(card))
+      c.offcard = [...(c.offcard||[]), bet]
+      persist(c)
+      setOffcardText('')
+      setOffcardError(legs.length ? '' : '⚠️ Parlay added but legs unclear — edit manually')
+      if (legs.length) setOffcardPaste(false)
+      return
+    }
+
     // Pick name = the most "wordy" line (most letters, least likely to be a number/label)
     let pick = ''
     let bestScore = 0
@@ -1102,7 +1142,12 @@ export default function TodayCard({ accounts, adjustAccount }) {
                       const c=JSON.parse(JSON.stringify(card))
                       if (adjustAccount && b.stake>0 && (b.status||'pending')==='pending') adjustAccount(b.platform||'dk', b.stake)
                       c.offcard.splice(i,1); persist(c)
-                    } }}
+                    },
+                    onGradeLeg: b.legs ? (legIdx, st)=>{
+                      const c=JSON.parse(JSON.stringify(card))
+                      c.offcard[i].legs[legIdx].result = st
+                      persist(c)
+                    } : undefined }}
                   onGrade={st=>gradeItem('offcard',i,st)}
                 />
               ))
