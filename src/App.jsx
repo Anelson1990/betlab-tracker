@@ -315,6 +315,35 @@ export default function App() {
                         {c.notes}
                       </div>
                     )}
+                    <button onClick={()=>{
+                      // Check if there's an active card already loaded
+                      let active = null
+                      try { active = JSON.parse(localStorage.getItem('betlab-today-v3')||'{}') } catch {}
+                      if (active && active.date && active.date !== c.date) {
+                        if (!window.confirm(`Today tab has ${active.date} loaded. Un-archiving ${c.date} will REPLACE it. Archive the current day first if you want to keep it. Continue?`)) return
+                      } else if (!window.confirm(`Pull ${c.date} back to the Today tab to add an off-card bet? It will be removed from history until you re-archive.`)) return
+                      // Restore bankroll to this day's end value so new bets deduct correctly
+                      const restored = {
+                        date: c.date,
+                        bankroll: c.bankroll,
+                        potd: c.potd && c.potd!=='NONE' ? { pick:c.potd, modelFire:'(restored)', game:'', odds:'', stake:0, payout:0, platform:'DK', status: c.potdResult==='W'?'win':c.potdResult==='L'?'loss':c.potdResult==='V'?'void':'pending', pl:c.potdPL||0, notes:'restored from history' } : null,
+                        rfi: [], props: [], offcard: [], sgp: null, ml: [],
+                        totalPL: c.pl||0,
+                        notes: (c.notes||'') + ' · un-archived to add off-card bet',
+                      }
+                      try {
+                        localStorage.setItem('betlab-today-v3', JSON.stringify(restored))
+                        // remove this card from history
+                        setCards(prev => prev.filter(x => x.id !== c.id))
+                        setTab('today')
+                      } catch(e) { console.error(e) }
+                    }}
+                      style={{ width:'100%', padding:9, marginTop:10,
+                        background:'rgba(251,191,36,.12)', border:'1px solid #fbbf24',
+                        borderRadius:7, fontSize:'.62rem', fontWeight:700, letterSpacing:'.06em',
+                        textTransform:'uppercase', color:'#fbbf24', cursor:'pointer' }}>
+                      ↩ Un-archive · Add Off-Card Bet
+                    </button>
                   </div>
                 )}
               </div>
