@@ -197,6 +197,7 @@ export default function TodayCard({ accounts }) {
   const [grading, setGrading]   = useState(false)
   const [gradeLog, setGradeLog] = useState([])
   const [archiveConfirm, setArchiveConfirm] = useState(false)
+  const [undoStack, setUndoStack] = useState([])
 
   useEffect(() => {
     try {
@@ -205,9 +206,20 @@ export default function TodayCard({ accounts }) {
     } catch {}
   }, [])
 
-  const persist = (c) => {
+  const persist = (c, trackUndo=true) => {
+    if (trackUndo) {
+      setUndoStack(prev => [...prev.slice(-9), JSON.parse(JSON.stringify(card))])
+    }
     setCard(c)
     try { localStorage.setItem(CARD_KEY, JSON.stringify(c)) } catch {}
+  }
+
+  const undo = () => {
+    if (undoStack.length === 0) return
+    const prev = undoStack[undoStack.length - 1]
+    setUndoStack(s => s.slice(0, -1))
+    setCard(prev)
+    try { localStorage.setItem(CARD_KEY, JSON.stringify(prev)) } catch {}
   }
 
   // ── RULE #1 ENFORCEMENT ──
@@ -445,6 +457,14 @@ export default function TodayCard({ accounts }) {
             letterSpacing:'.08em', textTransform:'uppercase' }}>
           {pasteMode ? '✕ Cancel' : "📋 Paste Today's JSON"}
         </button>
+        {undoStack.length > 0 && (
+          <button onClick={undo}
+            style={{ padding:'11px 14px', background:C.gold+'15',
+              border:`1px solid ${C.gold}40`, borderRadius:9,
+              color:C.gold, fontWeight:700, fontSize:'.75rem', cursor:'pointer' }}>
+            ↩ Undo
+          </button>
+        )}
         {!isEmpty && (
           <button onClick={()=>{ if(window.confirm('Clear today\'s card?')){ persist(EMPTY); setGradeLog([]) } }}
             style={{ padding:'11px 14px', background:C.red+'10',
