@@ -70,9 +70,9 @@ function BetRow({ bet, onGrade }) {
       </div>
 
       {/* ALWAYS-VISIBLE GRADE BUTTONS */}
-      {bet.status==='pending' && onGrade && (
+      {onGrade && (
         <div style={{ display:'grid',
-          gridTemplateColumns:bet.onPaperBet?'1fr 1fr 1fr 1fr 1fr':'1fr 1fr 1fr 1fr',
+          gridTemplateColumns:bet.onPaperBet?'1fr 1fr 1fr 1fr 1fr 1fr':'1fr 1fr 1fr 1fr 1fr',
           gap:6, padding:'0 14px 12px' }}>
           {[
             { label:'✅', st:'win',  color:C.accent },
@@ -94,7 +94,15 @@ function BetRow({ bet, onGrade }) {
               </button>
             )
           })}
-          {bet.onPaperBet && (
+          {bet.status!=='pending' && (
+            <button onClick={(e)=>{ e.stopPropagation(); onGrade('pending') }}
+              style={{ padding:'9px 4px', background:C.gold+'15',
+                border:`1px solid ${C.gold}40`, borderRadius:8,
+                color:C.gold, fontWeight:700, fontSize:'.72rem', cursor:'pointer' }}>
+              ↩
+            </button>
+          )}
+          {bet.onPaperBet && bet.status==='pending' && (
             <button onClick={(e)=>{ e.stopPropagation(); bet.onPaperBet() }}
               style={{ padding:'9px 4px', background:C.blue+'15',
                 border:`1px solid ${C.blue}40`, borderRadius:8,
