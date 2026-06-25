@@ -1118,6 +1118,21 @@ export default function TodayCard({ accounts, adjustAccount }) {
                         const existing = JSON.parse(localStorage.getItem(key)||'[]')
                         localStorage.setItem(key, JSON.stringify([...existing, newCard]))
                       } catch(e) { console.error(e) }
+                      // Save paper bets to dedicated paper archive for stats
+                      try {
+                        const pkey = 'betlab-paper-history-v1'
+                        const papers = JSON.parse(localStorage.getItem(pkey)||'[]')
+                        const todayPapers = (card.ml||[])
+                          .filter(b => b.result && b.result!=='pending')
+                          .map(b => ({
+                            date: card.date,
+                            pick: b.direction || b.sources || b.game || 'Paper',
+                            game: b.game||'',
+                            odds: b.odds||'',
+                            result: b.result,
+                          }))
+                        if (todayPapers.length) localStorage.setItem(pkey, JSON.stringify([...papers, ...todayPapers]))
+                      } catch(e) { console.error(e) }
                       persist(EMPTY)
                       setArchiveConfirm(false)
                       setGradeLog(['✅ Card archived to history!'])

@@ -422,6 +422,62 @@ export default function App() {
             </div>
           )}
 
+          {/* Paper Bets History & Stats */}
+          {(() => {
+            let papers = []
+            try { papers = JSON.parse(localStorage.getItem('betlab-paper-history-v1')||'[]') } catch {}
+            const live = (() => {
+              try {
+                const c = JSON.parse(localStorage.getItem('betlab-today-v3')||'{}')
+                return (c.ml||[]).filter(b=>b.result && b.result!=='pending').map(b=>({
+                  date:c.date||'Today', pick:b.direction||b.sources||b.game||'Paper', game:b.game||'', odds:b.odds||'', result:b.result
+                }))
+              } catch { return [] }
+            })()
+            const all = [...papers, ...live]
+            const w = all.filter(p=>p.result==='win').length
+            const l = all.filter(p=>p.result==='loss').length
+            const v = all.filter(p=>p.result==='void').length
+            const wr = w+l>0 ? Math.round((w/(w+l))*100) : 0
+            return (
+              <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>📋 Paper Bets — Model Tracking</div>
+                {all.length === 0 ? (
+                  <div style={{ fontSize:'.6rem', color:'#404060', textAlign:'center', padding:'8px 0' }}>
+                    No graded paper bets yet. Grade paper picks and archive the day to build history.
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
+                      {[
+                        {val:`${w}-${l}`, lbl:'Record', col:'#4ade80'},
+                        {val:`${wr}%`, lbl:'Win Rate', col: wr>=58?'#4ade80':wr>=50?'#fbbf24':'#f87171'},
+                        {val:`${all.length}`, lbl:'Total', col:'#60a5fa'},
+                      ].map(s => (
+                        <div key={s.lbl} style={{ background:'#0c0c1a', border:'1px solid #1a1a2e', borderRadius:6, padding:'7px 8px', textAlign:'center' }}>
+                          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', lineHeight:1, color:s.col }}>{s.val}</div>
+                          <div style={{ fontSize:'.42rem', letterSpacing:'.06em', textTransform:'uppercase', color:'#404060', marginTop:2 }}>{s.lbl}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {v>0 && <div style={{ fontSize:'.5rem', color:'#505070', marginBottom:6 }}>{v} void/push (excluded from WR)</div>}
+                    <div style={{ maxHeight:200, overflowY:'auto' }}>
+                      {all.slice().reverse().map((p,i) => (
+                        <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 0', borderBottom:'1px solid #0d0d1a' }}>
+                          <div style={{ flex:1, paddingRight:8 }}>
+                            <div style={{ fontSize:'.62rem', color:'#a0a0c0' }}>{p.pick}</div>
+                            <div style={{ fontSize:'.46rem', color:'#404060' }}>{p.date}{p.game?' · '+p.game:''}{p.odds?' · '+p.odds:''}</div>
+                          </div>
+                          <div style={{ fontSize:'.7rem' }}>{p.result==='win'?'✅':p.result==='loss'?'❌':'🔄'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:10 }}>Active Model Win Rates</div>
             <ResponsiveContainer width="100%" height={190}>
