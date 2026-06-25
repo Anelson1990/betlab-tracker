@@ -452,7 +452,75 @@ export default function App() {
             </div>
           )}
 
-          {/* Paper Bets History & Stats */}
+          {/* Monthly P&L Calendar */}
+          {(() => {
+            const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+            // Build a map of "Mon D" -> total pl that day
+            const plByDay = {}
+            cards.forEach(c => {
+              if (!c.date) return
+              plByDay[c.date] = (plByDay[c.date]||0) + (c.pl||0)
+            })
+            // Figure out which month to show — use the most recent card's month, else current
+            let monthIdx = new Date().getMonth()
+            let year = 2026
+            if (cards.length) {
+              const last = cards[cards.length-1]
+              const mi = MONTHS.indexOf((last.date||'').split(' ')[0])
+              if (mi >= 0) monthIdx = mi
+            }
+            const monthName = MONTHS[monthIdx]
+            const daysInMonth = new Date(year, monthIdx+1, 0).getDate()
+            const firstDow = new Date(year, monthIdx, 1).getDay() // 0=Sun
+            const cells = []
+            for (let i=0;i<firstDow;i++) cells.push(null)
+            for (let d=1; d<=daysInMonth; d++) cells.push(d)
+
+            const monthTotal = Object.entries(plByDay)
+              .filter(([k])=>k.startsWith(monthName+' '))
+              .reduce((s,[,v])=>s+v,0)
+
+            return (
+              <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>{monthName} {year} · Daily P&L</div>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color: monthTotal>=0?'#4ade80':'#f87171' }}>
+                    {monthTotal>=0?'+':''}${monthTotal.toFixed(0)}
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
+                  {['S','M','T','W','T','F','S'].map((d,i) => (
+                    <div key={'h'+i} style={{ textAlign:'center', fontSize:'.5rem', color:'#404060', fontWeight:700, paddingBottom:2 }}>{d}</div>
+                  ))}
+                  {cells.map((d,i) => {
+                    if (d === null) return <div key={'e'+i} />
+                    const key = `${monthName} ${d}`
+                    const pl = plByDay[key]
+                    const has = pl !== undefined
+                    const up = has && pl >= 0
+                    return (
+                      <div key={'d'+i} style={{
+                        aspectRatio:'1', borderRadius:5, padding:'2px',
+                        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                        background: has ? (up ? 'rgba(74,222,128,.15)' : 'rgba(248,113,113,.15)') : '#0c0c16',
+                        border: `1px solid ${has ? (up ? '#4ade8055' : '#f8717155') : '#13131f'}` }}>
+                        <div style={{ fontSize:'.5rem', color: has ? (up?'#4ade80':'#f87171') : '#404060', fontWeight:700 }}>{d}</div>
+                        {has && (
+                          <div style={{ fontSize:'.46rem', fontWeight:800, color: up?'#4ade80':'#f87171', lineHeight:1 }}>
+                            {up?'+':''}{Math.round(pl)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ display:'flex', gap:10, marginTop:8, justifyContent:'center' }}>
+                  <span style={{ fontSize:'.48rem', color:'#4ade80' }}>● Green = up day</span>
+                  <span style={{ fontSize:'.48rem', color:'#f87171' }}>● Red = down day</span>
+                </div>
+              </div>
+            )
+          })()}
           {(() => {
             let papers = []
             try { papers = JSON.parse(localStorage.getItem('betlab-paper-history-v1')||'[]') } catch {}
