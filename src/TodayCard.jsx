@@ -561,9 +561,22 @@ export default function TodayCard({ accounts, adjustAccount }) {
       }
       const stillPending = sd.days[idx].picks.filter(p=>p.result==='pending').length
       if (stillPending === 0 && sd.days[idx].picks.length > 0) {
-        // All graded — remove the day from the active sharp card (stays in stats/history aggregate)
+        // All graded — archive to history, then remove from active card
         const w = sd.days[idx].picks.filter(p=>p.result==='win').length
         const l = sd.days[idx].picks.filter(p=>p.result==='loss').length
+        const dayToArchive = sd.days[idx]
+        
+        // Save to history archive (betlab-sharp-history-v1)
+        const hist = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}')
+        const existingIdx = hist.days.findIndex(d => d.date === dayToArchive.date)
+        if (existingIdx >= 0) {
+          hist.days[existingIdx] = dayToArchive
+        } else {
+          hist.days.push(dayToArchive)
+        }
+        localStorage.setItem('betlab-sharp-history-v1', JSON.stringify(hist))
+        
+        // Remove from active card
         sd.days.splice(idx, 1)
         localStorage.setItem(SHARP_KEY, JSON.stringify(sd))
         return ` · sharp cleared (${w}-${l})`

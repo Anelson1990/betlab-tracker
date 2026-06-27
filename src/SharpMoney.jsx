@@ -73,6 +73,12 @@ export default function SharpMoney() {
   const [editingPick, setEditingPick] = useState(null)
   const [editForm, setEditForm] = useState({ sharpPick:'', game:'', gap:'' })
   const [form, setForm] = useState({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
+  const [history, setHistory] = useState(() => {
+    try {
+      const h = localStorage.getItem('betlab-sharp-history-v1')
+      return h ? JSON.parse(h) : { days: [] }
+    } catch { return { days: [] } }
+  })
 
   const today = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' })
 
@@ -341,10 +347,10 @@ export default function SharpMoney() {
       {/* HISTORY VIEW */}
       {view === 'history' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {data.days.length === 0 && (
-            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>No history yet.</div>
+          {history.days.length === 0 && (
+            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>No archived history yet.</div>
           )}
-          {[...data.days].reverse().map(day => {
+          {[...history.days].reverse().map(day => {
             const wins = day.picks.filter(p=>p.result==='win').length
             const graded = day.picks.filter(p=>p.result==='win'||p.result==='loss').length
             const wr = graded ? Math.round((wins/graded)*100) : null
@@ -357,65 +363,19 @@ export default function SharpMoney() {
                   </div>
                   <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                     {wr !== null && <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:wr>=55?'#4ade80':'#f87171' }}>{wr}% WR</div>}
-                    <button onClick={()=>autoGrade(day.date)} disabled={grading} style={{ padding:'4px 8px', background:'rgba(37,99,235,.1)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.55rem', color:'#60a5fa' }}>Grade</button>
-                    <button onClick={()=>{ if(window.confirm(`Delete all of ${day.date}?`)){ const u=JSON.parse(JSON.stringify(data)); u.days=u.days.filter(d=>d.date!==day.date); save(u) } }}
-                      style={{ padding:'4px 8px', background:'rgba(248,113,113,.1)', border:'1px solid #f87171', borderRadius:5, fontSize:'.55rem', color:'#f87171' }}>🗑</button>
                   </div>
                 </div>
-                {day.picks.sort((a,b)=>b.gap-a.gap).map(pick => {
-                  const g = getGroup(pick.gap)
-                  const isEditing = editingPick === pick.id
-                  if (isEditing) {
-                    return (
-                      <div key={pick.id} style={{ padding:'8px 12px', borderTop:'1px solid #0d0d1a', background:'#0c0c1a' }}>
-                        <input value={editForm.sharpPick}
-                          onChange={e=>setEditForm(f=>({...f,sharpPick:e.target.value}))}
-                          placeholder="Pick e.g. MIL ML"
-                          style={{ width:'100%', background:'#1a1a30', border:'1px solid #2563eb', borderRadius:5, color:'#f0f0f8', padding:7, fontSize:'.7rem', marginBottom:5 }} />
-                        <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-                          <input value={editForm.game}
-                            onChange={e=>setEditForm(f=>({...f,game:e.target.value}))}
-                            placeholder="Game e.g. MIL @ CIN"
-                            style={{ flex:2, background:'#1a1a30', border:'1px solid #2a2a44', borderRadius:5, color:'#f0f0f8', padding:7, fontSize:'.7rem' }} />
-                          <input value={editForm.gap} type="number"
-                            onChange={e=>setEditForm(f=>({...f,gap:e.target.value}))}
-                            placeholder="Gap%"
-                            style={{ flex:1, background:'#1a1a30', border:'1px solid #2a2a44', borderRadius:5, color:'#f0f0f8', padding:7, fontSize:'.7rem' }} />
-                        </div>
-                        <div style={{ display:'flex', gap:5 }}>
-                          <button onClick={()=>{
-                            editPick(day.date, pick.id, { sharpPick:editForm.sharpPick, game:editForm.game, gap:parseInt(editForm.gap)||0 })
-                            setEditingPick(null)
-                          }} style={{ flex:1, padding:7, background:'#4ade80', border:'none', borderRadius:5, fontSize:'.65rem', fontWeight:700, color:'#000' }}>Save</button>
-                          <button onClick={()=>setEditingPick(null)}
-                            style={{ padding:'7px 12px', background:'#1a1a30', border:'none', borderRadius:5, fontSize:'.65rem', fontWeight:700, color:'#505070' }}>Cancel</button>
-                        </div>
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={pick.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 12px', borderTop:'1px solid #0d0d1a' }}>
-                      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, color:g?.color||'#60a5fa', width:30 }}>{pick.gap}%</div>
-                      <div style={{ flex:1, fontSize:'.62rem', color:'#a0a0c0' }}>{pick.sharpPick || pick.bet || pick.side || '?'} · {pick.game}</div>
-                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                        {['win','loss','void'].map(st => (
-                          <button key={st} onClick={()=>setResult(day.date, pick.id, st)}
-                            style={{ padding:'3px 5px', borderRadius:4, border:'none',
-                              background: pick.result===st ? (st==='win'?'#4ade80':st==='loss'?'#f87171':'#505070') : 'transparent',
-                              fontSize:'.6rem', cursor:'pointer' }}>
-                            {st==='win'?'✅':st==='loss'?'❌':'🔄'}
-                          </button>
-                        ))}
-                        <button onClick={()=>{
-                          setEditForm({ sharpPick:pick.sharpPick||pick.bet||pick.side||'', game:pick.game||'', gap:String(pick.gap||'') })
-                          setEditingPick(pick.id)
-                        }} style={{ padding:'3px 5px', borderRadius:4, border:'none', background:'transparent', fontSize:'.6rem', cursor:'pointer' }}>✏️</button>
-                        <button onClick={()=>{ if(window.confirm('Delete this pick?')) deletePick(day.date, pick.id) }}
-                          style={{ padding:'3px 5px', borderRadius:4, border:'none', background:'transparent', fontSize:'.6rem', cursor:'pointer' }}>🗑</button>
-                      </div>
+                {day.picks.map(p => (
+                  <div key={p.id} style={{ padding:'6px 12px', borderTop:'1px solid #1a1a2e', fontSize:'.65rem', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div>
+                      <div style={{ color:'#e0e0f0', marginBottom:2 }}>{p.game} — {p.sharpPick}</div>
+                      <div style={{ color:'#5050a0', fontSize:'.55rem' }}>Gap: {p.gap}% | {p.confirms}</div>
                     </div>
-                  )
-                })}
+                    <div style={{ color:p.result==='win'?'#4ade80':p.result==='loss'?'#f87171':'#fbbf24', fontWeight:800 }}>
+                      {p.result==='win'?'✅':p.result==='loss'?'❌':'⏳'}
+                    </div>
+                  </div>
+                ))}
               </div>
             )
           })}
