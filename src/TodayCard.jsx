@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { parseCardDate, gradeSharpPicks } from './mlbUtils'
+import ScreenshotParser from './ScreenshotParser'
 
 const CARD_KEY = 'betlab-today-v3'
 const SHARP_KEY = 'betlab-sharp-v2'
@@ -717,6 +718,35 @@ export default function TodayCard({ accounts, adjustAccount }) {
 
   const acctTotal = (accounts?.dk||0)+(accounts?.b365||0)+(accounts?.pp||0) || card.bankroll || 185.90
 
+  // Handler for screenshot parser category routing
+  const addParsedBet = (bet, category) => {
+    const c = JSON.parse(JSON.stringify(card))
+    const newBet = {
+      pick: bet.pick,
+      odds: bet.odds,
+      stake: bet.stake || 10,
+      payout: bet.payout || Math.round(bet.stake * (parseInt(bet.odds) > 0 ? parseInt(bet.odds) / 100 : 100 / Math.abs(parseInt(bet.odds))) * 100) / 100,
+      platform: 'dk',
+      status: 'pending',
+      pl: 0
+    }
+    
+    // Route to appropriate category
+    if (category === 'potd') {
+      c.potd = newBet
+    } else if (category === 'rfi') {
+      c.rfi = [...(c.rfi || []), newBet]
+    } else if (category === 'props') {
+      c.props = [...(c.props || []), newBet]
+    } else if (category === 'offcard') {
+      c.offcard = [...(c.offcard || []), newBet]
+      // Hold stake for off-card
+      if (adjustAccount) adjustAccount('dk', -(newBet.stake))
+    }
+    
+    persist(c)
+  }
+
   return (
     <div>
       {/* HEADER */}
@@ -1293,6 +1323,9 @@ export default function TodayCard({ accounts, adjustAccount }) {
               )}
             </div>
           )}
+
+          {/* Screenshot Parser */}
+          <ScreenshotParser onAddBet={addParsedBet} />
         </div>
       )}
     </div>
