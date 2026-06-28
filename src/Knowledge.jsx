@@ -13,7 +13,8 @@ const QUOTES = [
   { text: "When sharps and models agree, the edge is real. When they conflict, wait for data.", author: "BetLab Sharp Guide" },
   { text: "A 76% sharp gap doesn't happen by accident. It happens because someone knows something.", author: "BetLab Sharp Guide" },
   { text: "Jung Hoo Lee is not Josh Jung.", author: "Jun 16 Lesson 😂" },
-]
+  { text: "The parlay missed on a fielder's choice. The $90 chase was the real loss. One was variance. The other was a decision.", author: "Jun 26 Lesson" },
+  { text: "The system works when you follow it. It breaks when you don't.", author: "BetLab Discipline" },]
 
 const SECTIONS = [
   {
@@ -53,14 +54,41 @@ const SECTIONS = [
     title: 'Sharp Money Rules',
     color: '#4ade80',
     rules: [
-      { rule: '10-19% gap = data only', detail: 'Note the direction but do not act on it alone.' },
-      { rule: '20-29% = signal', detail: 'Confirms or conflicts model. Factor into decision.' },
-      { rule: '30-39% = strong', detail: 'Follow unless model strongly conflicts.' },
-      { rule: '40-49% = very strong', detail: 'Almost always follow. Note if conflicts model.' },
-      { rule: '50%+ = massive', detail: 'Rare and powerful. WSH 76% Jun 16 = biggest seen. Follow.' },
-      { rule: 'Sharp + model agree = strongest', detail: 'WSH series Jun 14-16: 61-76% gaps, models agreed, won 3 straight.' },
+      { rule: 'Overall: 34-21, 62% WR (55 graded)', detail: 'Through Jun 28. Profitable system overall.' },
+      { rule: '10-19% gap — 71% WR (7 picks) ⚠️', detail: 'Edge exists but n=7 too small. Watch only until n=20+.' },
+      { rule: '20-29% gap — 50% WR (10 picks) ⚪', detail: 'Breakeven. No edge at this gap range. Skip.' },
+      { rule: '30-39% gap — 50% WR (6 picks) ⚪', detail: 'Breakeven. No edge at this gap range. Skip.' },
+      { rule: '40-49% gap — 69% WR (13 picks) ✅ BEST TIER', detail: 'Best gap tier. 9-4 record. Size up when model also confirms.' },
+      { rule: '50%+ gap — 63% WR (16 picks) ✅', detail: 'Real edge. Watch for public trap at 85%+. Best when confirms model.' },
+      { rule: 'Confirms models — 74% WR (25-9) ✅ PRIMARY', detail: 'Sharp + model agreement = strongest edge in system. Always bet when both align.' },
+      { rule: 'Conflicts models — 33% WR (3-6) ❌ AVOID', detail: 'When sharp conflicts model, follow the model not the sharp.' },
+      { rule: 'Neutral — 56% WR (5-4) ⚪', detail: 'Slight edge. Fall back to model signal only when sharp is neutral.' },
       { rule: 'Same team 3+ days = follow', detail: 'Sharps have intel when they stay on the same team all series.' },
-      { rule: 'Do NOT add rules yet', detail: 'Need 50+ graded picks per group before setting win rate thresholds.' },
+    ]
+  },
+  {
+    id: 'features',
+    icon: '🧠',
+    title: 'Model Feature Importance',
+    color: '#60a5fa',
+    rules: [
+      { rule: 'LGB #1 — sp_k_pct_gap', detail: 'SP strikeout rate gap. Highest gain. 28%+ K rate = elite. When one pitcher dominates K%, lean that direction.' },
+      { rule: 'LGB #2 — sp_babip_gap', detail: 'SP BABIP gap. BABIP >.320 = unlucky/hard contact. Regression signal: high BABIP SP likely to give up more runs.' },
+      { rule: 'LGB #3 — away_bullpen_era', detail: 'Away bullpen ERA (raw, not gap). Team-level pen quality generalizes. Check insidethepen.com for current ERA5d.' },
+      { rule: 'LGB #4 — away_k9_l10', detail: 'Away SP K/9 last 10 starts. Recent form signal beats full season K/9. Velocity gains 1mph+ = real improvement.' },
+      { rule: 'LGB #5 — away_sp_fip_era_diff', detail: 'Away SP FIP minus ERA. Positive = ERA likely to rise. Negative = ERA likely to fall. Key regression signal.' },
+      { rule: 'LGB #6 — team_era_gap', detail: 'Full team ERA gap (not just SP). Whole staff quality. Generalizes better than SP ERA gap alone.' },
+      { rule: 'LGB #7 — sp_era_gap_l5', detail: 'SP ERA gap last 5 starts only. Less overfit than full season ERA gap. Use L5 not season when comparing.' },
+      { rule: 'LGB #8 — team_whip_gap', detail: 'Team WHIP gap. Walks + hits per inning. Better than ERA at predicting baserunners.' },
+      { rule: 'LGB #9 — home_sp_ip', detail: 'Home SP innings per start. Durability signal. Spot starters under 5 GS = auto skip.' },
+      { rule: 'LGB #10 — home_sp_fip_era_diff', detail: 'Home SP FIP minus ERA. Same regression signal as #5. FIP > ERA = pitcher outperforming, likely to regress.' },
+      { rule: 'RFI #1 — home_team_fi_nrfi_pct (3.50%)', detail: 'Home team first inning NRFI historical rate. Most important RFI signal. Home FI R/G more predictive than season ERA.' },
+      { rule: 'RFI #2 — combined_fi_rg (3.39%)', detail: 'Combined first inning runs per game both teams. Raw F1 scoring rate signal. Key metric in RFI model.' },
+      { rule: 'RFI #3 — wind_mph (3.18%)', detail: '10+ mph blowing out = lean YRFI/OVER. Blowing in = lean NRFI/UNDER. Domes = skip wind check.' },
+      { rule: 'RFI #4 — away_sp_fi_nrfi_pct (3.15%)', detail: 'Away SP historical F1 NRFI rate. SP-specific F1 data more predictive than full game ERA for RFI bets.' },
+      { rule: 'RFI #5 — away_sp_fi_k_rate_l3 (3.11%)', detail: 'Away SP F1 K rate last 3 starts. SP who gets quick Ks in F1 = NRFI signal.' },
+      { rule: 'DEAD: Full game umpire', detail: 'Umpire correlation = 0.0013 with full game wins. Worthless for ML. F1-specific umpire slightly real but thin.' },
+      { rule: 'DEAD: sp_era_gap (season)', detail: 'Overfits in backtests. High training gain but near-zero out of sample impact. Use L5 ERA gap instead.' },
     ]
   },
   {

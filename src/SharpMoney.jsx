@@ -191,9 +191,53 @@ export default function SharpMoney() {
     }
 
     log.push('✅ Auto-grade complete')
+    const stillPending = updDay.picks.filter(p=>p.result==='pending').length
+    if (stillPending > 0) log.push(`⏳ ${stillPending} still pending — not ready to archive`)
+    else log.push('✅ All graded — ready to archive')
     save(updated)
     setGradeLog(log)
     setGrading(false)
+  }
+
+  // Archive a fully-graded day to history, then clear it from the active card.
+  // Safe order: write history FIRST, verify it landed, only THEN remove from active.
+  const archiveSharpDay = (date) => {
+    const day = data.days.find(d => d.date === date)
+    if (!day) { setGradeLog([`⚠️ ${date}: nothing to archive`]); return }
+    const pending = day.picks.filter(p=>p.result==='pending').length
+    if (pending > 0) {
+      setGradeLog([`⚠️ ${date}: ${pending} picks still pending. Grade them first.`])
+      return
+    }
+    if (day.picks.length === 0) { setGradeLog([`⚠️ ${date}: no picks`]); return }
+
+    // 1. Write to history archive FIRST
+    let hist
+    try { hist = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}') }
+    catch { hist = { days: [] } }
+    const exIdx = hist.days.findIndex(d => d.date === date)
+    if (exIdx >= 0) hist.days[exIdx] = JSON.parse(JSON.stringify(day))
+    else hist.days.push(JSON.parse(JSON.stringify(day)))
+    localStorage.setItem('betlab-sharp-history-v1', JSON.stringify(hist))
+
+    // 2. Verify the write landed before removing from active
+    let verify
+    try { verify = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}') }
+    catch { verify = { days: [] } }
+    const saved = verify.days.find(d => d.date === date)
+    if (!saved || saved.picks.length !== day.picks.length) {
+      setGradeLog([`❌ ${date}: archive write failed — keeping day in active card to avoid data loss.`])
+      return
+    }
+
+    // 3. Now safe to remove from active card
+    const w = day.picks.filter(p=>p.result==='win').length
+    const l = day.picks.filter(p=>p.result==='loss').length
+    const updated = JSON.parse(JSON.stringify(data))
+    updated.days = updated.days.filter(d => d.date !== date)
+    save(updated)
+    setHistory(verify)
+    setGradeLog([`🗂 ${date} archived to history (${w}-${l}). Verified ${saved.picks.length} picks saved.`])
   }
 
   // Stats across all history
@@ -337,9 +381,14 @@ export default function SharpMoney() {
           })}
 
           {todayPicks.length > 0 && (
-            <button onClick={()=>autoGrade(today)} disabled={grading} style={{ width:'100%', padding:9, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:grading?'#404060':'#60a5fa', marginTop:4 }}>
-              {grading ? '⏳ Grading...' : '🗂 Grade & Archive Sharp Picks'}
-            </button>
+            <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4 }}>
+              <button onClick={()=>autoGrade(today)} disabled={grading} style={{ width:'100%', padding:9, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:grading?'#404060':'#60a5fa' }}>
+                {grading ? '⏳ Grading...' : '⚡ Auto Grade Sharp Picks'}
+              </button>
+              <button onClick={()=>archiveSharpDay(today)} disabled={grading} style={{ width:'100%', padding:9, background:'linear-gradient(135deg,#fbbf24,#d97706)', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:800, textTransform:'uppercase', color:'#000' }}>
+                🗂 Archive Day to History
+              </button>
+            </div>
           )}
         </div>
       )}

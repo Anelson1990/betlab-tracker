@@ -566,17 +566,25 @@ export default function TodayCard({ accounts, adjustAccount }) {
         const l = sd.days[idx].picks.filter(p=>p.result==='loss').length
         const dayToArchive = sd.days[idx]
         
-        // Save to history archive (betlab-sharp-history-v1)
+        // Save to history archive (betlab-sharp-history-v1) FIRST
         const hist = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}')
         const existingIdx = hist.days.findIndex(d => d.date === dayToArchive.date)
         if (existingIdx >= 0) {
-          hist.days[existingIdx] = dayToArchive
+          hist.days[existingIdx] = JSON.parse(JSON.stringify(dayToArchive))
         } else {
-          hist.days.push(dayToArchive)
+          hist.days.push(JSON.parse(JSON.stringify(dayToArchive)))
         }
         localStorage.setItem('betlab-sharp-history-v1', JSON.stringify(hist))
-        
-        // Remove from active card
+
+        // Verify the write landed before removing from active
+        const verify = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}')
+        const saved = verify.days.find(d => d.date === dayToArchive.date)
+        if (!saved || saved.picks.length !== dayToArchive.picks.length) {
+          // archive failed — do NOT delete from active
+          return ` · ⚠️ sharp archive failed, kept in card`
+        }
+
+        // Now safe to remove from active card
         sd.days.splice(idx, 1)
         localStorage.setItem(SHARP_KEY, JSON.stringify(sd))
         return ` · sharp cleared (${w}-${l})`
