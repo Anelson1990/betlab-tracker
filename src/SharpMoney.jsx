@@ -152,7 +152,7 @@ export default function SharpMoney() {
     save(updated)
   }
 
-  const loadJSON = () => {
+  const loadJSON = async () => {
     try {
       const parsed = JSON.parse(pasteInput.trim())
       if (!parsed.date || !parsed.picks) { setPasteError('JSON must have "date" and "picks" fields'); return }
@@ -172,6 +172,30 @@ export default function SharpMoney() {
       setPasteInput('')
       setPasteError('')
       setShowPaste(false)
+
+      // SWEEP: any OTHER day still holding pending picks gets auto-graded,
+      // and archived to history if grading clears every pick. Runs every
+      // time a new sharp JSON lands so stale days can never go stranded.
+      const staleDates = updated.days
+        .filter(d => d.date !== parsed.date && d.picks.some(p => p.result === 'pending'))
+        .map(d => d.date)
+      if (staleDates.length > 0) {
+        const sweepLog = [`🧹 Sweeping ${staleDates.length} prior day(s) with pending picks...`]
+        for (const staleDate of staleDates) {
+          await autoGrade(staleDate)
+          // re-read latest data after autoGrade's save()
+          const latest = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"days":[]}')
+          const sd = latest.days.find(d => d.date === staleDate)
+          if (sd && sd.picks.every(p => p.result !== 'pending')) {
+            archiveSharpDay(staleDate)
+            sweepLog.push(`🗂 ${staleDate} fully graded — archived`)
+          } else if (sd) {
+            const left = sd.picks.filter(p => p.result === 'pending').length
+            sweepLog.push(`⏳ ${staleDate} — ${left} still pending (games not final yet)`)
+          }
+        }
+        setGradeLog(sweepLog)
+      }
     } catch { setPasteError('Invalid JSON — check format') }
   }
   const autoGrade = async (date) => {
