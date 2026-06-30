@@ -60,23 +60,6 @@ function loadData() {
 
 function saveData(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {} }
 
-const AIRTABLE_SHARP_STATS = {
-  asOf: 'Jun 28',
-  overall: { graded: 55, wins: 34, losses: 21, wr: 62 },
-  gapTiers: [
-    { label: '10-19%', graded: 7, wins: 5, losses: 2, wr: 71, note: 'edge, n too small' },
-    { label: '20-29%', graded: 10, wins: 5, losses: 5, wr: 50, note: 'breakeven' },
-    { label: '30-39%', graded: 6, wins: 3, losses: 3, wr: 50, note: 'breakeven' },
-    { label: '40-49%', graded: 13, wins: 9, losses: 4, wr: 69, note: '⭐ best tier' },
-    { label: '50%+', graded: 16, wins: 10, losses: 6, wr: 63, note: 'edge, watch public trap' },
-  ],
-  alignment: [
-    { label: 'Confirms Models', graded: 34, wins: 25, losses: 9, wr: 74, note: '✅ primary signal' },
-    { label: 'Conflicts Models', graded: 9, wins: 3, losses: 6, wr: 33, note: '❌ avoid' },
-    { label: 'Neutral', graded: 9, wins: 5, losses: 4, wr: 56, note: '⚪ fallback to model' },
-  ]
-}
-
 export default function SharpMoney() {
   const [data, setData] = useState(loadData)
   const [view, setView] = useState('today') // today | history | stats
@@ -387,32 +370,6 @@ export default function SharpMoney() {
       {/* TODAY VIEW */}
       {view === 'today' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {/* AIRTABLE SHARP STATS — permanent, accurate, survives localStorage loss */}
-          <div style={{ background:'#09090f', border:'1px solid #2a2a44', borderRadius:10, padding:'10px 12px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.78rem', fontWeight:800, color:'#a78bfa' }}>📊 Sharp Stats (Airtable)</div>
-              <div style={{ fontSize:'.5rem', color:'#404060' }}>as of {AIRTABLE_SHARP_STATS.asOf}</div>
-            </div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, padding:'6px 8px', background:'rgba(167,139,250,.08)', borderRadius:6 }}>
-              <div style={{ fontSize:'.62rem', color:'#c0c0e0' }}>Overall — {AIRTABLE_SHARP_STATS.overall.graded} graded</div>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.9rem', fontWeight:800, color:'#a78bfa' }}>{AIRTABLE_SHARP_STATS.overall.wins}-{AIRTABLE_SHARP_STATS.overall.losses} · {AIRTABLE_SHARP_STATS.overall.wr}%</div>
-            </div>
-            <div style={{ fontSize:'.5rem', color:'#404060', textTransform:'uppercase', marginBottom:4, letterSpacing:'.06em' }}>Gap Tiers</div>
-            {AIRTABLE_SHARP_STATS.gapTiers.map(t => (
-              <div key={t.label} style={{ display:'flex', justifyContent:'space-between', fontSize:'.6rem', padding:'2px 0' }}>
-                <div style={{ color:'#a0a0c0' }}>{t.label} ({t.graded})</div>
-                <div style={{ color:t.wr>=60?'#4ade80':t.wr>=50?'#fbbf24':'#f87171' }}>{t.wins}-{t.losses} · {t.wr}% {t.note}</div>
-              </div>
-            ))}
-            <div style={{ fontSize:'.5rem', color:'#404060', textTransform:'uppercase', margin:'6px 0 4px', letterSpacing:'.06em' }}>Model Alignment</div>
-            {AIRTABLE_SHARP_STATS.alignment.map(a => (
-              <div key={a.label} style={{ display:'flex', justifyContent:'space-between', fontSize:'.6rem', padding:'2px 0' }}>
-                <div style={{ color:'#a0a0c0' }}>{a.label} ({a.graded})</div>
-                <div style={{ color:a.wr>=60?'#4ade80':a.wr>=50?'#fbbf24':'#f87171' }}>{a.wins}-{a.losses} · {a.wr}% {a.note}</div>
-              </div>
-            ))}
-          </div>
-
           {/* PENDING FROM PRIOR DAYS — surfaces any day stuck between today/history */}
           {data.days.filter(d => d.date !== today && d.picks.some(p=>p.result==='pending')).map(day => {
             const pendingCount = day.picks.filter(p=>p.result==='pending').length
