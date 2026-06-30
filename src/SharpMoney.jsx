@@ -346,6 +346,26 @@ export default function SharpMoney() {
       {/* TODAY VIEW */}
       {view === 'today' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          {/* PENDING FROM PRIOR DAYS — surfaces any day stuck between today/history */}
+          {data.days.filter(d => d.date !== today && d.picks.some(p=>p.result==='pending')).map(day => {
+            const pendingCount = day.picks.filter(p=>p.result==='pending').length
+            return (
+              <div key={'stale-'+day.date} style={{ background:'rgba(251,191,36,.08)', border:'1px solid #fbbf24', borderRadius:10, padding:'10px 12px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color:'#fbbf24' }}>
+                    ⚠️ {day.date} — {pendingCount} ungraded
+                  </div>
+                  <button onClick={()=>autoGrade(day.date)} disabled={grading}
+                    style={{ padding:'5px 10px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#60a5fa' }}>
+                    {grading ? '⏳' : '⚡ Grade Now'}
+                  </button>
+                </div>
+                {day.picks.filter(p=>p.result==='pending').map(p => (
+                  <div key={p.id} style={{ fontSize:'.62rem', color:'#a0a0c0', padding:'3px 0' }}>{p.game} — {p.sharpPick}</div>
+                ))}
+              </div>
+            )
+          })}
           {todayPicks.length === 0 && (
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>
               No sharp picks logged today. Tap + Add to enter today's data.
