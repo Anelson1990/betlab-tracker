@@ -16,6 +16,15 @@ function getGroup(gap) {
   return GROUPS.find(g => gap >= g.min && gap <= g.max) || null
 }
 
+// BASELINE — real graded totals through Jun 30 that predate reliable localStorage
+// history (lost in an earlier wipe, confirmed durable in Airtable). Live picks
+// graded from this point forward ADD on top of these counts, they never replace them.
+const BASELINE_STATS = {
+  asOf: 'Jun 30',
+  byGroup: { '10-19%': { w: 5, l: 2 }, '20-29%': { w: 5, l: 6 }, '30-39%': { w: 3, l: 4 }, '40-49%': { w: 9, l: 4 }, '50%+': { w: 10, l: 6 } },
+  alignment: { confirms: { w: 25, l: 9 }, conflicts: { w: 3, l: 6 }, neutral: { w: 5, l: 4 } },
+}
+
 function parseCardDate(dateStr) {
   if (!dateStr) return new Date().toISOString().split('T')[0]
   const months = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' }
@@ -270,11 +279,37 @@ export default function SharpMoney() {
   const gradedPicks = allPicks.filter(p => p.result === 'win' || p.result === 'loss')
 
   const groupStats = GROUPS.map(g => {
-    const picks = gradedPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
-    const wins = picks.filter(p => p.result === 'win').length
-    const wr = picks.length ? Math.round((wins/picks.length)*100) : 0
-    return { ...g, picks: picks.length, wins, wr }
+    const livePicks = gradedPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
+    const liveWins = livePicks.filter(p => p.result === 'win').length
+    const liveLosses = livePicks.length - liveWins
+    const base = BASELINE_STATS.byGroup[g.label] || { w: 0, l: 0 }
+    const wins = base.w + liveWins
+    const losses = base.l + liveLosses
+    const picks = wins + losses
+    const wr = picks ? Math.round((wins/picks)*100) : 0
+    return { ...g, picks, wins, losses, wr }
   })
+
+  const baselineOverallW = Object.values(BASELINE_STATS.byGroup).reduce((s,g)=>s+g.w,0)
+  const baselineOverallL = Object.values(BASELINE_STATS.byGroup).reduce((s,g)=>s+g.l,0)
+  const liveOverallW = gradedPicks.filter(p=>p.result==='win').length
+  const liveOverallL = gradedPicks.filter(p=>p.result==='loss').length
+  const overallStats = {
+    wins: baselineOverallW + liveOverallW,
+    losses: baselineOverallL + liveOverallL,
+    get total() { return this.wins + this.losses },
+    get wr() { return this.total ? Math.round((this.wins/this.total)*100) : 0 },
+  }
+
+  const alignmentStats = ['confirms','conflicts','neutral'].reduce((acc, key) => {
+    const live = gradedPicks.filter(p => p.confirms === key)
+    const liveW = live.filter(p=>p.result==='win').length
+    const liveL = live.length - liveW
+    const base = BASELINE_STATS.alignment[key] || { w:0, l:0 }
+    const wins = base.w + liveW, losses = base.l + liveL, total = wins + losses
+    acc[key] = { wins, losses, total, wr: total ? Math.round((wins/total)*100) : null }
+    return acc
+  }, {})
 
   const RC = {
     pending: { color:'#fbbf24', label:'⏳' },
@@ -482,12 +517,15 @@ export default function SharpMoney() {
 
           {/* Overall */}
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Overall Sharp Performance</div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Overall Sharp Performance</div>
+              <div style={{ fontSize:'.44rem', color:'#404060' }}>baseline {BASELINE_STATS.asOf} + live</div>
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
               {[
-                { val: gradedPicks.length, lbl: 'Total Graded' },
-                { val: `${gradedPicks.filter(p=>p.result==='win').length}-${gradedPicks.filter(p=>p.result==='loss').length}`, lbl: 'W-L' },
-                { val: `${gradedPicks.length ? Math.round((gradedPicks.filter(p=>p.result==='win').length/gradedPicks.length)*100) : 0}%`, lbl: 'Win Rate' },
+                { val: overallStats.total, lbl: 'Total Graded' },
+                { val: `${overallStats.wins}-${overallStats.losses}`, lbl: 'W-L' },
+                { val: `${overallStats.wr}%`, lbl: 'Win Rate' },
               ].map(s => (
                 <div key={s.lbl} style={{ textAlign:'center', background:'#0c0c1a', borderRadius:6, padding:'8px 4px' }}>
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:'#4ade80', lineHeight:1 }}>{s.val}</div>
@@ -528,28 +566,24 @@ export default function SharpMoney() {
           ))}
 
           {/* Confirms vs Conflicts */}
-          {gradedPicks.length > 0 && (
-            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Sharp vs Model Alignment</div>
-              {[
-                { key:'confirms', label:'✅ Confirms Models', color:'#4ade80' },
-                { key:'conflicts', label:'⚠️ Conflicts Models', color:'#f87171' },
-                { key:'neutral', label:'⚪ Neutral', color:'#94a3b8' },
-              ].map(s => {
-                const picks = gradedPicks.filter(p => p.confirms === s.key)
-                const wins = picks.filter(p => p.result === 'win').length
-                const wr = picks.length ? Math.round((wins/picks.length)*100) : null
-                return (
-                  <div key={s.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
-                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.label}</div>
-                    <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
-                      {picks.length === 0 ? '— no data' : `${wins}-${picks.length-wins} · ${wr}% WR`}
-                    </div>
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Sharp vs Model Alignment</div>
+            {[
+              { key:'confirms', label:'✅ Confirms Models', color:'#4ade80' },
+              { key:'conflicts', label:'⚠️ Conflicts Models', color:'#f87171' },
+              { key:'neutral', label:'⚪ Neutral', color:'#94a3b8' },
+            ].map(s => {
+              const a = alignmentStats[s.key]
+              return (
+                <div key={s.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                  <div style={{ fontSize:'.6rem', color:s.color }}>{s.label}</div>
+                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
+                    {a.total === 0 ? '— no data' : `${a.wins}-${a.losses} · ${a.wr}% WR`}
                   </div>
-                )
-              })}
-            </div>
-          )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
     </div>
