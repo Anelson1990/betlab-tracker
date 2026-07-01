@@ -264,8 +264,9 @@ export default function SharpMoney() {
     setGradeLog([`🗂 ${date} archived to history (${w}-${l}). Verified ${saved.picks.length} picks saved.`])
   }
 
-  // Stats across all history
-  const allPicks = data.days.flatMap(d => d.picks)
+  // Stats across all history — active days AND archived history, so archiving
+  // a day never drops it out of the stats it's supposed to feed.
+  const allPicks = [...data.days, ...history.days].flatMap(d => d.picks)
   const gradedPicks = allPicks.filter(p => p.result === 'win' || p.result === 'loss')
 
   const groupStats = GROUPS.map(g => {
