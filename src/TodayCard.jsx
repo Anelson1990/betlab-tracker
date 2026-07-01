@@ -931,6 +931,20 @@ export default function TodayCard({ accounts, adjustAccount }) {
       )}
 
       {!isEmpty && (
+        <div style={{ textAlign:'right', marginBottom:6 }}>
+          <button onClick={()=>{
+            if (window.confirm('Force-clear the entire card? This wipes today\'s card completely — use this if a bad paste left it stuck. This cannot be undone.')) {
+              try { localStorage.setItem(CARD_KEY, JSON.stringify(EMPTY)) } catch {}
+              setCard(EMPTY)
+            }
+          }} style={{ padding:'3px 8px', background:'transparent', border:`1px solid ${C.border}`,
+            borderRadius:5, color:C.dim, fontSize:'.55rem', cursor:'pointer' }}>
+            🗑 Force Clear Card
+          </button>
+        </div>
+      )}
+
+      {!isEmpty && (
         <div>
           {/* POTD */}
           {card.potd?.stake > 0 && (

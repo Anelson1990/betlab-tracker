@@ -135,6 +135,13 @@ export default function SharpMoney() {
     save(updated)
   }
 
+  const deleteDay = (date) => {
+    const updated = JSON.parse(JSON.stringify(data))
+    updated.days = updated.days.filter(d => d.date !== date)
+    save(updated)
+    setGradeLog([`🗑 ${date} deleted from active card.`])
+  }
+
   const editPick = (date, id, fields) => {
     const updated = JSON.parse(JSON.stringify(data))
     const day = updated.days.find(d => d.date === date)
@@ -415,14 +422,29 @@ export default function SharpMoney() {
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color:'#fbbf24' }}>
                     ⚠️ {day.date} — {pendingCount} ungraded
                   </div>
-                  <button onClick={()=>autoGrade(day.date)} disabled={grading}
-                    style={{ padding:'5px 10px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#60a5fa' }}>
-                    {grading ? '⏳' : '⚡ Grade Now'}
-                  </button>
+                  <div style={{ display:'flex', gap:5 }}>
+                    <button onClick={()=>autoGrade(day.date)} disabled={grading}
+                      style={{ padding:'5px 10px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#60a5fa' }}>
+                      {grading ? '⏳' : '⚡ Grade Now'}
+                    </button>
+                    <button onClick={()=>{ if(window.confirm(`Delete all of ${day.date}? This cannot be undone.`)) deleteDay(day.date) }}
+                      style={{ padding:'5px 10px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#f87171' }}>
+                      🗑 Delete Day
+                    </button>
+                  </div>
                 </div>
                 {day.picks.filter(p=>p.result==='pending').map(p => (
-                  <div key={p.id} style={{ fontSize:'.62rem', color:'#a0a0c0', padding:'3px 0' }}>{p.game} — {p.sharpPick}</div>
+                  <div key={p.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'.62rem', color:'#a0a0c0', padding:'3px 0' }}>
+                    <div>{p.game} — {p.sharpPick}</div>
+                    <button onClick={()=>deletePick(day.date, p.id)}
+                      style={{ padding:'2px 6px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.55rem' }}>✕</button>
+                  </div>
                 ))}
+                {gradeLog.length > 0 && (
+                  <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(251,191,36,.2)' }}>
+                    {gradeLog.map((l,i) => <div key={i} style={{ fontSize:'.55rem', color:'#a0a0c0', lineHeight:1.6 }}>{l}</div>)}
+                  </div>
+                )}
               </div>
             )
           })}
