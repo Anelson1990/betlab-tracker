@@ -44,6 +44,7 @@ export default function App() {
   const [editingAcct, setEditingAcct] = useState(null)
   const [acctInput, setAcctInput] = useState('')
   const [paperArchived, setPaperArchived] = useState('')
+  const [calMonthOffset, setCalMonthOffset] = useState(0) // 0 = current real month, +1/-1 = navigate
   const [accounts, setAccounts] = useState(() => {
     try { const s = localStorage.getItem(BR_KEY); return s ? JSON.parse(s) : DEFAULT_ACCOUNTS } catch { return DEFAULT_ACCOUNTS }
   })
@@ -490,14 +491,12 @@ export default function App() {
               if (!c.date) return
               plByDay[c.date] = (plByDay[c.date]||0) + (c.pl||0)
             })
-            // Figure out which month to show — use the most recent card's month, else current
-            let monthIdx = new Date().getMonth()
-            let year = 2026
-            if (cards.length) {
-              const last = cards[cards.length-1]
-              const mi = MONTHS.indexOf((last.date||'').split(' ')[0])
-              if (mi >= 0) monthIdx = mi
-            }
+            // Navigate from TODAY's real month, offset by calMonthOffset — never locked to card data
+            const base = new Date()
+            base.setDate(1)
+            base.setMonth(base.getMonth() + calMonthOffset)
+            const monthIdx = base.getMonth()
+            const year = base.getFullYear()
             const monthName = MONTHS[monthIdx]
             const daysInMonth = new Date(year, monthIdx+1, 0).getDate()
             const firstDow = new Date(year, monthIdx, 1).getDay() // 0=Sun
@@ -512,7 +511,17 @@ export default function App() {
             return (
               <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>{monthName} {year} · Daily P&L</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <button onClick={()=>setCalMonthOffset(o=>o-1)}
+                      style={{ padding:'2px 7px', background:'#13131f', border:'1px solid #1a1a2e', borderRadius:5, color:'#a0a0c0', fontSize:'.65rem', cursor:'pointer' }}>‹</button>
+                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>{monthName} {year} · Daily P&L</div>
+                    <button onClick={()=>setCalMonthOffset(o=>o+1)}
+                      style={{ padding:'2px 7px', background:'#13131f', border:'1px solid #1a1a2e', borderRadius:5, color:'#a0a0c0', fontSize:'.65rem', cursor:'pointer' }}>›</button>
+                    {calMonthOffset !== 0 && (
+                      <button onClick={()=>setCalMonthOffset(0)}
+                        style={{ padding:'2px 6px', background:'transparent', border:'1px solid #1a1a2e', borderRadius:5, color:'#606080', fontSize:'.5rem', cursor:'pointer' }}>Today</button>
+                    )}
+                  </div>
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color: monthTotal>=0?'#4ade80':'#f87171' }}>
                     {monthTotal>=0?'+':''}${monthTotal.toFixed(0)}
                   </div>
