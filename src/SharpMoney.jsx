@@ -56,14 +56,35 @@ function findGame(games, abbr) {
   })
 }
 
+const DELETED_KEY = 'betlab-sharp-deleted-v1'
+
+function getDeletedDates() {
+  try { return new Set(JSON.parse(localStorage.getItem(DELETED_KEY) || '[]')) }
+  catch { return new Set() }
+}
+function markDateDeleted(date) {
+  try {
+    const s = getDeletedDates()
+    s.add(date)
+    localStorage.setItem(DELETED_KEY, JSON.stringify([...s]))
+  } catch {}
+}
+
 function loadData() {
   try {
     const s = localStorage.getItem(STORAGE_KEY)
-    const stored = s ? JSON.parse(s) : { days: [] }
-    // Seed dates always win — merge stored days that aren't in seed
-    const seedDates = new Set(SEED_SHARP.map(d => d.date))
-    const extraDays = stored.days.filter(d => !seedDates.has(d.date))
-    return { days: [...SEED_SHARP, ...extraDays] }
+    const stored = s ? JSON.parse(s) : null
+    const deleted = getDeletedDates()
+    if (stored === null) {
+      // Nothing saved yet — first ever load, seed the starter data (minus anything deleted)
+      return { days: SEED_SHARP.filter(d => !deleted.has(d.date)) }
+    }
+    // Once the user has any saved state, THEIR data wins completely.
+    // Seed data only fills in dates the user has never touched AND never deleted —
+    // it can never resurrect a date the user explicitly removed.
+    const storedDates = new Set(stored.days.map(d => d.date))
+    const untouchedSeedDays = SEED_SHARP.filter(d => !storedDates.has(d.date) && !deleted.has(d.date))
+    return { days: [...stored.days, ...untouchedSeedDays] }
   } catch { return { days: SEED_SHARP } }
 }
 
@@ -138,8 +159,9 @@ export default function SharpMoney() {
   const deleteDay = (date) => {
     const updated = JSON.parse(JSON.stringify(data))
     updated.days = updated.days.filter(d => d.date !== date)
+    markDateDeleted(date)
     save(updated)
-    setGradeLog([`🗑 ${date} deleted from active card.`])
+    setGradeLog([`🗑 ${date} deleted permanently — won't resurface from seed data.`])
   }
 
   const editPick = (date, id, fields) => {
