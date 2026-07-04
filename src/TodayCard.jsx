@@ -499,19 +499,22 @@ export default function TodayCard({ accounts, adjustAccount }) {
     const rfiN = (cd.rfi||[]).filter(b=>b.stake>0).length
     const mlW  = (cd.ml||[]).filter(b=>b.result==='win').length
     const mlL  = (cd.ml||[]).filter(b=>b.result==='loss').length
+    // Note: no longer filtering to stake>0 here — a $0-stake tracking pick (e.g.
+    // an RFI watchlist entry) can still be graded win/loss and should count toward
+    // the day's real W-L record even though it carries no P&L dollar value.
     const allPL = [
-      ...(cd.rfi||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
-      ...(cd.props||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
-      ...(cd.offcard||[]).filter(b=>b.stake>0).map(b=>b.pl||0),
-      cd.sgp?.stake>0 ? (cd.sgp.pl||0) : 0,
-      cd.potd?.stake>0 ? (cd.potd.pl||0) : 0,
+      ...(cd.rfi||[]).map(b=>b.pl||0),
+      ...(cd.props||[]).map(b=>b.pl||0),
+      ...(cd.offcard||[]).map(b=>b.pl||0),
+      cd.sgp ? (cd.sgp.pl||0) : 0,
+      cd.potd ? (cd.potd.pl||0) : 0,
     ].reduce((s,v)=>s+v,0)
     const totalS = [
-      ...(cd.rfi||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
-      ...(cd.props||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
-      ...(cd.offcard||[]).filter(b=>b.stake>0).map(b=>b.stake||0),
-      cd.sgp?.stake>0 ? (cd.sgp.stake||0) : 0,
-      cd.potd?.stake>0 ? (cd.potd.stake||0) : 0,
+      ...(cd.rfi||[]).map(b=>b.stake||0),
+      ...(cd.props||[]).map(b=>b.stake||0),
+      ...(cd.offcard||[]).map(b=>b.stake||0),
+      cd.sgp ? (cd.sgp.stake||0) : 0,
+      cd.potd ? (cd.potd.stake||0) : 0,
     ].reduce((s,v)=>s+v,0)
     const newCard = {
       id: 'arc-'+Date.now(),

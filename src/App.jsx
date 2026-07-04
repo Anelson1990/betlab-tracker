@@ -485,11 +485,26 @@ export default function App() {
           {/* Monthly P&L Calendar */}
           {(() => {
             const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-            // Build a map of "Mon D" -> total pl that day
+            // Build maps of "Mon D" -> total pl AND win/loss counts that day.
+            // W-L is tracked separately from $ P&L so a day's win/loss progress
+            // still shows even if a bet's dollar amount didn't parse correctly —
+            // POTD result + RFI "W-L" string + ML "W-L" string are parsed directly
+            // from whatever the card recorded at archive/grade time.
             const plByDay = {}
+            const wlByDay = {}
             cards.forEach(c => {
               if (!c.date) return
               plByDay[c.date] = (plByDay[c.date]||0) + (c.pl||0)
+              if (!wlByDay[c.date]) wlByDay[c.date] = { w:0, l:0 }
+              if (c.potdResult === 'W') wlByDay[c.date].w += 1
+              if (c.potdResult === 'L') wlByDay[c.date].l += 1
+              ;[c.rfi, c.ml].forEach(str => {
+                if (typeof str === 'string' && str.includes('-')) {
+                  const [w,l] = str.split('-').map(n=>parseInt(n,10))
+                  if (!isNaN(w)) wlByDay[c.date].w += w
+                  if (!isNaN(l)) wlByDay[c.date].l += l
+                }
+              })
             })
             // Navigate from TODAY's real month, offset by calMonthOffset — never locked to card data
             const base = new Date()
@@ -534,8 +549,14 @@ export default function App() {
                     if (d === null) return <div key={'e'+i} />
                     const key = `${monthName} ${d}`
                     const pl = plByDay[key]
-                    const has = pl !== undefined
-                    const up = has && pl >= 0
+                    const wl = wlByDay[key]
+                    const hasWL = wl && (wl.w + wl.l) > 0
+                    const hasPL = pl !== undefined && pl !== 0
+                    // A day "has data" if it has either a nonzero $ total OR any graded
+                    // win/loss — this way a day where bets graded correctly but the
+                    // dollar amount didn't parse (still $0) still shows real progress.
+                    const has = hasPL || hasWL
+                    const up = hasPL ? pl >= 0 : (hasWL ? wl.w >= wl.l : false)
                     return (
                       <div key={'d'+i} style={{
                         aspectRatio:'1', borderRadius:5, padding:'2px',
@@ -543,9 +564,14 @@ export default function App() {
                         background: has ? (up ? 'rgba(74,222,128,.15)' : 'rgba(248,113,113,.15)') : '#0c0c16',
                         border: `1px solid ${has ? (up ? '#4ade8055' : '#f8717155') : '#13131f'}` }}>
                         <div style={{ fontSize:'.5rem', color: has ? (up?'#4ade80':'#f87171') : '#404060', fontWeight:700 }}>{d}</div>
-                        {has && (
+                        {hasPL && (
                           <div style={{ fontSize:'.46rem', fontWeight:800, color: up?'#4ade80':'#f87171', lineHeight:1 }}>
-                            {up?'+':''}{Math.round(pl)}
+                            {pl>=0?'+':''}{Math.round(pl)}
+                          </div>
+                        )}
+                        {hasWL && (
+                          <div style={{ fontSize:'.4rem', fontWeight:700, color: up?'#4ade80cc':'#f87171cc', lineHeight:1, marginTop:1 }}>
+                            {wl.w}-{wl.l}
                           </div>
                         )}
                       </div>
