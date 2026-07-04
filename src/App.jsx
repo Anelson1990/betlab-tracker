@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { SEED_CARDS, SEED_MODELS, MODEL_COLORS, STATUS_CONFIG, RESULT_CONFIG } from './data.js'
+import { parseCardDate } from './mlbUtils'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
 import TodayCard from './TodayCard.jsx'
 import BetCard from './BetCard.jsx'
@@ -506,6 +507,18 @@ export default function App() {
                 }
               })
             })
+            // Bankroll delta per day — the actual up/down for the day regardless of
+            // whether individual bets parsed. Uses each day's END bankroll (which
+            // reflects manual edits too) minus the PRIOR chronological day's end
+            // bankroll, so a manual correction still shows correctly as a day change.
+            const brByDay = {}
+            const sortedByDate = [...cards]
+              .filter(c => c.date && c.bankroll > 0)
+              .sort((a,b) => parseCardDate(a.date).localeCompare(parseCardDate(b.date)))
+            sortedByDate.forEach((c, idx) => {
+              const prev = idx > 0 ? sortedByDate[idx-1].bankroll : null
+              if (prev !== null) brByDay[c.date] = c.bankroll - prev
+            })
             // Navigate from TODAY's real month, offset by calMonthOffset — never locked to card data
             const base = new Date()
             base.setDate(1)
@@ -550,13 +563,16 @@ export default function App() {
                     const key = `${monthName} ${d}`
                     const pl = plByDay[key]
                     const wl = wlByDay[key]
+                    const brDelta = brByDay[key]
+                    const hasBR = brDelta !== undefined
                     const hasWL = wl && (wl.w + wl.l) > 0
                     const hasPL = pl !== undefined && pl !== 0
-                    // A day "has data" if it has either a nonzero $ total OR any graded
-                    // win/loss — this way a day where bets graded correctly but the
-                    // dollar amount didn't parse (still $0) still shows real progress.
-                    const has = hasPL || hasWL
-                    const up = hasPL ? pl >= 0 : (hasWL ? wl.w >= wl.l : false)
+                    // Priority: real bankroll day-over-day delta (catches manual edits
+                    // too) > $ P&L > win/loss record — so the day always shows real
+                    // up/down progress using whatever signal is actually available.
+                    const has = hasBR || hasPL || hasWL
+                    const up = hasBR ? brDelta >= 0 : (hasPL ? pl >= 0 : (hasWL ? wl.w >= wl.l : false))
+                    const displayVal = hasBR ? brDelta : pl
                     return (
                       <div key={'d'+i} style={{
                         aspectRatio:'1', borderRadius:5, padding:'2px',
@@ -564,9 +580,9 @@ export default function App() {
                         background: has ? (up ? 'rgba(74,222,128,.15)' : 'rgba(248,113,113,.15)') : '#0c0c16',
                         border: `1px solid ${has ? (up ? '#4ade8055' : '#f8717155') : '#13131f'}` }}>
                         <div style={{ fontSize:'.5rem', color: has ? (up?'#4ade80':'#f87171') : '#404060', fontWeight:700 }}>{d}</div>
-                        {hasPL && (
+                        {(hasBR || hasPL) && (
                           <div style={{ fontSize:'.46rem', fontWeight:800, color: up?'#4ade80':'#f87171', lineHeight:1 }}>
-                            {pl>=0?'+':''}{Math.round(pl)}
+                            {displayVal>=0?'+':''}{Math.round(displayVal)}
                           </div>
                         )}
                         {hasWL && (
