@@ -975,8 +975,9 @@ export default function TodayCard({ accounts, adjustAccount }) {
             </div>
           )}
 
-          {/* RFI */}
-          {(card.rfi||[]).filter(b=>b.stake>0).length > 0 && (
+          {/* RFI — shows all entries regardless of stake, so $0 watchlist/tracking
+              picks (e.g. NRFI-Central) actually display, not just staked real bets */}
+          {(card.rfi||[]).length > 0 && (
             <div style={{ marginBottom:10 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                 <div style={{ color:C.dim, fontSize:'.6rem', letterSpacing:'.12em',
@@ -993,7 +994,7 @@ export default function TodayCard({ accounts, adjustAccount }) {
                   + PAPER BET
                 </button>
               </div>
-              {card.rfi.filter(b=>b.stake>0).map((b,i) => (
+              {card.rfi.map((b,i) => (
                 <BetRow key={i}
                   bet={{ ...b, pick:`${b.pick} — ${b.game}`, type:'RFI', platform:b.platform||'DK',
                     onDelete:()=>{
