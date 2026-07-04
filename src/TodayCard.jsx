@@ -260,7 +260,11 @@ export default function TodayCard({ accounts, adjustAccount }) {
       const sameDay = card && card.date && parsed.date && card.date === parsed.date
 
       if (sameDay) {
-        const sig = (b) => `${b.game||''}|${b.pick||b.direction||''}|${b.stake||0}`
+        // Signature includes conf/odds so $0-stake watchlist entries (RFI tracking,
+        // paper picks) don't falsely dedupe against each other just for sharing a
+        // $0 stake on the same game+pick — that collision was silently dropping
+        // entire RFI watchlist pastes.
+        const sig = (b) => `${b.game||''}|${b.pick||b.direction||''}|${b.stake||0}|${b.conf||b.odds||''}`
         const mergeArr = (existing=[], incoming=[]) => {
           const seen = new Set((existing||[]).map(sig))
           const adds = (incoming||[]).filter(b => !seen.has(sig(b)))
