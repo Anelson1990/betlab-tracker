@@ -177,7 +177,7 @@ export default function App() {
               }}>{s.emoji} {s.label}</button>
             ))}
           </div>
-          <SharpMoney sport={activeSport} />
+          <SharpMoney key={activeSport} sport={activeSport} />
         </>
       )}
 
