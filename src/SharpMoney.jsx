@@ -205,7 +205,6 @@ export default function SharpMoney({ sport }) {
   const potdGraded = potdEntries.filter(e => e.result === 'win' || e.result === 'loss')
   const potdWins = potdGraded.filter(e => e.result === 'win').length
   const potdWR = potdGraded.length ? Math.round((potdWins/potdGraded.length)*100) : 0
-  const todayPotd = potdEntries.filter(e => e.date === today)
 
   const today = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' })
   const todayRecord = data.days.find(d => d.date === today)
