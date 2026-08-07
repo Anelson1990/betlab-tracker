@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SEED_SHARP } from './sharp.js'
 import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin } from './sportApi.js'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 const GROUPS = [
   { label: '1-9%',   min: 1,  max: 9,  color: '#64748b', bg: 'rgba(100,116,139,.1)', border: '#334155' },
@@ -441,6 +442,46 @@ export default function SharpMoney({ sport }) {
               No {meta.label} sharp picks logged today. Tap + Add or paste JSON.
             </div>
           )}
+
+          {(() => {
+            const byGame = {}
+            todayPicks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+            const movers = Object.entries(byGame)
+              .filter(([, picks]) => picks.length >= 2)
+              .map(([game, picks]) => ({
+                game,
+                points: [...picks].sort((a,b) => checkpointOrder(a.checkTime) - checkpointOrder(b.checkTime))
+                  .map(p => ({ checkTime: p.checkTime || '?', gap: p.gap })),
+              }))
+            if (movers.length === 0) return null
+            return (
+              <div style={{ marginBottom:6 }}>
+                <div style={{ fontSize:'.52rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'.1em', color:'#a78bfa', marginBottom:4, paddingLeft:4 }}>📈 Line Movement Today</div>
+                {movers.map(m => {
+                  const first = m.points[0].gap, last = m.points[m.points.length-1].gap
+                  const trend = last - first
+                  return (
+                    <div key={m.game} style={{ background:'#09090f', border:'1px solid #2a2a50', borderRadius:8, padding:'8px 10px', marginBottom:4 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:700, color:'#e0e0f0' }}>{m.game}</div>
+                        <div style={{ fontSize:'.6rem', fontWeight:800, color: trend === 0 ? '#404060' : trend > 0 ? '#4ade80' : '#f87171' }}>
+                          {trend === 0 ? '— flat' : trend > 0 ? `▲ +${trend}` : `▼ ${trend}`}
+                        </div>
+                      </div>
+                      <ResponsiveContainer width="100%" height={50}>
+                        <LineChart data={m.points} margin={{ top:2, right:6, bottom:0, left:-30 }}>
+                          <XAxis dataKey="checkTime" tick={{ fontSize:7, fill:'#404060' }} axisLine={false} tickLine={false} />
+                          <YAxis hide domain={['dataMin - 3','dataMax + 3']} />
+                          <Tooltip contentStyle={{ background:'#0e0e1e', border:'1px solid #1a1a30', borderRadius:6, fontSize:'.55rem' }} labelStyle={{ color:'#a78bfa' }} formatter={(v)=>[`${v}%`,'Gap']} />
+                          <Line type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{ r:3, fill:'#a78bfa' }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
 
           {GROUPS.map(g => {
             const picks = todayPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
