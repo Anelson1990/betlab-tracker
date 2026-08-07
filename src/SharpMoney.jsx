@@ -70,6 +70,12 @@ function migrateLegacyMlbData(activeKey, historyKey, deletedKey) {
   } catch {}
 }
 
+const CHECKPOINTS = ['9 AM', '11 AM', '3 PM', '5 PM', 'Close']
+function checkpointOrder(ct) {
+  const i = CHECKPOINTS.indexOf(ct)
+  return i === -1 ? 999 : i
+}
+
 function getDeletedDates(dKey) {
   try { return new Set(JSON.parse(localStorage.getItem(dKey) || '[]')) }
   catch { return new Set() }
@@ -114,7 +120,7 @@ export default function SharpMoney({ sport }) {
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState('')
   const [editDate, setEditDate] = useState('')
-  const [form, setForm] = useState({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
+  const [form, setForm] = useState({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'', checkTime:'9 AM' })
   const [history, setHistory] = useState(() => {
     try { const h = localStorage.getItem(HISTORY_KEY); return h ? JSON.parse(h) : { days: [] } }
     catch { return { days: [] } }
@@ -134,10 +140,11 @@ export default function SharpMoney({ sport }) {
     if (!day) { day = { date: dateToUse, picks: [] }; updated.days.push(day) }
     day.picks.push({
       id: Date.now().toString(), game: form.game, sharpPick: form.sharpPick,
-      sharpOdds: form.sharpOdds, gap: parseInt(form.gap) || 0, confirms: form.confirms, result: 'pending',
+      sharpOdds: form.sharpOdds, gap: parseInt(form.gap) || 0, confirms: form.confirms,
+      checkTime: form.checkTime, result: 'pending',
     })
     save(updated)
-    setForm({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
+    setForm({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'', checkTime:'9 AM' })
     setShowAdd(false)
   }
 
@@ -243,7 +250,10 @@ export default function SharpMoney({ sport }) {
       const existing = updated.days.find(d => d.date === parsed.date)
       const withIds = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
       if (existing) {
-        const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}`
+        // checkTime is part of the signature so a re-paste of the same game
+        // at a new checkpoint (9am -> 11am -> 3pm -> 5pm) gets ADDED as a new
+        // line-movement snapshot instead of being treated as a duplicate.
+        const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}|${p.checkTime||''}`
         const seen = new Set(existing.picks.map(sig))
         const adds = withIds.filter(p => !seen.has(sig(p)))
         existing.picks = [...existing.picks, ...adds]
@@ -367,7 +377,10 @@ export default function SharpMoney({ sport }) {
               <input value={form.sharpPick} onChange={e=>setForm(f=>({...f,sharpPick:e.target.value}))} placeholder="Sharp pick e.g. WSH -136" style={IS} />
               <input value={form.sharpOdds} onChange={e=>setForm(f=>({...f,sharpOdds:e.target.value}))} placeholder="Odds e.g. -136" style={IS} />
               <input value={form.gap} onChange={e=>setForm(f=>({...f,gap:e.target.value}))} placeholder="Gap % e.g. 76" type="number" style={IS} />
-              <select value={form.confirms} onChange={e=>setForm(f=>({...f,confirms:e.target.value}))} style={IS}>
+              <select value={form.checkTime} onChange={e=>setForm(f=>({...f,checkTime:e.target.value}))} style={IS}>
+                {CHECKPOINTS.map(c => <option key={c} value={c}>{c} check</option>)}
+              </select>
+              <select value={form.confirms} onChange={e=>setForm(f=>({...f,confirms:e.target.value}))} style={{...IS, gridColumn:'1 / -1'}}>
                 <option value="">Model signal?</option>
                 <option value="confirms">✅ Confirms models</option>
                 <option value="conflicts">⚠️ Conflicts models</option>
@@ -435,12 +448,27 @@ export default function SharpMoney({ sport }) {
             return (
               <div key={g.label}>
                 <div style={{ fontSize:'.52rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'.1em', color:g.color, marginBottom:4, paddingLeft:4 }}>{g.label} Gap</div>
-                {picks.sort((a,b) => b.gap - a.gap).map(pick => (
+                {picks.sort((a,b) => b.gap - a.gap).map(pick => {
+                  // Find this game's earlier checkpoint(s) today to show movement.
+                  const sameGame = todayPicks
+                    .filter(p => p.game === pick.game && p.id !== pick.id)
+                    .sort((a,b) => checkpointOrder(a.checkTime) - checkpointOrder(b.checkTime))
+                  const priorChecks = sameGame.filter(p => checkpointOrder(p.checkTime) < checkpointOrder(pick.checkTime))
+                  const lastCheck = priorChecks[priorChecks.length - 1]
+                  const movement = lastCheck ? pick.gap - lastCheck.gap : null
+                  return (
                   <div key={pick.id} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:8, padding:'9px 10px', marginBottom:4 }}>
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                       <div style={{ flex:1 }}>
                         <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{pick.sharpPick || pick.bet || pick.side || pick.game}</div>
-                        <div style={{ fontSize:'.46rem', color:'#505070' }}>{pick.game} · {pick.gap}% gap {pick.signal ? '· '+pick.signal : pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}</div>
+                        <div style={{ fontSize:'.46rem', color:'#505070' }}>
+                          {pick.game} · {pick.gap}% gap {pick.checkTime ? `· ${pick.checkTime}` : ''} {pick.signal ? '· '+pick.signal : pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}
+                        </div>
+                        {movement !== null && (
+                          <div style={{ fontSize:'.46rem', color: movement === 0 ? '#404060' : movement > 0 ? '#4ade80' : '#f87171', marginTop:2, fontWeight:700 }}>
+                            {movement === 0 ? '— flat' : movement > 0 ? `▲ +${movement}` : `▼ ${movement}`} since {lastCheck.checkTime || 'earlier check'} ({lastCheck.gap}%)
+                          </div>
+                        )}
                       </div>
                       <div style={{ display:'flex', gap:3, alignItems:'center' }}>
                         <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:g.color }}>{pick.gap}%</div>
@@ -451,7 +479,8 @@ export default function SharpMoney({ sport }) {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )
           })}
