@@ -11,10 +11,10 @@ const GROUPS = [
   { label: '40-49%', min: 40, max: 49, color: '#4ade80', bg: 'rgba(74,222,128,.1)', border: '#14532d' },
   { label: '50%+',   min: 50, max: 999, color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: '#4c1d95' },
 ]
+function tierFor(gap) {
+  return GROUPS.find(g => gap >= g.min && gap <= g.max) || null
+}
 
-// Real graded MLB totals through Jun 30 2026 that predate reliable localStorage
-// history. Only applied to MLB — the other sports start fresh with no baseline
-// since this is their first season being tracked.
 const MLB_BASELINE = {
   asOf: 'Jun 30',
   byGroup: { '1-9%': { w: 0, l: 0 }, '10-19%': { w: 5, l: 2 }, '20-29%': { w: 5, l: 6 }, '30-39%': { w: 3, l: 4 }, '40-49%': { w: 9, l: 4 }, '50%+': { w: 10, l: 6 } },
@@ -31,12 +31,6 @@ const LEGACY_ACTIVE_KEY = 'betlab-sharp-v2'
 const LEGACY_HISTORY_KEY = 'betlab-sharp-history-v1'
 const LEGACY_DELETED_KEY = 'betlab-sharp-deleted-v1'
 
-// One-time recovery: before the multi-sport revamp, MLB's data lived under
-// unsuffixed keys. The revamp switched to sport-suffixed keys without
-// migrating the old data, orphaning it. This runs once, merges any legacy
-// days that aren't already present under the new MLB keys (day-level dedupe
-// — never overwrites a day that already exists in the new store), then sets
-// a flag so it never runs again.
 function migrateLegacyMlbData(activeKey, historyKey, deletedKey) {
   try {
     if (localStorage.getItem(MIGRATION_FLAG)) return
@@ -75,6 +69,22 @@ const CHECKPOINTS = ['9 AM', '11 AM', '3 PM', '5 PM', 'Close']
 function checkpointOrder(ct) {
   const i = CHECKPOINTS.indexOf(ct)
   return i === -1 ? 999 : i
+}
+
+function getClosingPicksMap(picks) {
+  const map = new Map()
+  for (const p of picks) {
+    const cur = map.get(p.game)
+    if (!cur || checkpointOrder(p.checkTime) >= checkpointOrder(cur.checkTime)) {
+      map.set(p.game, p)
+    }
+  }
+  return map
+}
+function closingPicksAcrossDays(days) {
+  const out = []
+  for (const day of days) out.push(...getClosingPicksMap(day.picks).values())
+  return out
 }
 
 function getDeletedDates(dKey) {
@@ -172,7 +182,7 @@ export default function SharpMoney({ sport }) {
     updated.days = updated.days.filter(d => d.date !== date)
     markDateDeleted(DELETED_KEY, date)
     save(updated)
-    setGradeLog([`🗑 ${date} deleted permanently — won't resurface from seed data.`])
+    setGradeLog([`deleted ${date} permanently`])
   }
 
   const autoGrade = async (date) => {
@@ -181,30 +191,33 @@ export default function SharpMoney({ sport }) {
     const day = data.days.find(d => d.date === date)
     if (!day) { setGrading(false); return }
     const isoDate = parseCardDate(date)
-    log.push(`🔄 Fetching ${meta.label} games for ${date}...`)
+    log.push(`Fetching ${meta.label} games for ${date}...`)
     const games = await fetchGames(sport, isoDate)
-    if (!games.length) { setGradeLog([`⚠️ No ${meta.label} games found. Try after games finish.`]); setGrading(false); return }
-    log.push(`✅ Found ${games.length} games`)
+    if (!games.length) { setGradeLog([`No ${meta.label} games found. Try after games finish.`]); setGrading(false); return }
+    log.push(`Found ${games.length} games`)
     const updated = JSON.parse(JSON.stringify(data))
     const updDay = updated.days.find(d => d.date === date)
+    const closingMap = getClosingPicksMap(updDay.picks)
 
     for (const pick of updDay.picks) {
+      const isClosing = closingMap.get(pick.game)?.id === pick.id
+      if (!isClosing) continue
       if (pick.result !== 'pending') continue
       const nameField = pick.sharpPick || pick.bet || pick.side || ''
       const teamAbbr = nameField.split(' ')[0]
-      if (!teamAbbr) { log.push(`⚠️ ${pick.game}: no pick name`); continue }
+      if (!teamAbbr) { log.push(`${pick.game}: no pick name`); continue }
       const m = matchGame(sport, games, teamAbbr)
-      if (!m) { log.push(`⚠️ ${pick.game}: game not found`); continue }
-      if (!m.final) { log.push(`⏳ ${pick.game}: not final yet`); continue }
+      if (!m) { log.push(`${pick.game}: game not found`); continue }
+      if (!m.final) { log.push(`${pick.game}: not final yet`); continue }
       const won = decideWin(m)
       pick.result = won ? 'win' : 'loss'
-      log.push(`${won?'✅':'❌'} ${pick.game} — ${m.awayAbbr} ${m.awayScore} @ ${m.homeAbbr} ${m.homeScore} — Sharp on ${teamAbbr} → ${won?'WIN':'LOSS'}`)
+      log.push(`${won?'WIN':'LOSS'} ${pick.game} (closing ${pick.checkTime||''}) - ${m.awayAbbr} ${m.awayScore} @ ${m.homeAbbr} ${m.homeScore} - Sharp on ${teamAbbr}`)
     }
 
-    log.push('✅ Auto-grade complete')
-    const stillPending = updDay.picks.filter(p=>p.result==='pending').length
-    if (stillPending > 0) log.push(`⏳ ${stillPending} still pending — not ready to archive`)
-    else log.push('✅ All graded — ready to archive')
+    log.push('Auto-grade complete')
+    const stillPending = updDay.picks.filter(p => closingMap.get(p.game)?.id === p.id && p.result==='pending').length
+    if (stillPending > 0) log.push(`${stillPending} closing pick(s) still pending - not ready to archive`)
+    else log.push('All closing picks graded - ready to archive')
     save(updated)
     setGradeLog(log)
     setGrading(false)
@@ -212,10 +225,11 @@ export default function SharpMoney({ sport }) {
 
   const archiveSharpDay = (date) => {
     const day = data.days.find(d => d.date === date)
-    if (!day) { setGradeLog([`⚠️ ${date}: nothing to archive`]); return }
-    const pending = day.picks.filter(p=>p.result==='pending').length
-    if (pending > 0) { setGradeLog([`⚠️ ${date}: ${pending} picks still pending. Grade them first.`]); return }
-    if (day.picks.length === 0) { setGradeLog([`⚠️ ${date}: no picks`]); return }
+    if (!day) { setGradeLog([`${date}: nothing to archive`]); return }
+    if (day.picks.length === 0) { setGradeLog([`${date}: no picks`]); return }
+    const closingMap = getClosingPicksMap(day.picks)
+    const pending = day.picks.filter(p => closingMap.get(p.game)?.id === p.id && p.result==='pending').length
+    if (pending > 0) { setGradeLog([`${date}: ${pending} closing pick(s) still pending. Grade them first.`]); return }
 
     let hist
     try { hist = JSON.parse(localStorage.getItem(HISTORY_KEY)||'{"days":[]}') }
@@ -230,17 +244,18 @@ export default function SharpMoney({ sport }) {
     catch { verify = { days: [] } }
     const saved = verify.days.find(d => d.date === date)
     if (!saved || saved.picks.length !== day.picks.length) {
-      setGradeLog([`❌ ${date}: archive write failed — keeping day in active card to avoid data loss.`])
+      setGradeLog([`${date}: archive write failed - keeping day in active card to avoid data loss.`])
       return
     }
 
-    const w = day.picks.filter(p=>p.result==='win').length
-    const l = day.picks.filter(p=>p.result==='loss').length
+    const closingSaved = [...getClosingPicksMap(saved.picks).values()]
+    const w = closingSaved.filter(p=>p.result==='win').length
+    const l = closingSaved.filter(p=>p.result==='loss').length
     const updated = JSON.parse(JSON.stringify(data))
     updated.days = updated.days.filter(d => d.date !== date)
     save(updated)
     setHistory(verify)
-    setGradeLog([`🗂 ${date} archived to history (${w}-${l}). Verified ${saved.picks.length} picks saved.`])
+    setGradeLog([`${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`])
   }
 
   const loadJSON = async () => {
@@ -251,9 +266,6 @@ export default function SharpMoney({ sport }) {
       const existing = updated.days.find(d => d.date === parsed.date)
       const withIds = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
       if (existing) {
-        // checkTime is part of the signature so a re-paste of the same game
-        // at a new checkpoint (9am -> 11am -> 3pm -> 5pm) gets ADDED as a new
-        // line-movement snapshot instead of being treated as a duplicate.
         const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}|${p.checkTime||''}`
         const seen = new Set(existing.picks.map(sig))
         const adds = withIds.filter(p => !seen.has(sig(p)))
@@ -265,20 +277,27 @@ export default function SharpMoney({ sport }) {
       setPasteInput(''); setPasteError(''); setShowPaste(false)
 
       const staleDates = updated.days
-        .filter(d => d.date !== parsed.date && d.picks.some(p => p.result === 'pending'))
+        .filter(d => {
+          if (d.date === parsed.date) return false
+          const closingMap = getClosingPicksMap(d.picks)
+          return [...closingMap.values()].some(p => p.result === 'pending')
+        })
         .map(d => d.date)
       if (staleDates.length > 0) {
-        const sweepLog = [`🧹 Sweeping ${staleDates.length} prior day(s) with pending picks...`]
+        const sweepLog = [`Sweeping ${staleDates.length} prior day(s) with pending closing picks...`]
         for (const staleDate of staleDates) {
           await autoGrade(staleDate)
           const latest = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"days":[]}')
           const sd = latest.days.find(d => d.date === staleDate)
-          if (sd && sd.picks.every(p => p.result !== 'pending')) {
-            archiveSharpDay(staleDate)
-            sweepLog.push(`🗂 ${staleDate} fully graded — archived`)
-          } else if (sd) {
-            const left = sd.picks.filter(p => p.result === 'pending').length
-            sweepLog.push(`⏳ ${staleDate} — ${left} still pending (games not final yet)`)
+          if (sd) {
+            const closingMap = getClosingPicksMap(sd.picks)
+            const stillPending = [...closingMap.values()].some(p => p.result === 'pending')
+            if (!stillPending) {
+              archiveSharpDay(staleDate)
+              sweepLog.push(`${staleDate} fully graded - archived`)
+            } else {
+              sweepLog.push(`${staleDate} - closing pick(s) still pending (games not final yet)`)
+            }
           }
         }
         setGradeLog(sweepLog)
@@ -286,8 +305,8 @@ export default function SharpMoney({ sport }) {
     } catch { setPasteError('Invalid JSON — check format') }
   }
 
-  const allPicks = [...data.days, ...history.days].flatMap(d => d.picks)
-  const gradedPicks = allPicks.filter(p => p.result === 'win' || p.result === 'loss')
+  const closingPicksAll = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)]
+  const gradedPicks = closingPicksAll.filter(p => p.result === 'win' || p.result === 'loss')
 
   const groupStats = GROUPS.map(g => {
     const livePicks = gradedPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
@@ -324,10 +343,20 @@ export default function SharpMoney({ sport }) {
 
   const IS = { background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none', width:'100%' }
 
+  const todayGameGroups = (() => {
+    const byGame = {}
+    todayPicks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+    return Object.entries(byGame).map(([game, picks]) => {
+      const sorted = [...picks].sort((a,b) => checkpointOrder(a.checkTime) - checkpointOrder(b.checkTime))
+      const opening = sorted[0]
+      const closing = sorted[sorted.length - 1]
+      return { game, sorted, opening, closing, openTier: tierFor(opening.gap), closeTier: tierFor(closing.gap) }
+    }).sort((a,b) => b.closing.gap - a.closing.gap)
+  })()
+
   return (
     <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
 
-      {/* HEADER */}
       <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <div>
@@ -341,7 +370,7 @@ export default function SharpMoney({ sport }) {
               + Add
             </button>
             <button onClick={()=>setShowPaste(!showPaste)} style={{ padding:'6px 12px', background:'rgba(74,222,128,.1)', border:'1px solid #14532d', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#4ade80' }}>
-              📋 Paste JSON
+              Paste JSON
             </button>
           </div>
         </div>
@@ -359,11 +388,11 @@ export default function SharpMoney({ sport }) {
           <textarea
             value={pasteInput}
             onChange={e=>setPasteInput(e.target.value)}
-            placeholder='{"date":"Aug 5","picks":[...]}'
+            placeholder='{"date":"Aug 7","picks":[...]}'
             style={{ width:'100%', minHeight:100, background:'#0c0c1a', border:'1px solid #1a1a2e', borderRadius:6, padding:8, color:'#e0e0f0', fontSize:'.72rem', fontFamily:'monospace', resize:'vertical', boxSizing:'border-box' }} />
           {pasteError && <div style={{ color:'#f87171', fontSize:'.7rem', marginTop:4 }}>{pasteError}</div>}
           <div style={{ display:'flex', gap:4, marginTop:8 }}>
-            <button onClick={loadJSON} style={{ flex:1, padding:8, background:'#4ade80', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#000' }}>⚡ Load Picks</button>
+            <button onClick={loadJSON} style={{ flex:1, padding:8, background:'#4ade80', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#000' }}>Load Picks</button>
             <button onClick={()=>{setShowPaste(false);setPasteInput('');setPasteError('')}} style={{ flex:1, padding:8, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
           </div>
         </div>
@@ -383,14 +412,14 @@ export default function SharpMoney({ sport }) {
               </select>
               <select value={form.confirms} onChange={e=>setForm(f=>({...f,confirms:e.target.value}))} style={{...IS, gridColumn:'1 / -1'}}>
                 <option value="">Model signal?</option>
-                <option value="confirms">✅ Confirms models</option>
-                <option value="conflicts">⚠️ Conflicts models</option>
-                <option value="neutral">⚪ Neutral</option>
+                <option value="confirms">Confirms models</option>
+                <option value="conflicts">Conflicts models</option>
+                <option value="neutral">Neutral</option>
               </select>
             </div>
             <div style={{ display:'flex', gap:4, marginTop:4 }}>
               <button onClick={addPick} style={{ flex:1, padding:8, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#fff' }}>Add</button>
-              <button onClick={()=>{setShowAdd(false);setForm({game:'',sharpPick:'',sharpOdds:'',gap:'',confirms:''})}} style={{ flex:1, padding:8, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
+              <button onClick={()=>{setShowAdd(false);setForm({game:'',sharpPick:'',sharpOdds:'',gap:'',confirms:'',checkTime:'9 AM'})}} style={{ flex:1, padding:8, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#505070' }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -399,7 +428,7 @@ export default function SharpMoney({ sport }) {
       {gradeLog.length > 0 && (
         <div style={{ background:'#060610', border:'1px solid #1a1a30', borderRadius:8, padding:10 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-            <div style={{ fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', color:'#404060' }}>⚡ Grade Log</div>
+            <div style={{ fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', color:'#404060' }}>Grade Log</div>
             <button onClick={()=>setGradeLog([])} style={{ background:'none', border:'none', color:'#404060', fontSize:'.52rem' }}>Clear</button>
           </div>
           {gradeLog.map((l,i) => <div key={i} style={{ fontSize:'.56rem', color:'#606080', lineHeight:1.8 }}>{l}</div>)}
@@ -408,131 +437,109 @@ export default function SharpMoney({ sport }) {
 
       {view === 'today' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {data.days.filter(d => d.date !== today && d.picks.some(p=>p.result==='pending')).map(day => {
-            const pendingCount = day.picks.filter(p=>p.result==='pending').length
+          {data.days.filter(d => {
+            if (d.date === today) return false
+            const closingMap = getClosingPicksMap(d.picks)
+            return [...closingMap.values()].some(p => p.result === 'pending')
+          }).map(day => {
+            const closingMap = getClosingPicksMap(day.picks)
+            const pendingCount = [...closingMap.values()].filter(p=>p.result==='pending').length
             return (
               <div key={'stale-'+day.date} style={{ background:'rgba(251,191,36,.08)', border:'1px solid #fbbf24', borderRadius:10, padding:'10px 12px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color:'#fbbf24' }}>
-                    ⚠️ {day.date} — {pendingCount} ungraded
+                    {day.date} — {pendingCount} closing pick(s) ungraded
                   </div>
                   <div style={{ display:'flex', gap:5 }}>
                     <button onClick={()=>autoGrade(day.date)} disabled={grading}
                       style={{ padding:'5px 10px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#60a5fa' }}>
-                      {grading ? '⏳' : '⚡ Grade Now'}
+                      {grading ? '...' : 'Grade Now'}
                     </button>
                     <button onClick={()=>{ if(window.confirm(`Delete all of ${day.date}? This cannot be undone.`)) deleteDay(day.date) }}
                       style={{ padding:'5px 10px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#f87171' }}>
-                      🗑 Delete Day
+                      Delete Day
                     </button>
                   </div>
                 </div>
-                {day.picks.filter(p=>p.result==='pending').map(p => (
-                  <div key={p.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'.62rem', color:'#a0a0c0', padding:'3px 0' }}>
-                    <div>{p.game} — {p.sharpPick}</div>
-                    <button onClick={()=>deletePick(day.date, p.id)}
-                      style={{ padding:'2px 6px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.55rem' }}>✕</button>
-                  </div>
-                ))}
               </div>
             )
           })}
-          {todayPicks.length === 0 && (
+
+          {todayGameGroups.length === 0 && (
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>
               No {meta.label} sharp picks logged today. Tap + Add or paste JSON.
             </div>
           )}
 
-          {(() => {
-            const byGame = {}
-            todayPicks.forEach(p => { (byGame[p.game] ||= []).push(p) })
-            const movers = Object.entries(byGame)
-              .filter(([, picks]) => picks.length >= 2)
-              .map(([game, picks]) => ({
-                game,
-                points: [...picks].sort((a,b) => checkpointOrder(a.checkTime) - checkpointOrder(b.checkTime))
-                  .map(p => ({ checkTime: p.checkTime || '?', gap: p.gap })),
-              }))
-            if (movers.length === 0) return null
+          {todayGameGroups.map(({ game, sorted, opening, closing, openTier, closeTier }) => {
+            const trend = closing.gap - opening.gap
+            const movedTier = openTier?.label !== closeTier?.label
+            const tierColor = closeTier ? closeTier.color : '#404060'
+            const tierBorder = closeTier ? closeTier.border : '#1a1a2e'
             return (
-              <div style={{ marginBottom:6 }}>
-                <div style={{ fontSize:'.52rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'.1em', color:'#a78bfa', marginBottom:4, paddingLeft:4 }}>📈 Line Movement Today</div>
-                {movers.map(m => {
-                  const first = m.points[0].gap, last = m.points[m.points.length-1].gap
-                  const trend = last - first
-                  return (
-                    <div key={m.game} style={{ background:'#09090f', border:'1px solid #2a2a50', borderRadius:8, padding:'8px 10px', marginBottom:4 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:700, color:'#e0e0f0' }}>{m.game}</div>
-                        <div style={{ fontSize:'.6rem', fontWeight:800, color: trend === 0 ? '#404060' : trend > 0 ? '#4ade80' : '#f87171' }}>
-                          {trend === 0 ? '— flat' : trend > 0 ? `▲ +${trend}` : `▼ ${trend}`}
-                        </div>
-                      </div>
-                      <ResponsiveContainer width="100%" height={50}>
-                        <LineChart data={m.points} margin={{ top:2, right:6, bottom:0, left:-30 }}>
-                          <XAxis dataKey="checkTime" tick={{ fontSize:7, fill:'#404060' }} axisLine={false} tickLine={false} />
-                          <YAxis hide domain={['dataMin - 3','dataMax + 3']} />
-                          <Tooltip contentStyle={{ background:'#0e0e1e', border:'1px solid #1a1a30', borderRadius:6, fontSize:'.55rem' }} labelStyle={{ color:'#a78bfa' }} formatter={(v)=>[`${v}%`,'Gap']} />
-                          <Line type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{ r:3, fill:'#a78bfa' }} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
-
-          {GROUPS.map(g => {
-            const picks = todayPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
-            if (picks.length === 0) return null
-            return (
-              <div key={g.label}>
-                <div style={{ fontSize:'.52rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'.1em', color:g.color, marginBottom:4, paddingLeft:4 }}>{g.label} Gap</div>
-                {picks.sort((a,b) => b.gap - a.gap).map(pick => {
-                  // Find this game's earlier checkpoint(s) today to show movement.
-                  const sameGame = todayPicks
-                    .filter(p => p.game === pick.game && p.id !== pick.id)
-                    .sort((a,b) => checkpointOrder(a.checkTime) - checkpointOrder(b.checkTime))
-                  const priorChecks = sameGame.filter(p => checkpointOrder(p.checkTime) < checkpointOrder(pick.checkTime))
-                  const lastCheck = priorChecks[priorChecks.length - 1]
-                  const movement = lastCheck ? pick.gap - lastCheck.gap : null
-                  return (
-                  <div key={pick.id} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:8, padding:'9px 10px', marginBottom:4 }}>
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{pick.sharpPick || pick.bet || pick.side || pick.game}</div>
-                        <div style={{ fontSize:'.46rem', color:'#505070' }}>
-                          {pick.game} · {pick.gap}% gap {pick.checkTime ? `· ${pick.checkTime}` : ''} {pick.signal ? '· '+pick.signal : pick.confirms === 'confirms' ? '✅ confirms' : pick.confirms === 'conflicts' ? '⚠️ conflicts' : ''}
-                        </div>
-                        {movement !== null && (
-                          <div style={{ fontSize:'.46rem', color: movement === 0 ? '#404060' : movement > 0 ? '#4ade80' : '#f87171', marginTop:2, fontWeight:700 }}>
-                            {movement === 0 ? '— flat' : movement > 0 ? `▲ +${movement}` : `▼ ${movement}`} since {lastCheck.checkTime || 'earlier check'} ({lastCheck.gap}%)
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:g.color }}>{pick.gap}%</div>
-                        <button onClick={()=>setResult(today, pick.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${pick.result==='win'?'#14532d':'#1a2a1a'}`, background:pick.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.65rem', opacity:pick.result==='win'?1:0.4 }}>✅</button>
-                        <button onClick={()=>setResult(today, pick.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${pick.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:pick.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.65rem', opacity:pick.result==='loss'?1:0.4 }}>❌</button>
-                        <button onClick={()=>setResult(today, pick.id, 'pending')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${pick.result==='pending'?'#713f12':'#1a2a1a'}`, background:pick.result==='pending'?'rgba(251,191,36,.2)':'#0c0c1a', fontSize:'.65rem', opacity:pick.result==='pending'?1:0.4 }}>⏳</button>
-                        <button onClick={()=>deletePick(today, pick.id)} style={{ padding:'3px 6px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.55rem' }}>✕</button>
-                      </div>
+              <div key={game} style={{ background:'#09090f', border:`1px solid ${tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
+                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:'#f0f0f8' }}>{closing.sharpPick || closing.bet || closing.side || game}</div>
+                    <div style={{ fontSize:'.46rem', color:'#505070' }}>
+                      {game} {closing.signal ? '· '+closing.signal : closing.confirms==='confirms' ? '· confirms' : closing.confirms==='conflicts' ? '· conflicts' : ''}
                     </div>
                   </div>
-                  )
-                })}
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.2rem', fontWeight:800, color:tierColor }}>{closing.gap}%</div>
+                    <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase' }}>{closeTier ? closeTier.label : 'no tier'} · closing</div>
+                  </div>
+                </div>
+
+                {sorted.length >= 2 && (
+                  <>
+                    <div style={{ fontSize:'.5rem', marginBottom:4 }}>
+                      <span style={{ color:'#404060' }}>Opened </span>
+                      <span style={{ color: openTier ? openTier.color : '#404060', fontWeight:700 }}>{opening.gap}% ({openTier ? openTier.label : 'none'})</span>
+                      <span style={{ color:'#404060' }}> {'->'} Closed </span>
+                      <span style={{ color: closeTier ? closeTier.color : '#404060', fontWeight:700 }}>{closing.gap}% ({closeTier ? closeTier.label : 'none'})</span>
+                      {movedTier && <span style={{ color:'#a78bfa', marginLeft:5 }}>· moved tiers</span>}
+                      {trend !== 0 && <span style={{ color: trend>0?'#4ade80':'#f87171', marginLeft:5, fontWeight:700 }}>{trend>0?`+${trend}`:`${trend}`}</span>}
+                    </div>
+                    <ResponsiveContainer width="100%" height={44}>
+                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap}))} margin={{top:2,right:6,bottom:0,left:-30}}>
+                        <XAxis dataKey="checkTime" tick={{fontSize:7,fill:'#404060'}} axisLine={false} tickLine={false} />
+                        <YAxis hide domain={['dataMin - 3','dataMax + 3']} />
+                        <Tooltip contentStyle={{background:'#0e0e1e',border:'1px solid #1a1a30',borderRadius:6,fontSize:'.55rem'}} labelStyle={{color:'#a78bfa'}} formatter={(v)=>[`${v}%`,'Gap']} />
+                        <Line type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{r:3,fill:'#a78bfa'}} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </>
+                )}
+
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                  {sorted.map(p => (
+                    <div key={p.id} style={{ display:'flex', alignItems:'center', gap:3, background: p.id===closing.id ? 'rgba(167,139,250,.15)' : '#0c0c1a', border:`1px solid ${p.id===closing.id?'#4c1d95':'#1a1a30'}`, borderRadius:5, padding:'2px 6px' }}>
+                      <span style={{ fontSize:'.5rem', color: p.id===closing.id ? '#a78bfa' : '#505070', fontWeight: p.id===closing.id?800:400 }}>
+                        {p.checkTime||'?'}: {p.gap}%{p.id===closing.id?' (closing)':''}
+                      </span>
+                      <button onClick={()=>deletePick(today, p.id)} style={{ background:'none', border:'none', color:'#7f1d1d', fontSize:'.55rem', padding:0, marginLeft:2, cursor:'pointer' }}>X</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display:'flex', gap:3, alignItems:'center', marginTop:8, justifyContent:'flex-end' }}>
+                  <span style={{ fontSize:'.46rem', color:'#404060', marginRight:4 }}>Grade closing:</span>
+                  <button onClick={()=>setResult(today, closing.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='win'?'#14532d':'#1a2a1a'}`, background:closing.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='win'?1:0.4 }}>W</button>
+                  <button onClick={()=>setResult(today, closing.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:closing.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='loss'?1:0.4 }}>L</button>
+                  <button onClick={()=>setResult(today, closing.id, 'pending')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='pending'?'#713f12':'#1a2a1a'}`, background:closing.result==='pending'?'rgba(251,191,36,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='pending'?1:0.4 }}>?</button>
+                </div>
               </div>
             )
           })}
 
-          {todayPicks.length > 0 && (
+          {todayGameGroups.length > 0 && (
             <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4 }}>
               <button onClick={()=>autoGrade(today)} disabled={grading} style={{ width:'100%', padding:9, background:grading?'#1a1a30':'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:grading?'#404060':'#60a5fa' }}>
-                {grading ? '⏳ Grading...' : '⚡ Auto Grade Sharp Picks'}
+                {grading ? 'Grading...' : 'Auto Grade Closing Picks'}
               </button>
               <button onClick={()=>archiveSharpDay(today)} disabled={grading} style={{ width:'100%', padding:9, background:'linear-gradient(135deg,#fbbf24,#d97706)', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:800, textTransform:'uppercase', color:'#000' }}>
-                🗂 Archive Day to History
+                Archive Day to History
               </button>
             </div>
           )}
@@ -545,28 +552,30 @@ export default function SharpMoney({ sport }) {
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>No archived {meta.label} history yet.</div>
           )}
           {[...history.days].reverse().map(day => {
-            const wins = day.picks.filter(p=>p.result==='win').length
-            const graded = day.picks.filter(p=>p.result==='win'||p.result==='loss').length
+            const closingMap = getClosingPicksMap(day.picks)
+            const closingList = [...closingMap.values()]
+            const wins = closingList.filter(p=>p.result==='win').length
+            const graded = closingList.filter(p=>p.result==='win'||p.result==='loss').length
             const wr = graded ? Math.round((wins/graded)*100) : null
             return (
               <div key={day.date} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, overflow:'hidden' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px 6px' }}>
                   <div>
                     <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{day.date}</div>
-                    <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{day.picks.length} picks · {graded} graded</div>
+                    <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{closingList.length} games · {day.picks.length} total checkpoints · {graded} graded</div>
                   </div>
                   <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                     {wr !== null && <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:wr>=55?'#4ade80':'#f87171' }}>{wr}% WR</div>}
                   </div>
                 </div>
-                {day.picks.map(p => (
+                {closingList.map(p => (
                   <div key={p.id} style={{ padding:'6px 12px', borderTop:'1px solid #1a1a2e', fontSize:'.65rem', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div>
                       <div style={{ color:'#e0e0f0', marginBottom:2 }}>{p.game} — {p.sharpPick}</div>
-                      <div style={{ color:'#5050a0', fontSize:'.55rem' }}>Gap: {p.gap}% | {p.confirms}</div>
+                      <div style={{ color:'#5050a0', fontSize:'.55rem' }}>Closing gap: {p.gap}% ({p.checkTime||'?'}) | {p.confirms}</div>
                     </div>
                     <div style={{ color:p.result==='win'?'#4ade80':p.result==='loss'?'#f87171':'#fbbf24', fontWeight:800 }}>
-                      {p.result==='win'?'✅':p.result==='loss'?'❌':'⏳'}
+                      {p.result==='win'?'W':p.result==='loss'?'L':'?'}
                     </div>
                   </div>
                 ))}
@@ -582,7 +591,7 @@ export default function SharpMoney({ sport }) {
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Overall {meta.label} Sharp Performance</div>
-              {isMlb && <div style={{ fontSize:'.44rem', color:'#404060' }}>baseline {BASELINE_STATS.asOf} + live</div>}
+              {isMlb && <div style={{ fontSize:'.44rem', color:'#404060' }}>baseline {BASELINE_STATS.asOf} + live, closing picks only</div>}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
               {[
@@ -619,7 +628,7 @@ export default function SharpMoney({ sport }) {
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.5rem', color:'#505070' }}>
                     <span>{g.wins}W · {g.picks-g.wins}L</span>
-                    <span>{g.wr >= 55 ? '✅ Edge' : g.wr >= 50 ? '⚪ Breakeven' : '❌ Below 50%'}</span>
+                    <span>{g.wr >= 55 ? 'Edge' : g.wr >= 50 ? 'Breakeven' : 'Below 50%'}</span>
                   </div>
                 </>
               )}
@@ -630,9 +639,9 @@ export default function SharpMoney({ sport }) {
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Sharp vs Model Alignment</div>
             {[
-              { key:'confirms', label:'✅ Confirms Models', color:'#4ade80' },
-              { key:'conflicts', label:'⚠️ Conflicts Models', color:'#f87171' },
-              { key:'neutral', label:'⚪ Neutral', color:'#94a3b8' },
+              { key:'confirms', label:'Confirms Models', color:'#4ade80' },
+              { key:'conflicts', label:'Conflicts Models', color:'#f87171' },
+              { key:'neutral', label:'Neutral', color:'#94a3b8' },
             ].map(s => {
               const a = alignmentStats[s.key]
               return (
