@@ -177,6 +177,17 @@ export default function SharpMoney({ sport }) {
     save(updated)
   }
 
+  // Removes ALL checkpoints for one game at once — for a delayed/postponed
+  // game you want out of today's card entirely, not just its latest check.
+  const deleteGame = (date, game) => {
+    const updated = JSON.parse(JSON.stringify(data))
+    const day = updated.days.find(d => d.date === date)
+    if (!day) return
+    day.picks = day.picks.filter(p => p.game !== game)
+    if (day.picks.length === 0) updated.days = updated.days.filter(d => d.date !== date)
+    save(updated)
+  }
+
   const deleteDay = (date) => {
     const updated = JSON.parse(JSON.stringify(data))
     updated.days = updated.days.filter(d => d.date !== date)
@@ -523,11 +534,17 @@ export default function SharpMoney({ sport }) {
                   ))}
                 </div>
 
-                <div style={{ display:'flex', gap:3, alignItems:'center', marginTop:8, justifyContent:'flex-end' }}>
-                  <span style={{ fontSize:'.46rem', color:'#404060', marginRight:4 }}>Grade closing:</span>
-                  <button onClick={()=>setResult(today, closing.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='win'?'#14532d':'#1a2a1a'}`, background:closing.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='win'?1:0.4 }}>W</button>
-                  <button onClick={()=>setResult(today, closing.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:closing.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='loss'?1:0.4 }}>L</button>
-                  <button onClick={()=>setResult(today, closing.id, 'pending')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='pending'?'#713f12':'#1a2a1a'}`, background:closing.result==='pending'?'rgba(251,191,36,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='pending'?1:0.4 }}>?</button>
+                <div style={{ display:'flex', gap:3, alignItems:'center', marginTop:8, justifyContent:'space-between' }}>
+                  <button onClick={()=>{ if(window.confirm(`Delete ${game} entirely (all ${sorted.length} checkpoint${sorted.length>1?'s':''})? Use this if the game got delayed/postponed.`)) deleteGame(today, game) }}
+                    style={{ padding:'3px 8px', background:'rgba(248,113,113,.08)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.5rem', fontWeight:700 }}>
+                    Delete Game
+                  </button>
+                  <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                    <span style={{ fontSize:'.46rem', color:'#404060', marginRight:4 }}>Grade closing:</span>
+                    <button onClick={()=>setResult(today, closing.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='win'?'#14532d':'#1a2a1a'}`, background:closing.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='win'?1:0.4 }}>W</button>
+                    <button onClick={()=>setResult(today, closing.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:closing.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='loss'?1:0.4 }}>L</button>
+                    <button onClick={()=>setResult(today, closing.id, 'pending')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${closing.result==='pending'?'#713f12':'#1a2a1a'}`, background:closing.result==='pending'?'rgba(251,191,36,.2)':'#0c0c1a', fontSize:'.65rem', opacity:closing.result==='pending'?1:0.4 }}>?</button>
+                  </div>
                 </div>
               </div>
             )
