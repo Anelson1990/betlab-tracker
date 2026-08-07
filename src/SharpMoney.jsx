@@ -143,7 +143,12 @@ export default function SharpMoney({ sport }) {
   // checkpoint/gap data above.
   const POTD_KEY = `betlab-potd-v1-${sport}`
   const [potdEntries, setPotdEntries] = useState(() => {
-    try { const p = localStorage.getItem(POTD_KEY); return p ? JSON.parse(p) : [] } catch { return [] }
+    try {
+      const p = localStorage.getItem(POTD_KEY)
+      if (!p) return []
+      const parsed = JSON.parse(p)
+      return Array.isArray(parsed) ? parsed : []
+    } catch { return [] }
   })
   const [showPotdAdd, setShowPotdAdd] = useState(false)
   const [showPotdPaste, setShowPotdPaste] = useState(false)
@@ -689,7 +694,7 @@ export default function SharpMoney({ sport }) {
             </div>
           )}
 
-          {[...potdEntries].reverse().map(entry => (
+          {[...(Array.isArray(potdEntries) ? potdEntries : [])].reverse().map(entry => (
             <div key={entry.id} style={{ background:'#09090f', border:'1px solid #2a2a50', borderRadius:8, padding:'10px 10px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
                 <div style={{ flex:1 }}>
