@@ -25,6 +25,51 @@ const EMPTY_BASELINE = {
   alignment: { confirms: { w: 0, l: 0 }, conflicts: { w: 0, l: 0 }, neutral: { w: 0, l: 0 } },
 }
 
+const MIGRATION_FLAG = 'betlab-sharp-mlb-legacy-migrated-v1'
+const LEGACY_ACTIVE_KEY = 'betlab-sharp-v2'
+const LEGACY_HISTORY_KEY = 'betlab-sharp-history-v1'
+const LEGACY_DELETED_KEY = 'betlab-sharp-deleted-v1'
+
+// One-time recovery: before the multi-sport revamp, MLB's data lived under
+// unsuffixed keys. The revamp switched to sport-suffixed keys without
+// migrating the old data, orphaning it. This runs once, merges any legacy
+// days that aren't already present under the new MLB keys (day-level dedupe
+// — never overwrites a day that already exists in the new store), then sets
+// a flag so it never runs again.
+function migrateLegacyMlbData(activeKey, historyKey, deletedKey) {
+  try {
+    if (localStorage.getItem(MIGRATION_FLAG)) return
+    const legacyActive = JSON.parse(localStorage.getItem(LEGACY_ACTIVE_KEY) || 'null')
+    const legacyHistory = JSON.parse(localStorage.getItem(LEGACY_HISTORY_KEY) || 'null')
+    const legacyDeleted = JSON.parse(localStorage.getItem(LEGACY_DELETED_KEY) || '[]')
+
+    if (legacyActive?.days?.length) {
+      const current = JSON.parse(localStorage.getItem(activeKey) || '{"days":[]}')
+      const currentDates = new Set(current.days.map(d => d.date))
+      const toAdd = legacyActive.days.filter(d => !currentDates.has(d.date))
+      if (toAdd.length) {
+        current.days = [...current.days, ...toAdd]
+        localStorage.setItem(activeKey, JSON.stringify(current))
+      }
+    }
+    if (legacyHistory?.days?.length) {
+      const current = JSON.parse(localStorage.getItem(historyKey) || '{"days":[]}')
+      const currentDates = new Set(current.days.map(d => d.date))
+      const toAdd = legacyHistory.days.filter(d => !currentDates.has(d.date))
+      if (toAdd.length) {
+        current.days = [...current.days, ...toAdd]
+        localStorage.setItem(historyKey, JSON.stringify(current))
+      }
+    }
+    if (Array.isArray(legacyDeleted) && legacyDeleted.length) {
+      const current = new Set(JSON.parse(localStorage.getItem(deletedKey) || '[]'))
+      legacyDeleted.forEach(d => current.add(d))
+      localStorage.setItem(deletedKey, JSON.stringify([...current]))
+    }
+    localStorage.setItem(MIGRATION_FLAG, '1')
+  } catch {}
+}
+
 function getDeletedDates(dKey) {
   try { return new Set(JSON.parse(localStorage.getItem(dKey) || '[]')) }
   catch { return new Set() }
@@ -47,6 +92,7 @@ export default function SharpMoney({ sport }) {
   const SEED = isMlb ? SEED_SHARP : []
 
   function loadData() {
+    if (isMlb) migrateLegacyMlbData(STORAGE_KEY, HISTORY_KEY, DELETED_KEY)
     try {
       const s = localStorage.getItem(STORAGE_KEY)
       const stored = s ? JSON.parse(s) : null
