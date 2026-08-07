@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { SEED_SHARP } from './sharp.js'
-
-const STORAGE_KEY = 'betlab-sharp-v2'
-const MLB_API = 'https://statsapi.mlb.com/api/v1'
+import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin } from './sportApi.js'
 
 const GROUPS = [
   { label: '10-19%', min: 10, max: 19, color: '#60a5fa', bg: 'rgba(96,165,250,.1)', border: '#1e40af' },
@@ -12,87 +10,56 @@ const GROUPS = [
   { label: '50%+',   min: 50, max: 999, color: '#a78bfa', bg: 'rgba(167,139,250,.1)', border: '#4c1d95' },
 ]
 
-function getGroup(gap) {
-  return GROUPS.find(g => gap >= g.min && gap <= g.max) || null
-}
-
-// BASELINE — real graded totals through Jun 30 that predate reliable localStorage
-// history (lost in an earlier wipe, confirmed durable in Airtable). Live picks
-// graded from this point forward ADD on top of these counts, they never replace them.
-const BASELINE_STATS = {
+// Real graded MLB totals through Jun 30 2026 that predate reliable localStorage
+// history. Only applied to MLB — the other sports start fresh with no baseline
+// since this is their first season being tracked.
+const MLB_BASELINE = {
   asOf: 'Jun 30',
   byGroup: { '10-19%': { w: 5, l: 2 }, '20-29%': { w: 5, l: 6 }, '30-39%': { w: 3, l: 4 }, '40-49%': { w: 9, l: 4 }, '50%+': { w: 10, l: 6 } },
   alignment: { confirms: { w: 25, l: 9 }, conflicts: { w: 3, l: 6 }, neutral: { w: 5, l: 4 } },
 }
-
-function parseCardDate(dateStr) {
-  if (!dateStr) return new Date().toISOString().split('T')[0]
-  const months = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' }
-  const parts = dateStr.trim().split(' ')
-  if (parts.length >= 2) {
-    const month = months[parts[0]] || '06'
-    const day = parts[1].padStart(2, '0')
-    return `2026-${month}-${day}`
-  }
-  return new Date().toISOString().split('T')[0]
+const EMPTY_BASELINE = {
+  asOf: null,
+  byGroup: { '10-19%': { w: 0, l: 0 }, '20-29%': { w: 0, l: 0 }, '30-39%': { w: 0, l: 0 }, '40-49%': { w: 0, l: 0 }, '50%+': { w: 0, l: 0 } },
+  alignment: { confirms: { w: 0, l: 0 }, conflicts: { w: 0, l: 0 }, neutral: { w: 0, l: 0 } },
 }
 
-async function fetchGames(dateStr) {
-  try {
-    const res = await fetch(`${MLB_API}/schedule?sportId=1&date=${dateStr}&hydrate=linescore,team`)
-    return (await res.json())?.dates?.[0]?.games || []
-  } catch { return [] }
-}
-
-function findGame(games, abbr) {
-  if (!abbr) return null
-  const a = abbr.toUpperCase()
-  return games.find(g => {
-    const h = g.teams?.home?.team?.abbreviation?.toUpperCase() || ''
-    const aw = g.teams?.away?.team?.abbreviation?.toUpperCase() || ''
-    const hn = g.teams?.home?.team?.teamName?.toUpperCase() || ''
-    const an = g.teams?.away?.team?.teamName?.toUpperCase() || ''
-    return h===a || aw===a || hn.includes(a) || an.includes(a)
-  })
-}
-
-const DELETED_KEY = 'betlab-sharp-deleted-v1'
-
-function getDeletedDates() {
-  try { return new Set(JSON.parse(localStorage.getItem(DELETED_KEY) || '[]')) }
+function getDeletedDates(dKey) {
+  try { return new Set(JSON.parse(localStorage.getItem(dKey) || '[]')) }
   catch { return new Set() }
 }
-function markDateDeleted(date) {
+function markDateDeleted(dKey, date) {
   try {
-    const s = getDeletedDates()
+    const s = getDeletedDates(dKey)
     s.add(date)
-    localStorage.setItem(DELETED_KEY, JSON.stringify([...s]))
+    localStorage.setItem(dKey, JSON.stringify([...s]))
   } catch {}
 }
 
-function loadData() {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY)
-    const stored = s ? JSON.parse(s) : null
-    const deleted = getDeletedDates()
-    if (stored === null) {
-      // Nothing saved yet — first ever load, seed the starter data (minus anything deleted)
-      return { days: SEED_SHARP.filter(d => !deleted.has(d.date)) }
-    }
-    // Once the user has any saved state, THEIR data wins completely.
-    // Seed data only fills in dates the user has never touched AND never deleted —
-    // it can never resurrect a date the user explicitly removed.
-    const storedDates = new Set(stored.days.map(d => d.date))
-    const untouchedSeedDays = SEED_SHARP.filter(d => !storedDates.has(d.date) && !deleted.has(d.date))
-    return { days: [...stored.days, ...untouchedSeedDays] }
-  } catch { return { days: SEED_SHARP } }
-}
+export default function SharpMoney({ sport }) {
+  const meta = SPORTS.find(s => s.key === sport) || SPORTS[0]
+  const isMlb = sport === 'mlb'
+  const BASELINE_STATS = isMlb ? MLB_BASELINE : EMPTY_BASELINE
+  const STORAGE_KEY = `betlab-sharp-v2-${sport}`
+  const HISTORY_KEY = `betlab-sharp-history-v1-${sport}`
+  const DELETED_KEY = `betlab-sharp-deleted-v1-${sport}`
+  const SEED = isMlb ? SEED_SHARP : []
 
-function saveData(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {} }
+  function loadData() {
+    try {
+      const s = localStorage.getItem(STORAGE_KEY)
+      const stored = s ? JSON.parse(s) : null
+      const deleted = getDeletedDates(DELETED_KEY)
+      if (stored === null) return { days: SEED.filter(d => !deleted.has(d.date)) }
+      const storedDates = new Set(stored.days.map(d => d.date))
+      const untouchedSeedDays = SEED.filter(d => !storedDates.has(d.date) && !deleted.has(d.date))
+      return { days: [...stored.days, ...untouchedSeedDays] }
+    } catch { return { days: SEED } }
+  }
+  function saveData(data) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {} }
 
-export default function SharpMoney() {
   const [data, setData] = useState(loadData)
-  const [view, setView] = useState('today') // today | history | stats
+  const [view, setView] = useState('today')
   const [grading, setGrading] = useState(false)
   const [gradeLog, setGradeLog] = useState([])
   const [showAdd, setShowAdd] = useState(false)
@@ -100,19 +67,13 @@ export default function SharpMoney() {
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState('')
   const [editDate, setEditDate] = useState('')
-  const [editingPick, setEditingPick] = useState(null)
-  const [editForm, setEditForm] = useState({ sharpPick:'', game:'', gap:'' })
   const [form, setForm] = useState({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
   const [history, setHistory] = useState(() => {
-    try {
-      const h = localStorage.getItem('betlab-sharp-history-v1')
-      return h ? JSON.parse(h) : { days: [] }
-    } catch { return { days: [] } }
+    try { const h = localStorage.getItem(HISTORY_KEY); return h ? JSON.parse(h) : { days: [] } }
+    catch { return { days: [] } }
   })
 
   const today = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric' })
-
-  // Get or create today's day record
   const todayRecord = data.days.find(d => d.date === today)
   const todayPicks = todayRecord?.picks || []
 
@@ -125,13 +86,8 @@ export default function SharpMoney() {
     let day = updated.days.find(d => d.date === dateToUse)
     if (!day) { day = { date: dateToUse, picks: [] }; updated.days.push(day) }
     day.picks.push({
-      id: Date.now().toString(),
-      game: form.game,
-      sharpPick: form.sharpPick,
-      sharpOdds: form.sharpOdds,
-      gap: parseInt(form.gap) || 0,
-      confirms: form.confirms,
-      result: 'pending',
+      id: Date.now().toString(), game: form.game, sharpPick: form.sharpPick,
+      sharpOdds: form.sharpOdds, gap: parseInt(form.gap) || 0, confirms: form.confirms, result: 'pending',
     })
     save(updated)
     setForm({ game:'', sharpPick:'', sharpOdds:'', gap:'', confirms:'' })
@@ -159,18 +115,77 @@ export default function SharpMoney() {
   const deleteDay = (date) => {
     const updated = JSON.parse(JSON.stringify(data))
     updated.days = updated.days.filter(d => d.date !== date)
-    markDateDeleted(date)
+    markDateDeleted(DELETED_KEY, date)
     save(updated)
     setGradeLog([`🗑 ${date} deleted permanently — won't resurface from seed data.`])
   }
 
-  const editPick = (date, id, fields) => {
+  const autoGrade = async (date) => {
+    setGrading(true)
+    const log = []
+    const day = data.days.find(d => d.date === date)
+    if (!day) { setGrading(false); return }
+    const isoDate = parseCardDate(date)
+    log.push(`🔄 Fetching ${meta.label} games for ${date}...`)
+    const games = await fetchGames(sport, isoDate)
+    if (!games.length) { setGradeLog([`⚠️ No ${meta.label} games found. Try after games finish.`]); setGrading(false); return }
+    log.push(`✅ Found ${games.length} games`)
     const updated = JSON.parse(JSON.stringify(data))
-    const day = updated.days.find(d => d.date === date)
-    if (!day) return
-    const pick = day.picks.find(p => p.id === id)
-    if (pick) Object.assign(pick, fields)
+    const updDay = updated.days.find(d => d.date === date)
+
+    for (const pick of updDay.picks) {
+      if (pick.result !== 'pending') continue
+      const nameField = pick.sharpPick || pick.bet || pick.side || ''
+      const teamAbbr = nameField.split(' ')[0]
+      if (!teamAbbr) { log.push(`⚠️ ${pick.game}: no pick name`); continue }
+      const m = matchGame(sport, games, teamAbbr)
+      if (!m) { log.push(`⚠️ ${pick.game}: game not found`); continue }
+      if (!m.final) { log.push(`⏳ ${pick.game}: not final yet`); continue }
+      const won = decideWin(m)
+      pick.result = won ? 'win' : 'loss'
+      log.push(`${won?'✅':'❌'} ${pick.game} — ${m.awayAbbr} ${m.awayScore} @ ${m.homeAbbr} ${m.homeScore} — Sharp on ${teamAbbr} → ${won?'WIN':'LOSS'}`)
+    }
+
+    log.push('✅ Auto-grade complete')
+    const stillPending = updDay.picks.filter(p=>p.result==='pending').length
+    if (stillPending > 0) log.push(`⏳ ${stillPending} still pending — not ready to archive`)
+    else log.push('✅ All graded — ready to archive')
     save(updated)
+    setGradeLog(log)
+    setGrading(false)
+  }
+
+  const archiveSharpDay = (date) => {
+    const day = data.days.find(d => d.date === date)
+    if (!day) { setGradeLog([`⚠️ ${date}: nothing to archive`]); return }
+    const pending = day.picks.filter(p=>p.result==='pending').length
+    if (pending > 0) { setGradeLog([`⚠️ ${date}: ${pending} picks still pending. Grade them first.`]); return }
+    if (day.picks.length === 0) { setGradeLog([`⚠️ ${date}: no picks`]); return }
+
+    let hist
+    try { hist = JSON.parse(localStorage.getItem(HISTORY_KEY)||'{"days":[]}') }
+    catch { hist = { days: [] } }
+    const exIdx = hist.days.findIndex(d => d.date === date)
+    if (exIdx >= 0) hist.days[exIdx] = JSON.parse(JSON.stringify(day))
+    else hist.days.push(JSON.parse(JSON.stringify(day)))
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist))
+
+    let verify
+    try { verify = JSON.parse(localStorage.getItem(HISTORY_KEY)||'{"days":[]}') }
+    catch { verify = { days: [] } }
+    const saved = verify.days.find(d => d.date === date)
+    if (!saved || saved.picks.length !== day.picks.length) {
+      setGradeLog([`❌ ${date}: archive write failed — keeping day in active card to avoid data loss.`])
+      return
+    }
+
+    const w = day.picks.filter(p=>p.result==='win').length
+    const l = day.picks.filter(p=>p.result==='loss').length
+    const updated = JSON.parse(JSON.stringify(data))
+    updated.days = updated.days.filter(d => d.date !== date)
+    save(updated)
+    setHistory(verify)
+    setGradeLog([`🗂 ${date} archived to history (${w}-${l}). Verified ${saved.picks.length} picks saved.`])
   }
 
   const loadJSON = async () => {
@@ -181,7 +196,6 @@ export default function SharpMoney() {
       const existing = updated.days.find(d => d.date === parsed.date)
       const withIds = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
       if (existing) {
-        // merge — dedupe by game + pick so re-pasting doesn't duplicate
         const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}`
         const seen = new Set(existing.picks.map(sig))
         const adds = withIds.filter(p => !seen.has(sig(p)))
@@ -190,13 +204,8 @@ export default function SharpMoney() {
         updated.days.push({ date: parsed.date, picks: withIds })
       }
       save(updated)
-      setPasteInput('')
-      setPasteError('')
-      setShowPaste(false)
+      setPasteInput(''); setPasteError(''); setShowPaste(false)
 
-      // SWEEP: any OTHER day still holding pending picks gets auto-graded,
-      // and archived to history if grading clears every pick. Runs every
-      // time a new sharp JSON lands so stale days can never go stranded.
       const staleDates = updated.days
         .filter(d => d.date !== parsed.date && d.picks.some(p => p.result === 'pending'))
         .map(d => d.date)
@@ -204,7 +213,6 @@ export default function SharpMoney() {
         const sweepLog = [`🧹 Sweeping ${staleDates.length} prior day(s) with pending picks...`]
         for (const staleDate of staleDates) {
           await autoGrade(staleDate)
-          // re-read latest data after autoGrade's save()
           const latest = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"days":[]}')
           const sd = latest.days.find(d => d.date === staleDate)
           if (sd && sd.picks.every(p => p.result !== 'pending')) {
@@ -219,91 +227,7 @@ export default function SharpMoney() {
       }
     } catch { setPasteError('Invalid JSON — check format') }
   }
-  const autoGrade = async (date) => {
-    setGrading(true)
-    const log = []
-    const day = data.days.find(d => d.date === date)
-    if (!day) { setGrading(false); return }
-    const dateStr = parseCardDate(date)
-    log.push(`🔄 Fetching games for ${date}...`)
-    const games = await fetchGames(dateStr)
-    if (!games.length) { setGradeLog(['⚠️ No games found. Try after games finish.']); setGrading(false); return }
-    log.push(`✅ Found ${games.length} games`)
-    const updated = JSON.parse(JSON.stringify(data))
-    const updDay = updated.days.find(d => d.date === date)
 
-    for (const pick of updDay.picks) {
-      if (pick.result !== 'pending') continue
-      // Extract team abbr from sharpPick/bet/side (e.g. "WSH -136" → "WSH")
-      const nameField = pick.sharpPick || pick.bet || pick.side || ''
-      const teamAbbr = nameField.split(' ')[0]
-      if (!teamAbbr) { log.push(`⚠️ ${pick.game}: no pick name`); continue }
-      const game = findGame(games, teamAbbr)
-      if (!game) { log.push(`⚠️ ${pick.game}: game not found`); continue }
-      if (game.status?.detailedState !== 'Final') { log.push(`⏳ ${pick.game}: not final yet`); continue }
-      const hs = game.teams?.home?.score
-      const as = game.teams?.away?.score
-      const ha = game.teams?.home?.team?.abbreviation?.toUpperCase()
-      const aa = game.teams?.away?.team?.abbreviation?.toUpperCase()
-      const ta = teamAbbr.toUpperCase()
-      const pickedHome = ta === ha
-      const won = (pickedHome && hs > as) || (!pickedHome && as > hs)
-      pick.result = won ? 'win' : 'loss'
-      log.push(`${won?'✅':'❌'} ${pick.game} — ${aa} ${as} @ ${ha} ${hs} — Sharp on ${teamAbbr} → ${won?'WIN':'LOSS'}`)
-    }
-
-    log.push('✅ Auto-grade complete')
-    const stillPending = updDay.picks.filter(p=>p.result==='pending').length
-    if (stillPending > 0) log.push(`⏳ ${stillPending} still pending — not ready to archive`)
-    else log.push('✅ All graded — ready to archive')
-    save(updated)
-    setGradeLog(log)
-    setGrading(false)
-  }
-
-  // Archive a fully-graded day to history, then clear it from the active card.
-  // Safe order: write history FIRST, verify it landed, only THEN remove from active.
-  const archiveSharpDay = (date) => {
-    const day = data.days.find(d => d.date === date)
-    if (!day) { setGradeLog([`⚠️ ${date}: nothing to archive`]); return }
-    const pending = day.picks.filter(p=>p.result==='pending').length
-    if (pending > 0) {
-      setGradeLog([`⚠️ ${date}: ${pending} picks still pending. Grade them first.`])
-      return
-    }
-    if (day.picks.length === 0) { setGradeLog([`⚠️ ${date}: no picks`]); return }
-
-    // 1. Write to history archive FIRST
-    let hist
-    try { hist = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}') }
-    catch { hist = { days: [] } }
-    const exIdx = hist.days.findIndex(d => d.date === date)
-    if (exIdx >= 0) hist.days[exIdx] = JSON.parse(JSON.stringify(day))
-    else hist.days.push(JSON.parse(JSON.stringify(day)))
-    localStorage.setItem('betlab-sharp-history-v1', JSON.stringify(hist))
-
-    // 2. Verify the write landed before removing from active
-    let verify
-    try { verify = JSON.parse(localStorage.getItem('betlab-sharp-history-v1')||'{"days":[]}') }
-    catch { verify = { days: [] } }
-    const saved = verify.days.find(d => d.date === date)
-    if (!saved || saved.picks.length !== day.picks.length) {
-      setGradeLog([`❌ ${date}: archive write failed — keeping day in active card to avoid data loss.`])
-      return
-    }
-
-    // 3. Now safe to remove from active card
-    const w = day.picks.filter(p=>p.result==='win').length
-    const l = day.picks.filter(p=>p.result==='loss').length
-    const updated = JSON.parse(JSON.stringify(data))
-    updated.days = updated.days.filter(d => d.date !== date)
-    save(updated)
-    setHistory(verify)
-    setGradeLog([`🗂 ${date} archived to history (${w}-${l}). Verified ${saved.picks.length} picks saved.`])
-  }
-
-  // Stats across all history — active days AND archived history, so archiving
-  // a day never drops it out of the stats it's supposed to feed.
   const allPicks = [...data.days, ...history.days].flatMap(d => d.picks)
   const gradedPicks = allPicks.filter(p => p.result === 'win' || p.result === 'loss')
 
@@ -340,14 +264,6 @@ export default function SharpMoney() {
     return acc
   }, {})
 
-  const RC = {
-    pending: { color:'#fbbf24', label:'⏳' },
-    win:     { color:'#4ade80', label:'✅ Win' },
-    loss:    { color:'#f87171', label:'❌ Loss' },
-    skip:    { color:'#94a3b8', label:'⏭️ Skip' },
-  }
-  const cycle = r => { const c=['pending','win','loss','skip']; return c[(c.indexOf(r)+1)%c.length] }
-
   const IS = { background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none', width:'100%' }
 
   return (
@@ -357,7 +273,7 @@ export default function SharpMoney() {
       <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <div>
-            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', color:'#f0f0f8', lineHeight:1 }}>💰 Sharp Money</div>
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', color:'#f0f0f8', lineHeight:1 }}>{meta.emoji} {meta.label} Sharp Money</div>
             <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.08em', marginTop:2 }}>
               {gradedPicks.length} graded · {gradedPicks.filter(p=>p.result==='win').length} wins · {gradedPicks.length ? Math.round((gradedPicks.filter(p=>p.result==='win').length/gradedPicks.length)*100) : 0}% overall WR
             </div>
@@ -372,7 +288,6 @@ export default function SharpMoney() {
           </div>
         </div>
 
-        {/* View toggle */}
         <div style={{ display:'flex', gap:4 }}>
           {[['today','Today'],['history','History'],['stats','Stats']].map(([v,l]) => (
             <button key={v} onClick={()=>setView(v)} style={{ flex:1, padding:'6px 2px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', border:'1px solid', borderRadius:5, background:view===v?'#1a1a30':'#0c0c1a', color:view===v?'#f0f0f8':'#404060', borderColor:view===v?'#2a2a50':'#1a1a30' }}>{l}</button>
@@ -380,14 +295,13 @@ export default function SharpMoney() {
         </div>
       </div>
 
-      {/* PASTE JSON FORM */}
       {showPaste && (
         <div style={{ background:'#09090f', border:'1px solid #14532d', borderRadius:10, padding:12 }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#4ade80', marginBottom:8 }}>Paste Sharp JSON</div>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#4ade80', marginBottom:8 }}>Paste {meta.label} Sharp JSON</div>
           <textarea
             value={pasteInput}
             onChange={e=>setPasteInput(e.target.value)}
-            placeholder='{"date":"Jun 23","picks":[...]}'
+            placeholder='{"date":"Aug 5","picks":[...]}'
             style={{ width:'100%', minHeight:100, background:'#0c0c1a', border:'1px solid #1a1a2e', borderRadius:6, padding:8, color:'#e0e0f0', fontSize:'.72rem', fontFamily:'monospace', resize:'vertical', boxSizing:'border-box' }} />
           {pasteError && <div style={{ color:'#f87171', fontSize:'.7rem', marginTop:4 }}>{pasteError}</div>}
           <div style={{ display:'flex', gap:4, marginTop:8 }}>
@@ -398,7 +312,7 @@ export default function SharpMoney() {
       )}
       {showAdd && (
         <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Add Sharp Pick</div>
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Add {meta.label} Sharp Pick</div>
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             <input value={editDate} onChange={e=>setEditDate(e.target.value)} placeholder={`Date (default: ${today})`} style={IS} />
             <input value={form.game} onChange={e=>setForm(f=>({...f,game:e.target.value}))} placeholder="Game e.g. KC @ WSH" style={IS} />
@@ -421,7 +335,6 @@ export default function SharpMoney() {
         </div>
       )}
 
-      {/* GRADE LOG */}
       {gradeLog.length > 0 && (
         <div style={{ background:'#060610', border:'1px solid #1a1a30', borderRadius:8, padding:10 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
@@ -432,10 +345,8 @@ export default function SharpMoney() {
         </div>
       )}
 
-      {/* TODAY VIEW */}
       {view === 'today' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {/* PENDING FROM PRIOR DAYS — surfaces any day stuck between today/history */}
           {data.days.filter(d => d.date !== today && d.picks.some(p=>p.result==='pending')).map(day => {
             const pendingCount = day.picks.filter(p=>p.result==='pending').length
             return (
@@ -462,21 +373,15 @@ export default function SharpMoney() {
                       style={{ padding:'2px 6px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.55rem' }}>✕</button>
                   </div>
                 ))}
-                {gradeLog.length > 0 && (
-                  <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(251,191,36,.2)' }}>
-                    {gradeLog.map((l,i) => <div key={i} style={{ fontSize:'.55rem', color:'#a0a0c0', lineHeight:1.6 }}>{l}</div>)}
-                  </div>
-                )}
               </div>
             )
           })}
           {todayPicks.length === 0 && (
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>
-              No sharp picks logged today. Tap + Add to enter today's data.
+              No {meta.label} sharp picks logged today. Tap + Add or paste JSON.
             </div>
           )}
 
-          {/* Group by gap size */}
           {GROUPS.map(g => {
             const picks = todayPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
             if (picks.length === 0) return null
@@ -517,11 +422,10 @@ export default function SharpMoney() {
         </div>
       )}
 
-      {/* HISTORY VIEW */}
       {view === 'history' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
           {history.days.length === 0 && (
-            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>No archived history yet.</div>
+            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>No archived {meta.label} history yet.</div>
           )}
           {[...history.days].reverse().map(day => {
             const wins = day.picks.filter(p=>p.result==='win').length
@@ -555,15 +459,13 @@ export default function SharpMoney() {
         </div>
       )}
 
-      {/* STATS VIEW */}
       {view === 'stats' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
 
-          {/* Overall */}
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Overall Sharp Performance</div>
-              <div style={{ fontSize:'.44rem', color:'#404060' }}>baseline {BASELINE_STATS.asOf} + live</div>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Overall {meta.label} Sharp Performance</div>
+              {isMlb && <div style={{ fontSize:'.44rem', color:'#404060' }}>baseline {BASELINE_STATS.asOf} + live</div>}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
               {[
@@ -579,7 +481,6 @@ export default function SharpMoney() {
             </div>
           </div>
 
-          {/* By group */}
           {groupStats.map(g => (
             <div key={g.label} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:10, padding:12 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -609,7 +510,6 @@ export default function SharpMoney() {
             </div>
           ))}
 
-          {/* Confirms vs Conflicts */}
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Sharp vs Model Alignment</div>
             {[

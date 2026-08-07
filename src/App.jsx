@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react'
-import { SEED_CARDS, SEED_MODELS, MODEL_COLORS, STATUS_CONFIG, RESULT_CONFIG } from './data.js'
-import { parseCardDate } from './mlbUtils'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts'
-import TodayCard from './TodayCard.jsx'
-import BetCard from './BetCard.jsx'
-import ChecklistTab from './Checklist.jsx'
+import { CHECKLIST } from './data.js'
+import { SPORTS } from './sportApi.js'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import SharpMoney from './SharpMoney.jsx'
+import ChecklistTab from './Checklist.jsx'
 import Knowledge from './Knowledge.jsx'
 
-const STORAGE_KEY = 'betlab-tracker-cards-v1'
 const BR_KEY = 'betlab-bankroll-v2'
+const BR_HISTORY_KEY = 'betlab-bankroll-history-v1'
+const GOAL_KEY = 'betlab-goal-v1'
 const DEFAULT_ACCOUNTS = { dk: 150.97, b365: 30.00, pp: 30.00 }
+const DEFAULT_GOAL = 300
 
-function loadCards() {
-  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : SEED_CARDS } catch { return SEED_CARDS }
+function isoToday() {
+  return new Date().toISOString().split('T')[0]
 }
-function saveCards(cards) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cards)) } catch {} }
+
+function loadBankrollHistory() {
+  try { const h = localStorage.getItem(BR_HISTORY_KEY); return h ? JSON.parse(h) : [] } catch { return [] }
+}
+function saveBankrollHistory(h) { try { localStorage.setItem(BR_HISTORY_KEY, JSON.stringify(h)) } catch {} }
 
 const TT = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -25,32 +29,46 @@ const TT = ({ active, payload, label }) => {
       {payload.map((p,i) => (
         <div key={i} style={{ color:p.color||p.fill, display:'flex', justifyContent:'space-between', gap:10 }}>
           <span>{p.name||p.dataKey}</span>
-          <span style={{ fontWeight:700 }}>{p.dataKey==='br'||p.dataKey==='profit'?'$'+Number(p.value).toFixed(0):Number(p.value).toFixed(1)+'%'}</span>
+          <span style={{ fontWeight:700 }}>${Number(p.value).toFixed(0)}</span>
         </div>
       ))}
     </div>
   )
 }
 
-const EMPTY_FORM = { date:'', potd:'', potdResult:'W', potdPL:'', rfi:'', ml:'', hitParlay:'L', staked:'', pl:'', bankroll:'', notes:'' }
-
 export default function App() {
-  const [tab, setTab] = useState('today')
-  const [cards, setCards] = useState(loadCards)
-  const [models] = useState(SEED_MODELS)
-  const [expanded, setExpanded] = useState({})
-  const [modelFilter, setModelFilter] = useState('all')
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [tab, setTab] = useState('sharp')
+  const [activeSport, setActiveSport] = useState('mlb')
   const [editingAcct, setEditingAcct] = useState(null)
   const [acctInput, setAcctInput] = useState('')
-  const [paperArchived, setPaperArchived] = useState('')
-  const [calMonthOffset, setCalMonthOffset] = useState(0) // 0 = current real month, +1/-1 = navigate
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
+  const [calMonthOffset, setCalMonthOffset] = useState(0)
   const [accounts, setAccounts] = useState(() => {
     try { const s = localStorage.getItem(BR_KEY); return s ? JSON.parse(s) : DEFAULT_ACCOUNTS } catch { return DEFAULT_ACCOUNTS }
   })
+  const [goal, setGoal] = useState(() => {
+    try { const s = localStorage.getItem(GOAL_KEY); return s ? parseFloat(s) : DEFAULT_GOAL } catch { return DEFAULT_GOAL }
+  })
+  const [bankrollHistory, setBankrollHistory] = useState(loadBankrollHistory)
 
-  useEffect(() => { saveCards(cards) }, [cards])
+  const latestBR = Object.values(accounts).reduce((a,b) => a+b, 0)
+
+  // Auto-snapshot today's total bankroll whenever accounts change. Overwrites
+  // today's entry (not append) so multiple edits in one day don't spam history.
+  useEffect(() => {
+    const today = isoToday()
+    setBankrollHistory(prev => {
+      const idx = prev.findIndex(h => h.date === today)
+      const next = [...prev]
+      if (idx >= 0) next[idx] = { date: today, total: latestBR }
+      else next.push({ date: today, total: latestBR })
+      next.sort((a,b) => a.date.localeCompare(b.date))
+      saveBankrollHistory(next)
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestBR])
 
   const saveAcct = () => {
     const val = parseFloat(acctInput)
@@ -61,57 +79,22 @@ export default function App() {
     setEditingAcct(null); setAcctInput('')
   }
 
-  // Adjust a platform balance by a delta (sportsbook-style hold/credit)
-  const adjustAccount = (platform, delta) => {
-    const key = (platform||'dk').toLowerCase()
-    setAccounts(prev => {
-      const acctKey = prev[key] !== undefined ? key : 'dk'
-      const updated = { ...prev, [acctKey]: Math.round(((prev[acctKey]||0) + delta) * 100) / 100 }
-      try { localStorage.setItem(BR_KEY, JSON.stringify(updated)) } catch {}
-      return updated
-    })
+  const saveGoal = () => {
+    const val = parseFloat(goalInput)
+    if (!val) return
+    setGoal(val)
+    try { localStorage.setItem(GOAL_KEY, JSON.stringify(val)) } catch {}
+    setEditingGoal(false); setGoalInput('')
   }
-
-  const toggle = id => setExpanded(e => ({ ...e, [id]: !e[id] }))
-  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const addCard = () => {
-    if (!form.date || !form.potd) return
-    const card = { id: Date.now().toString(), date:form.date, potd:form.potd, potdResult:form.potdResult, potdPL:parseFloat(form.potdPL)||0, rfi:form.rfi, ml:form.ml, hitParlay:form.hitParlay, staked:parseFloat(form.staked)||0, pl:parseFloat(form.pl)||0, bankroll:parseFloat(form.bankroll)||0, notes:form.notes }
-    setCards(prev => [...prev, card])
-    setForm(EMPTY_FORM); setShowForm(false)
-  }
-
-  const deleteCard = (id, e) => {
-    e.stopPropagation()
-    if (window.confirm('Delete this card?')) setCards(prev => prev.filter(c => c.id !== id))
-  }
-
-  // Stats
-  const realCards = cards.filter(c => c.potdResult !== 'P')
-  const potdWins = realCards.filter(c => c.potdResult === 'W').length
-  const potdLoss = realCards.filter(c => c.potdResult === 'L').length
-  const potdVoid = realCards.filter(c => c.potdResult === 'V').length
-  const latestBR = Object.values(accounts).reduce((a,b) => a+b, 0)
-  const totalPL = cards.reduce((a,c) => a+c.pl, 0)
-  const activeModels = models.filter(m => m.status === 'active')
-  const filteredModels = modelFilter === 'all' ? models : models.filter(m => m.status === modelFilter)
-  const bankrollData = cards.filter(c => c.bankroll > 0).map(c => ({ date:c.date, br:c.bankroll }))
-  const topModels = [...activeModels].sort((a,b) => b.roi - a.roi).slice(0, 8).map(m => ({
-    ...m,
-    wr: m.bets ? Math.round((m.wins/m.bets)*100) : 0
-  }))
-  const GOAL = 300
 
   const tabs = [
-    ['today','🎯 Today'],
-    ['paper','📋 Paper'],
     ['sharp','💰 Sharp'],
-    ['cards','🗂 Cards'],
-    ['models','📊 Models'],
-    ['analytics','📈 Stats'],
-    ['knowledge','📖 Learn'],
+    ['stats','📈 Stats'],
+    ['checklist','✅ Checklist'],
+    ['learn','📖 Learn'],
   ]
+
+  const goalPct = Math.min(100, Math.round((latestBR/goal)*100))
 
   return (
     <div style={{ background:'#060608', minHeight:'100vh', maxWidth:520, margin:'0 auto' }}>
@@ -122,42 +105,50 @@ export default function App() {
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.8rem', letterSpacing:'.06em' }}>
             <span style={{ background:'linear-gradient(135deg,#fff,#7070a0)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Bet</span>
             <span style={{ background:'linear-gradient(135deg,#93c5fd,#2563eb)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Lab</span>
-            <span style={{ background:'linear-gradient(135deg,#fff,#7070a0)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}> Tracker</span>
+            <span style={{ background:'linear-gradient(135deg,#fff,#7070a0)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}> Sharp</span>
           </div>
           <div style={{ textAlign:'right' }}>
-            <div style={{ textAlign:'right' }}>
-              {[['dk','DK','#60a5fa'],['b365','B365','#4ade80'],['pp','PP','#f97316']].map(([key,label,color]) => (
-                <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4, marginBottom:2 }}>
-                  <div style={{ fontSize:'.38rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', width:20 }}>{label}</div>
-                  {editingAcct === key ? (
-                    <div style={{ display:'flex', gap:2 }}>
-                      <input value={acctInput} onChange={e=>setAcctInput(e.target.value)} type="number"
-                        style={{ width:60, background:'#0c0c1a', border:`1px solid ${color}`, borderRadius:4, padding:'2px 4px', fontSize:'.62rem', color:'#f0f0f8', outline:'none', textAlign:'right' }}
-                        onKeyDown={e=>e.key==='Enter'&&saveAcct()} autoFocus />
-                      <button onClick={saveAcct} style={{ padding:'2px 5px', background:'#2563eb', border:'none', borderRadius:3, fontSize:'.55rem', color:'#fff' }}>✓</button>
-                      <button onClick={()=>setEditingAcct(null)} style={{ padding:'2px 4px', background:'#1a1a30', border:'none', borderRadius:3, fontSize:'.55rem', color:'#505070' }}>✕</button>
-                    </div>
-                  ) : (
-                    <div onClick={()=>{setAcctInput(accounts[key].toFixed(2));setEditingAcct(key)}} style={{ cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:700, color }}>
-                      ${accounts[key].toFixed(2)}
-                    </div>
-                  )}
-                </div>
-              ))}
-              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.1rem', color:'#4ade80', lineHeight:1, borderTop:'1px solid #1a1a30', paddingTop:2, marginTop:2 }}>${latestBR.toFixed(2)}</div>
-              <div style={{ fontSize:'.32rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060' }}>Total · tap to edit</div>
-            </div>
+            {[['dk','DK','#60a5fa'],['b365','B365','#4ade80'],['pp','PP','#f97316']].map(([key,label,color]) => (
+              <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4, marginBottom:2 }}>
+                <div style={{ fontSize:'.38rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', width:20 }}>{label}</div>
+                {editingAcct === key ? (
+                  <div style={{ display:'flex', gap:2 }}>
+                    <input value={acctInput} onChange={e=>setAcctInput(e.target.value)} type="number"
+                      style={{ width:60, background:'#0c0c1a', border:`1px solid ${color}`, borderRadius:4, padding:'2px 4px', fontSize:'.62rem', color:'#f0f0f8', outline:'none', textAlign:'right' }}
+                      onKeyDown={e=>e.key==='Enter'&&saveAcct()} autoFocus />
+                    <button onClick={saveAcct} style={{ padding:'2px 5px', background:'#2563eb', border:'none', borderRadius:3, fontSize:'.55rem', color:'#fff' }}>✓</button>
+                    <button onClick={()=>setEditingAcct(null)} style={{ padding:'2px 4px', background:'#1a1a30', border:'none', borderRadius:3, fontSize:'.55rem', color:'#505070' }}>✕</button>
+                  </div>
+                ) : (
+                  <div onClick={()=>{setAcctInput(accounts[key].toFixed(2));setEditingAcct(key)}} style={{ cursor:'pointer', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:700, color }}>
+                    ${accounts[key].toFixed(2)}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.1rem', color:'#4ade80', lineHeight:1, borderTop:'1px solid #1a1a30', paddingTop:2, marginTop:2 }}>${latestBR.toFixed(2)}</div>
+            <div style={{ fontSize:'.32rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060' }}>Total · tap to edit</div>
           </div>
         </div>
 
-        {/* Goal progress bar */}
+        {/* Goal progress bar — tap the goal amount to edit */}
         <div style={{ marginBottom:8 }}>
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-            <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.08em' }}>Goal: ${GOAL}</div>
-            <div style={{ fontSize:'.44rem', color:'#4ade80' }}>{Math.round((latestBR/GOAL)*100)}%</div>
+            {editingGoal ? (
+              <div style={{ display:'flex', gap:2, alignItems:'center' }}>
+                <span style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>Goal: $</span>
+                <input value={goalInput} onChange={e=>setGoalInput(e.target.value)} type="number"
+                  style={{ width:50, background:'#0c0c1a', border:'1px solid #4ade80', borderRadius:4, padding:'1px 3px', fontSize:'.5rem', color:'#f0f0f8', outline:'none' }}
+                  onKeyDown={e=>e.key==='Enter'&&saveGoal()} autoFocus />
+                <button onClick={saveGoal} style={{ padding:'1px 4px', background:'#2563eb', border:'none', borderRadius:3, fontSize:'.5rem', color:'#fff' }}>✓</button>
+              </div>
+            ) : (
+              <div onClick={()=>{setGoalInput(String(goal));setEditingGoal(true)}} style={{ cursor:'pointer', fontSize:'.44rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.08em' }}>Goal: ${goal} ✎</div>
+            )}
+            <div style={{ fontSize:'.44rem', color:'#4ade80' }}>{goalPct}%</div>
           </div>
           <div style={{ height:4, background:'#1a1a30', borderRadius:2, overflow:'hidden' }}>
-            <div style={{ height:'100%', width:`${Math.min(100,(latestBR/GOAL)*100)}%`, background:'linear-gradient(90deg,#2563eb,#4ade80)', borderRadius:2 }} />
+            <div style={{ height:'100%', width:`${goalPct}%`, background:'linear-gradient(90deg,#2563eb,#4ade80)', borderRadius:2 }} />
           </div>
         </div>
 
@@ -173,406 +164,123 @@ export default function App() {
         </div>
       </div>
 
-      {/* STRIP */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, padding:'10px 12px', background:'#07070f', borderBottom:'1px solid #1a1a30' }}>
-        {[
-          { val:`${potdWins}-${potdLoss}`, lbl:'POTD', color:'#4ade80' },
-          { val:`${totalPL>=0?'+':''}$${totalPL.toFixed(0)}`, lbl:'Net P&L', color:totalPL>=0?'#4ade80':'#f87171' },
-          { val:cards.length, lbl:'Days', color:'#60a5fa' },
-          { val:activeModels.length, lbl:'Active', color:'#a78bfa' },
-        ].map(s => (
-          <div key={s.lbl} style={{ textAlign:'center' }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, lineHeight:1, color:s.color }}>{s.val}</div>
-            <div style={{ fontSize:'.38rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginTop:2 }}>{s.lbl}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* TODAY TAB */}
-      {tab === 'today' && (
-        <div style={{ padding:'10px 12px' }}>
-          <TodayCard accounts={accounts} adjustAccount={adjustAccount} />
-        </div>
-      )}
-
-      {/* PAPER BETS TAB */}
-      {tab === 'paper' && (
-        <div style={{ padding:'10px 12px' }}>
-          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem',
-            fontWeight:800, letterSpacing:'.12em', textTransform:'uppercase',
-            color:'#505070', marginBottom:10 }}>
-            📋 Paper Picks — Today
-          </div>
-          <div style={{ background:'#09090f', border:'1px solid #1a1a2e',
-            borderRadius:10, padding:12, marginBottom:10 }}>
-            <div style={{ fontSize:'.6rem', color:'#404060', marginBottom:8,
-              letterSpacing:'.1em', textTransform:'uppercase' }}>
-              Paper picks track model performance without real money.
-              Grade them at end of day to build your stats.
-            </div>
-            {(() => {
-              try {
-                const s = localStorage.getItem('betlab-today-v3')
-                const c = s ? JSON.parse(s) : null
-                if (!c || !c.ml || c.ml.length === 0) {
-                  return <div style={{ color:'#404060', fontSize:'.75rem', textAlign:'center', padding:'20px 0' }}>
-                    No paper picks today — paste today\'s JSON on the Today tab
-                  </div>
-                }
-                return c.ml.map((b,i) => (
-                  <div key={i} style={{ background:'#0c0c1a', border:'1px solid #1a1a2e',
-                    borderLeft:`3px solid ${b.result==='win'?'#4ade80':b.result==='loss'?'#f87171':'#334155'}`,
-                    borderRadius:8, padding:'10px 12px', marginBottom:6 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <div>
-                        <div style={{ color:'#f0f0f8', fontSize:'.8rem', fontWeight:700 }}>
-                          {b.direction} · {b.game}
-                        </div>
-                        <div style={{ color:'#404060', fontSize:'.65rem', marginTop:2 }}>{b.sources}</div>
-                        <div style={{ color:'#60a5fa', fontSize:'.72rem', fontWeight:700, marginTop:2 }}>{b.odds}</div>
-                      </div>
-                      <div style={{ color:b.result==='win'?'#4ade80':b.result==='loss'?'#f87171':'#6060a0',
-                        fontSize:'1rem', fontWeight:700 }}>
-                        {b.result==='win'?'✅':b.result==='loss'?'❌':b.result==='void'?'🔄':'⏳'}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              } catch { return null }
-            })()}
-          </div>
-
-          {/* Paper Archive Button */}
-          <button onClick={()=>{
-            try {
-              const c = JSON.parse(localStorage.getItem('betlab-today-v3')||'{}')
-              const graded = (c.ml||[]).filter(b=>b.result && b.result!=='pending')
-              if (graded.length === 0) { setPaperArchived('⚠️ No graded paper bets to archive'); return }
-              const pkey = 'betlab-paper-history-v1'
-              const papers = JSON.parse(localStorage.getItem(pkey)||'[]')
-              const seen = new Set(papers.map(p=>`${p.date}|${p.pick}|${p.game}|${p.result}`))
-              const toAdd = graded
-                .map(b=>({ date:c.date||'Today', pick:b.direction||b.sources||b.game||'Paper', game:b.game||'', odds:b.odds||'', result:b.result }))
-                .filter(p=>!seen.has(`${p.date}|${p.pick}|${p.game}|${p.result}`))
-              if (toAdd.length === 0) { setPaperArchived('✓ Already archived — no new paper bets'); return }
-              localStorage.setItem(pkey, JSON.stringify([...papers, ...toAdd]))
-              setPaperArchived(`✅ ${toAdd.length} paper bet${toAdd.length>1?'s':''} archived to Stats`)
-            } catch(e) { setPaperArchived('⚠️ Archive failed') }
-          }}
-            style={{ width:'100%', padding:12,
-              background:'linear-gradient(135deg,#60a5fa,#2563eb)',
-              border:'none', borderRadius:10, color:'#fff',
-              fontWeight:800, fontSize:'.85rem', cursor:'pointer', letterSpacing:'.05em' }}>
-            🗂 ARCHIVE PAPER BETS TO STATS
-          </button>
-          {paperArchived && (
-            <div style={{ textAlign:'center', fontSize:'.7rem', color:'#60a5fa', marginTop:8 }}>
-              {paperArchived}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SHARP MONEY TAB */}
-      {tab === 'sharp' && <SharpMoney />}
-
-      {/* CARDS TAB */}
-      {tab === 'cards' && (
-        <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:6 }}>
-          {[...cards].reverse().map(c => {
-            const rc = RESULT_CONFIG[c.potdResult] || RESULT_CONFIG.P
-            const isOpen = expanded[c.id]
-            const borderColor = c.potdResult==='W'?'#14532d':c.potdResult==='L'?'#7f1d1d':c.potdResult==='V'?'#334155':'#1e40af'
-            return (
-              <div key={c.id} style={{ background:'#09090f', border:`1px solid ${borderColor}`, borderRadius:10, overflow:'hidden' }}>
-                <div onClick={()=>toggle(c.id)} style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px 8px', cursor:'pointer' }}>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#505070', width:34, flexShrink:0 }}>{c.date}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.95rem', fontWeight:800, color:'#f0f0f8', lineHeight:1.1 }}>{c.potd}</div>
-                    <div style={{ fontSize:'.38rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginTop:1 }}>Pick of the Day</div>
-                  </div>
-                  <div style={{ borderRadius:5, padding:'3px 7px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, border:`1px solid ${rc.border}`, color:rc.color, background:rc.bg, flexShrink:0 }}>{rc.label}</div>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.95rem', fontWeight:800, color:c.potdPL>=0?'#4ade80':'#f87171', width:44, textAlign:'right', flexShrink:0 }}>
-                    {c.potdPL>=0?'+':''}${Math.abs(c.potdPL).toFixed(0)}
-                  </div>
-                  <button onClick={e=>deleteCard(c.id,e)} style={{ background:'none', border:'none', color:'#404060', fontSize:'.7rem', padding:'0 0 0 4px', flexShrink:0 }}>✕</button>
-                </div>
-                {isOpen && (
-                  <div style={{ padding:'0 12px 10px', borderTop:'1px solid #111120' }}>
-                    {[
-                      ['RFI Record',   c.rfi||'—',    null],
-                      ['ML Record',    c.ml||'—',     null],
-                      ['SGP/Parlay',   c.hitParlay==='W'?'✅ Win':c.hitParlay==='P'?'📋 Paper':'❌ Loss', c.hitParlay==='W'?'#4ade80':c.hitParlay==='P'?'#60a5fa':'#f87171'],
-                      ['Total Staked', `$${c.staked.toFixed(2)}`, null],
-                      ['Total P&L',    `${c.pl>=0?'+':''}$${c.pl.toFixed(2)}`, c.pl>=0?'#4ade80':'#f87171'],
-                      ['Bankroll End', `$${c.bankroll.toFixed(2)}`, '#fbbf24'],
-                    ].map(([lbl,val,col]) => (
-                      <div key={lbl} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0d0d1a' }}>
-                        <span style={{ fontSize:'.52rem', letterSpacing:'.06em', textTransform:'uppercase', color:'#404060' }}>{lbl}</span>
-                        <span style={{ fontSize:'.62rem', fontWeight:600, color:col||'#a0a0c0' }}>{val}</span>
-                      </div>
-                    ))}
-                    {c.notes && (
-                      <div style={{ fontSize:'.6rem', color:'#6060a0', lineHeight:1.6, marginTop:8, paddingTop:6, borderTop:'1px solid #0d0d1a' }}>
-                        {c.notes}
-                      </div>
-                    )}
-                    <button onClick={()=>{
-                      // Check if there's an active card already loaded
-                      let active = null
-                      try { active = JSON.parse(localStorage.getItem('betlab-today-v3')||'{}') } catch {}
-                      if (active && active.date && active.date !== c.date) {
-                        if (!window.confirm(`Today tab has ${active.date} loaded. Un-archiving ${c.date} will REPLACE it. Archive the current day first if you want to keep it. Continue?`)) return
-                      } else if (!window.confirm(`Pull ${c.date} back to the Today tab to add an off-card bet? It will be removed from history until you re-archive.`)) return
-                      // Restore bankroll to this day's end value so new bets deduct correctly
-                      const restored = {
-                        date: c.date,
-                        bankroll: c.bankroll,
-                        potd: c.potd && c.potd!=='NONE' ? { pick:c.potd, modelFire:'(restored)', game:'', odds:'', stake:0, payout:0, platform:'DK', status: c.potdResult==='W'?'win':c.potdResult==='L'?'loss':c.potdResult==='V'?'void':'pending', pl:c.potdPL||0, notes:'restored from history' } : null,
-                        rfi: [], props: [], offcard: [], sgp: null, ml: [],
-                        totalPL: c.pl||0,
-                        notes: (c.notes||'') + ' · un-archived to add off-card bet',
-                      }
-                      try {
-                        localStorage.setItem('betlab-today-v3', JSON.stringify(restored))
-                        // remove this card from history
-                        setCards(prev => prev.filter(x => x.id !== c.id))
-                        setTab('today')
-                      } catch(e) { console.error(e) }
-                    }}
-                      style={{ width:'100%', padding:9, marginTop:10,
-                        background:'rgba(251,191,36,.12)', border:'1px solid #fbbf24',
-                        borderRadius:7, fontSize:'.62rem', fontWeight:700, letterSpacing:'.06em',
-                        textTransform:'uppercase', color:'#fbbf24', cursor:'pointer' }}>
-                      ↩ Un-archive · Add Off-Card Bet
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-
-          {!showForm ? (
-            <button onClick={()=>setShowForm(true)} style={{ width:'100%', padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#fff', marginTop:2 }}>+ Log Card Manually</button>
-          ) : (
-            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, letterSpacing:'.12em', textTransform:'uppercase', color:'#505070', marginBottom:10 }}>Log Card</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:6 }}>
-                {[['date','Date','Jun 14','text'],['potd','POTD Pick','ATL ML -116','text']].map(([k,l,p,t]) => (
-                  <div key={k}>
-                    <label style={{ fontSize:'.44rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginBottom:3, display:'block' }}>{l}</label>
-                    <input value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder={p} type={t} style={{ width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none' }} />
-                  </div>
-                ))}
-                <div>
-                  <label style={{ fontSize:'.44rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginBottom:3, display:'block' }}>POTD Result</label>
-                  <select value={form.potdResult} onChange={e=>setF('potdResult',e.target.value)} style={{ width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none' }}>
-                    <option value="W">✅ Win</option><option value="L">❌ Loss</option><option value="V">🔄 Void</option><option value="P">📋 Paper</option>
-                  </select>
-                </div>
-                {[['potdPL','POTD P&L ($)','10.00','number'],['rfi','RFI Record','2-1','text'],['ml','ML Record','1-0','text'],['staked','Total Staked ($)','40.00','number'],['pl','Total P&L ($)','-5.00','number'],['bankroll','Bankroll End ($)','45.00','number']].map(([k,l,p,t]) => (
-                  <div key={k}>
-                    <label style={{ fontSize:'.44rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginBottom:3, display:'block' }}>{l}</label>
-                    <input value={form[k]} onChange={e=>setF(k,e.target.value)} placeholder={p} type={t} style={{ width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none' }} />
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginBottom:6 }}>
-                <label style={{ fontSize:'.44rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginBottom:3, display:'block' }}>Notes</label>
-                <input value={form.notes} onChange={e=>setF('notes',e.target.value)} placeholder="Key picks, lessons..." style={{ width:'100%', background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none' }} />
-              </div>
-              <button onClick={addCard} style={{ width:'100%', padding:9, background:'#2563eb', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, textTransform:'uppercase', color:'#fff', marginBottom:4 }}>Save</button>
-              <button onClick={()=>setShowForm(false)} style={{ width:'100%', padding:9, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:700, textTransform:'uppercase', color:'#505070' }}>Cancel</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* MODELS TAB */}
-      {tab === 'models' && (
-        <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:6 }}>
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:2 }}>
-            {[['all','All'],['active','Active'],['monitor','Monitor'],['display','Display'],['retired','Retired']].map(([v,l]) => (
-              <button key={v} onClick={()=>setModelFilter(v)} style={{ padding:'4px 8px', background:modelFilter===v?'#1a1a30':'#0c0c1a', border:'1px solid #1a1a30', borderRadius:4, fontSize:'.52rem', fontWeight:700, textTransform:'uppercase', color:modelFilter===v?'#f0f0f8':'#404060' }}>{l}</button>
+      {/* SHARP TAB — sport selector + per-sport tracker */}
+      {tab === 'sharp' && (
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, padding:'10px 12px', background:'#07070f', borderBottom:'1px solid #1a1a30' }}>
+            {SPORTS.map(s => (
+              <button key={s.key} onClick={()=>setActiveSport(s.key)} style={{
+                padding:'8px 4px',
+                fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, letterSpacing:'.04em', textTransform:'uppercase',
+                border:'1px solid', borderRadius:7,
+                background: activeSport===s.key?'#1a1a30':'#0c0c1a', color: activeSport===s.key?'#f0f0f8':'#404060', borderColor: activeSport===s.key?'#2a2a50':'#1a1a30',
+              }}>{s.emoji} {s.label}</button>
             ))}
           </div>
-          {filteredModels.map(m => {
-            const color = MODEL_COLORS[m.name] || '#60a5fa'
-            const sc = STATUS_CONFIG[m.status]
-            const wr = m.bets ? Math.round((m.wins/m.bets)*100) : 0
-            const isOpen = expanded['m_'+m.name]
-            return (
-              <div key={m.name} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, overflow:'hidden' }}>
-                <div onClick={()=>toggle('m_'+m.name)} style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 10px 6px', cursor:'pointer' }}>
-                  <div style={{ width:8, height:8, borderRadius:'50%', background:color, flexShrink:0 }} />
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color, flex:1 }}>{m.name}</div>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:700, color }}>{wr}% WR</div>
-                  <div style={{ fontSize:'.58rem', fontWeight:700, color:m.roi>0?'#4ade80':'#f87171', width:44, textAlign:'right' }}>{m.roi>0?'+':''}{m.roi}%</div>
-                  <div style={{ borderRadius:4, padding:'2px 5px', fontSize:'.38rem', fontWeight:700, textTransform:'uppercase', border:`1px solid ${sc.border}`, color:sc.color, background:sc.bg, flexShrink:0 }}>{sc.label}</div>
-                </div>
-                <div style={{ height:4, background:'#1a1a30', margin:'0 10px 6px', borderRadius:2, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${Math.max(0,wr)}%`, background:color, opacity:0.7, borderRadius:2 }} />
-                </div>
-                {isOpen && (
-                  <div style={{ padding:'0 10px 10px', borderTop:'1px solid #111120' }}>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, margin:'8px 0' }}>
-                      {[{val:`${m.wins}-${m.bets-m.wins}`,lbl:'Record',col:color},{val:`${m.profit>=0?'+':''}$${m.profit.toFixed(0)}`,lbl:'Profit',col:m.profit>=0?'#4ade80':'#f87171'},{val:m.bets,lbl:'Bets',col:'#fbbf24'}].map(s => (
-                        <div key={s.lbl} style={{ textAlign:'center', background:'#0c0c1a', borderRadius:5, padding:6 }}>
-                          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:700, lineHeight:1, color:s.col }}>{s.val}</div>
-                          <div style={{ fontSize:'.36rem', letterSpacing:'.06em', textTransform:'uppercase', color:'#404060', marginTop:2 }}>{s.lbl}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ fontSize:'.56rem', color:'#505070', lineHeight:1.5 }}>{m.note}</div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+          <SharpMoney sport={activeSport} />
+        </>
       )}
 
-      {/* KNOWLEDGE TAB */}
-      {tab === 'knowledge' && <Knowledge />}
+      {/* STATS TAB — bankroll tracker, calendar, line graph, adjustable goal meter. Nothing else. */}
+      {tab === 'stats' && (
+        <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:10 }}>
 
-      {/* ANALYTICS TAB */}
-      {tab === 'analytics' && (
-        <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          {/* Strip: quick bankroll facts */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4 }}>
             {[
-              {val:`${potdWins}-${potdLoss}`,lbl:'POTD Record',sub:`${potdVoid} void · ${Math.round((potdWins/(potdWins+potdLoss||1))*100)}% WR`,col:'#4ade80'},
-              {val:`$${latestBR.toFixed(0)}`,lbl:'Bankroll',sub:`Goal $${GOAL} · ${Math.round((latestBR/GOAL)*100)}%`,col:'#fbbf24'},
-              {val:'72.7%',lbl:'MC YRFI WR',sub:'Best model · 33 bets',col:'#4ade80'},
-              {val:'81.5%',lbl:'Hit Lock WR',sub:'Best prop · 27 bets',col:'#f97316'},
+              { val:`$${latestBR.toFixed(0)}`, lbl:'Bankroll', color:'#4ade80' },
+              { val:`${goalPct}%`, lbl:'To Goal', color:'#60a5fa' },
+              { val:bankrollHistory.length, lbl:'Days Tracked', color:'#a78bfa' },
             ].map(s => (
-              <div key={s.lbl} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:'9px 10px' }}>
-                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.5rem', lineHeight:1, color:s.col }}>{s.val}</div>
-                <div style={{ fontSize:'.42rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginTop:2 }}>{s.lbl}</div>
-                <div style={{ fontSize:'.48rem', color:'#505070', marginTop:2 }}>{s.sub}</div>
+              <div key={s.lbl} style={{ textAlign:'center', background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:'8px 4px' }}>
+                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, lineHeight:1, color:s.color }}>{s.val}</div>
+                <div style={{ fontSize:'.38rem', letterSpacing:'.08em', textTransform:'uppercase', color:'#404060', marginTop:2 }}>{s.lbl}</div>
               </div>
             ))}
           </div>
 
-          {/* Bankroll vs Goal */}
-          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:6 }}>Bankroll vs $300 Goal</div>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-              <span style={{ fontSize:'.52rem', color:'#4ade80' }}>${latestBR.toFixed(2)}</span>
-              <span style={{ fontSize:'.52rem', color:'#404060' }}>$300 goal</span>
+          {/* Adjustable goal meter */}
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:14 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Goal Meter</div>
+              {editingGoal ? (
+                <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                  <input value={goalInput} onChange={e=>setGoalInput(e.target.value)} type="number"
+                    style={{ width:70, background:'#0c0c1a', border:'1px solid #4ade80', borderRadius:5, padding:'4px 6px', fontSize:'.7rem', color:'#f0f0f8', outline:'none' }}
+                    onKeyDown={e=>e.key==='Enter'&&saveGoal()} autoFocus />
+                  <button onClick={saveGoal} style={{ padding:'4px 8px', background:'#2563eb', border:'none', borderRadius:5, fontSize:'.6rem', color:'#fff' }}>Save</button>
+                </div>
+              ) : (
+                <button onClick={()=>{setGoalInput(String(goal));setEditingGoal(true)}} style={{ padding:'4px 10px', background:'rgba(74,222,128,.1)', border:'1px solid #14532d', borderRadius:5, fontSize:'.6rem', color:'#4ade80', fontWeight:700 }}>Edit Goal ✎</button>
+              )}
             </div>
-            <div style={{ height:8, background:'#1a1a30', borderRadius:4, overflow:'hidden' }}>
-              <div style={{ height:'100%', width:`${Math.min(100,(latestBR/GOAL)*100)}%`, background:'linear-gradient(90deg,#2563eb,#4ade80)', borderRadius:4 }} />
+            <div style={{ textAlign:'center', marginBottom:10 }}>
+              <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'2.2rem', color:'#f0f0f8', lineHeight:1 }}>${latestBR.toFixed(2)}</div>
+              <div style={{ fontSize:'.5rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.08em', marginTop:2 }}>of ${goal.toFixed(0)} goal · ${Math.max(0,goal-latestBR).toFixed(2)} to go</div>
             </div>
-            <div style={{ fontSize:'.5rem', color:'#404060', marginTop:4 }}>Need ${Math.max(0,GOAL-latestBR).toFixed(2)} more to hit goal</div>
+            <div style={{ height:10, background:'#1a1a30', borderRadius:5, overflow:'hidden' }}>
+              <div style={{ height:'100%', width:`${goalPct}%`, background:'linear-gradient(90deg,#2563eb,#4ade80)', borderRadius:5, transition:'width .3s' }} />
+            </div>
           </div>
 
-          {bankrollData.length > 1 && (
-            <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
-              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:10 }}>Bankroll History</div>
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={bankrollData} margin={{ top:4, right:4, bottom:4, left:-20 }}>
+          {/* Line graph */}
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Bankroll Over Time</div>
+            {bankrollHistory.length < 2 ? (
+              <div style={{ fontSize:'.6rem', color:'#404060', textAlign:'center', padding:'20px 0' }}>Need at least 2 days logged to draw a trend line.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={bankrollHistory.map(h => ({ date: h.date.slice(5), total: h.total }))} margin={{ top:4, right:4, bottom:4, left:-20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1a1a30" />
-                  <XAxis dataKey="date" tick={{ fontSize:8, fill:'#404060' }} />
-                  <YAxis tick={{ fontSize:8, fill:'#404060' }} />
+                  <XAxis dataKey="date" tick={{ fontSize:7, fill:'#404060' }} />
+                  <YAxis tick={{ fontSize:8, fill:'#404060' }} domain={['dataMin - 10','dataMax + 10']} />
                   <Tooltip content={<TT />} />
-                  <ReferenceLine y={50} stroke="#404060" strokeDasharray="3 3" />
-                  <ReferenceLine y={300} stroke="#2563eb" strokeDasharray="4 2" label={{ value:'Goal', fill:'#2563eb', fontSize:8, position:'right' }} />
-                  <Line type="monotone" dataKey="br" name="Bankroll" stroke="#4ade80" strokeWidth={2} dot={{ r:3, fill:'#4ade80' }} />
+                  <Line type="monotone" dataKey="total" name="Bankroll" stroke="#4ade80" strokeWidth={2} dot={{ r:2, fill:'#4ade80' }} />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Monthly P&L Calendar */}
+          {/* Calendar */}
           {(() => {
-            const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-            // Build maps of "Mon D" -> total pl AND win/loss counts that day.
-            // W-L is tracked separately from $ P&L so a day's win/loss progress
-            // still shows even if a bet's dollar amount didn't parse correctly —
-            // POTD result + RFI "W-L" string + ML "W-L" string are parsed directly
-            // from whatever the card recorded at archive/grade time.
-            const plByDay = {}
-            const wlByDay = {}
-            cards.forEach(c => {
-              if (!c.date) return
-              plByDay[c.date] = (plByDay[c.date]||0) + (c.pl||0)
-              if (!wlByDay[c.date]) wlByDay[c.date] = { w:0, l:0 }
-              if (c.potdResult === 'W') wlByDay[c.date].w += 1
-              if (c.potdResult === 'L') wlByDay[c.date].l += 1
-              ;[c.rfi, c.ml].forEach(str => {
-                if (typeof str === 'string' && str.includes('-')) {
-                  const [w,l] = str.split('-').map(n=>parseInt(n,10))
-                  if (!isNaN(w)) wlByDay[c.date].w += w
-                  if (!isNaN(l)) wlByDay[c.date].l += l
-                }
-              })
-            })
-            // Bankroll delta per day — the actual up/down for the day regardless of
-            // whether individual bets parsed. Uses each day's END bankroll (which
-            // reflects manual edits too) minus the PRIOR chronological day's end
-            // bankroll, so a manual correction still shows correctly as a day change.
-            const brByDay = {}
-            const sortedByDate = [...cards]
-              .filter(c => c.date && c.bankroll > 0)
-              .sort((a,b) => parseCardDate(a.date).localeCompare(parseCardDate(b.date)))
-            sortedByDate.forEach((c, idx) => {
-              const prev = idx > 0 ? sortedByDate[idx-1].bankroll : null
-              if (prev !== null) brByDay[c.date] = c.bankroll - prev
-            })
-            // Navigate from TODAY's real month, offset by calMonthOffset — never locked to card data
-            const base = new Date()
-            base.setDate(1)
-            base.setMonth(base.getMonth() + calMonthOffset)
-            const monthIdx = base.getMonth()
-            const year = base.getFullYear()
-            const monthName = MONTHS[monthIdx]
-            const daysInMonth = new Date(year, monthIdx+1, 0).getDate()
-            const firstDow = new Date(year, monthIdx, 1).getDay() // 0=Sun
-            const cells = []
-            for (let i=0;i<firstDow;i++) cells.push(null)
-            for (let d=1; d<=daysInMonth; d++) cells.push(d)
+            const byDate = {}
+            bankrollHistory.forEach(h => { byDate[h.date] = h.total })
+            const sortedDates = Object.keys(byDate).sort()
 
-            const monthTotal = Object.entries(plByDay)
-              .filter(([k])=>k.startsWith(monthName+' '))
-              .reduce((s,[,v])=>s+v,0)
+            const now = new Date()
+            const viewDate = new Date(now.getFullYear(), now.getMonth() + calMonthOffset, 1)
+            const monthLabel = viewDate.toLocaleDateString('en-US', { month:'long', year:'numeric' })
+            const year = viewDate.getFullYear()
+            const month = viewDate.getMonth()
+            const firstDay = new Date(year, month, 1).getDay()
+            const daysInMonth = new Date(year, month + 1, 0).getDate()
+            const cells = [...Array(firstDay).fill(null), ...Array(daysInMonth).keys()].map((d,i) => d === null ? null : d + 1)
 
             return (
-              <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
+              <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <button onClick={()=>setCalMonthOffset(o=>o-1)}
-                      style={{ padding:'2px 7px', background:'#13131f', border:'1px solid #1a1a2e', borderRadius:5, color:'#a0a0c0', fontSize:'.65rem', cursor:'pointer' }}>‹</button>
-                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>{monthName} {year} · Daily P&L</div>
-                    <button onClick={()=>setCalMonthOffset(o=>o+1)}
-                      style={{ padding:'2px 7px', background:'#13131f', border:'1px solid #1a1a2e', borderRadius:5, color:'#a0a0c0', fontSize:'.65rem', cursor:'pointer' }}>›</button>
-                    {calMonthOffset !== 0 && (
-                      <button onClick={()=>setCalMonthOffset(0)}
-                        style={{ padding:'2px 6px', background:'transparent', border:'1px solid #1a1a2e', borderRadius:5, color:'#606080', fontSize:'.5rem', cursor:'pointer' }}>Today</button>
-                    )}
-                  </div>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color: monthTotal>=0?'#4ade80':'#f87171' }}>
-                    {monthTotal>=0?'+':''}${monthTotal.toFixed(0)}
-                  </div>
+                  <button onClick={()=>setCalMonthOffset(o=>o-1)} style={{ background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:5, padding:'3px 8px', color:'#60a5fa', fontSize:'.7rem' }}>‹</button>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>{monthLabel}</div>
+                  <button onClick={()=>setCalMonthOffset(o=>o+1)} style={{ background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:5, padding:'3px 8px', color:'#60a5fa', fontSize:'.7rem' }}>›</button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3, marginBottom:4 }}>
+                  {['S','M','T','W','T','F','S'].map((d,i) => (
+                    <div key={i} style={{ textAlign:'center', fontSize:'.4rem', color:'#404060', fontWeight:700 }}>{d}</div>
+                  ))}
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
-                  {['S','M','T','W','T','F','S'].map((d,i) => (
-                    <div key={'h'+i} style={{ textAlign:'center', fontSize:'.5rem', color:'#404060', fontWeight:700, paddingBottom:2 }}>{d}</div>
-                  ))}
                   {cells.map((d,i) => {
                     if (d === null) return <div key={'e'+i} />
-                    const key = `${monthName} ${d}`
-                    const pl = plByDay[key]
-                    const wl = wlByDay[key]
-                    const brDelta = brByDay[key]
-                    const hasBR = brDelta !== undefined
-                    const hasWL = wl && (wl.w + wl.l) > 0
-                    const hasPL = pl !== undefined && pl !== 0
-                    // Priority: real bankroll day-over-day delta (catches manual edits
-                    // too) > $ P&L > win/loss record — so the day always shows real
-                    // up/down progress using whatever signal is actually available.
-                    const has = hasBR || hasPL || hasWL
-                    const up = hasBR ? brDelta >= 0 : (hasPL ? pl >= 0 : (hasWL ? wl.w >= wl.l : false))
-                    const displayVal = hasBR ? brDelta : pl
+                    const dateKey = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+                    const total = byDate[dateKey]
+                    const has = total !== undefined
+                    // day-over-day delta vs the most recent PRIOR logged date (not just calendar-adjacent)
+                    let delta = null
+                    if (has) {
+                      const priorDates = sortedDates.filter(dt => dt < dateKey)
+                      if (priorDates.length > 0) delta = total - byDate[priorDates[priorDates.length-1]]
+                    }
+                    const up = delta === null ? true : delta >= 0
                     return (
                       <div key={'d'+i} style={{
                         aspectRatio:'1', borderRadius:5, padding:'2px',
@@ -580,15 +288,13 @@ export default function App() {
                         background: has ? (up ? 'rgba(74,222,128,.15)' : 'rgba(248,113,113,.15)') : '#0c0c16',
                         border: `1px solid ${has ? (up ? '#4ade8055' : '#f8717155') : '#13131f'}` }}>
                         <div style={{ fontSize:'.5rem', color: has ? (up?'#4ade80':'#f87171') : '#404060', fontWeight:700 }}>{d}</div>
-                        {(hasBR || hasPL) && (
+                        {has && delta !== null && (
                           <div style={{ fontSize:'.46rem', fontWeight:800, color: up?'#4ade80':'#f87171', lineHeight:1 }}>
-                            {displayVal>=0?'+':''}{Math.round(displayVal)}
+                            {delta>=0?'+':''}{Math.round(delta)}
                           </div>
                         )}
-                        {hasWL && (
-                          <div style={{ fontSize:'.4rem', fontWeight:700, color: up?'#4ade80cc':'#f87171cc', lineHeight:1, marginTop:1 }}>
-                            {wl.w}-{wl.l}
-                          </div>
+                        {has && delta === null && (
+                          <div style={{ fontSize:'.4rem', fontWeight:700, color:'#60a5fa', lineHeight:1 }}>${Math.round(total)}</div>
                         )}
                       </div>
                     )
@@ -601,98 +307,15 @@ export default function App() {
               </div>
             )
           })()}
-          {(() => {
-            let papers = []
-            try { papers = JSON.parse(localStorage.getItem('betlab-paper-history-v1')||'[]') } catch {}
-            const live = (() => {
-              try {
-                const c = JSON.parse(localStorage.getItem('betlab-today-v3')||'{}')
-                return (c.ml||[]).filter(b=>b.result && b.result!=='pending').map(b=>({
-                  date:c.date||'Today', pick:b.direction||b.sources||b.game||'Paper', game:b.game||'', odds:b.odds||'', result:b.result
-                }))
-              } catch { return [] }
-            })()
-            const merged = [...papers, ...live]
-            const seen = new Set()
-            const all = merged.filter(p => {
-              const key = `${p.date}|${p.pick}|${p.game}|${p.result}`
-              if (seen.has(key)) return false
-              seen.add(key)
-              return true
-            })
-            const w = all.filter(p=>p.result==='win').length
-            const l = all.filter(p=>p.result==='loss').length
-            const v = all.filter(p=>p.result==='void').length
-            const wr = w+l>0 ? Math.round((w/(w+l))*100) : 0
-            return (
-              <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
-                <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>📋 Paper Bets — Model Tracking</div>
-                {all.length === 0 ? (
-                  <div style={{ fontSize:'.6rem', color:'#404060', textAlign:'center', padding:'8px 0' }}>
-                    No graded paper bets yet. Grade paper picks and archive the day to build history.
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
-                      {[
-                        {val:`${w}-${l}`, lbl:'Record', col:'#4ade80'},
-                        {val:`${wr}%`, lbl:'Win Rate', col: wr>=58?'#4ade80':wr>=50?'#fbbf24':'#f87171'},
-                        {val:`${all.length}`, lbl:'Total', col:'#60a5fa'},
-                      ].map(s => (
-                        <div key={s.lbl} style={{ background:'#0c0c1a', border:'1px solid #1a1a2e', borderRadius:6, padding:'7px 8px', textAlign:'center' }}>
-                          <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:'1.2rem', lineHeight:1, color:s.col }}>{s.val}</div>
-                          <div style={{ fontSize:'.42rem', letterSpacing:'.06em', textTransform:'uppercase', color:'#404060', marginTop:2 }}>{s.lbl}</div>
-                        </div>
-                      ))}
-                    </div>
-                    {v>0 && <div style={{ fontSize:'.5rem', color:'#505070', marginBottom:6 }}>{v} void/push (excluded from WR)</div>}
-                    <div style={{ maxHeight:200, overflowY:'auto' }}>
-                      {all.slice().reverse().map((p,i) => (
-                        <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 0', borderBottom:'1px solid #0d0d1a' }}>
-                          <div style={{ flex:1, paddingRight:8 }}>
-                            <div style={{ fontSize:'.62rem', color:'#a0a0c0' }}>{p.pick}</div>
-                            <div style={{ fontSize:'.46rem', color:'#404060' }}>{p.date}{p.game?' · '+p.game:''}{p.odds?' · '+p.odds:''}</div>
-                          </div>
-                          <div style={{ fontSize:'.7rem' }}>{p.result==='win'?'✅':p.result==='loss'?'❌':'🔄'}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })()}
-
-          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:10 }}>Active Model Win Rates</div>
-            <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={topModels} margin={{ top:4, right:4, bottom:28, left:-20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a30" />
-                <XAxis dataKey="name" tick={{ fontSize:7, fill:'#404060' }} angle={-35} textAnchor="end" interval={0} />
-                <YAxis domain={[40,85]} tick={{ fontSize:8, fill:'#404060' }} />
-                <Tooltip content={<TT />} />
-                <ReferenceLine y={55} stroke="#f87171" strokeDasharray="4 4" />
-                <Bar dataKey="wr" name="Win Rate %">
-                  {topModels.map((m,i) => <Cell key={i} fill={MODEL_COLORS[m.name]||'#60a5fa'} opacity={0.85} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:10 }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>POTD History</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-              {[...cards].reverse().map(c => (
-                <div key={c.id} style={{ display:'flex', alignItems:'center', gap:8, background:'#0c0c1a', borderRadius:5, padding:'6px 8px' }}>
-                  <div style={{ fontSize:'.48rem', color:'#505070', width:32, flexShrink:0 }}>{c.date}</div>
-                  <div style={{ fontSize:'.6rem', color:'#f0f0f8', flex:1 }}>{c.potd}</div>
-                  <div style={{ fontSize:'.8rem' }}>{c.potdResult==='W'?'✅':c.potdResult==='L'?'❌':c.potdResult==='V'?'🔄':'📋'}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
+
+      {/* CHECKLIST TAB */}
+      {tab === 'checklist' && <ChecklistTab />}
+
+      {/* LEARN TAB */}
+      {tab === 'learn' && <Knowledge />}
+
     </div>
   )
 }
