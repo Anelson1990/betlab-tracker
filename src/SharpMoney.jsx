@@ -332,19 +332,6 @@ export default function SharpMoney({ sport }) {
             <button onClick={()=>setShowPaste(!showPaste)} style={{ padding:'6px 12px', background:'rgba(74,222,128,.1)', border:'1px solid #14532d', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#4ade80' }}>
               📋 Paste JSON
             </button>
-            <button onClick={()=>{
-              if (!window.confirm(`Wipe ALL ${meta.label} data (today's picks + history)? This cannot be undone. Other sports are not affected.`)) return
-              try {
-                localStorage.removeItem(STORAGE_KEY)
-                localStorage.removeItem(HISTORY_KEY)
-                localStorage.removeItem(DELETED_KEY)
-              } catch {}
-              setData({ days: [] })
-              setHistory({ days: [] })
-              setGradeLog([`🗑 All ${meta.label} data wiped clean.`])
-            }} style={{ padding:'6px 10px', background:'rgba(248,113,113,.08)', border:'1px solid #7f1d1d', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, color:'#f87171' }}>
-              🗑 Reset {meta.label}
-            </button>
           </div>
         </div>
 
