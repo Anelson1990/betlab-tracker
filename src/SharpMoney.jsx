@@ -65,7 +65,7 @@ function migrateLegacyMlbData(activeKey, historyKey, deletedKey) {
   } catch {}
 }
 
-const CHECKPOINTS = ['9 AM', '11 AM', '3 PM', '5 PM', 'Close']
+const CHECKPOINTS = ['9 AM', '11 AM', '1 PM', '3 PM', '5 PM', 'Close']
 function checkpointOrder(ct) {
   const i = CHECKPOINTS.indexOf(ct)
   return i === -1 ? 999 : i
