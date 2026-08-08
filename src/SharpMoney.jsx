@@ -492,9 +492,11 @@ export default function SharpMoney({ sport }) {
       for (const picks of Object.values(byGame)) {
         if (picks.length < 2) continue
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
-        const first = sorted[0], last = sorted[sorted.length-1]
+        const last = sorted[sorted.length-1]
         if (last.result !== 'win' && last.result !== 'loss') continue
-        const reaction = lineReaction(last.gap, oddsMove(first.sharpOdds, last.sharpOdds))
+        const withOdds = sorted.filter(p => parseOdds(p.sharpOdds) !== null)
+        if (withOdds.length < 2) continue
+        const reaction = lineReaction(last.gap, oddsMove(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds))
         if (!reaction) continue
         buckets[reaction.label][last.result === 'win' ? 'w' : 'l'] += 1
       }
@@ -692,9 +694,15 @@ export default function SharpMoney({ sport }) {
                 </div>
 
                 {sorted.length >= 2 && (() => {
-                  const move = oddsMove(opening.sharpOdds, closing.sharpOdds)
-                  const reaction = lineReaction(closing.gap, move)
-                  const hasOdds = parseOdds(opening.sharpOdds) !== null && parseOdds(closing.sharpOdds) !== null
+                  // Use the first and last checkpoints that actually HAVE odds,
+                  // not just the first/last overall -- otherwise a day where
+                  // odds started being recorded midway through shows nothing.
+                  const withOdds = sorted.filter(p => parseOdds(p.sharpOdds) !== null)
+                  const oddsFirst = withOdds[0]
+                  const oddsLast = withOdds[withOdds.length - 1]
+                  const hasOdds = withOdds.length >= 2
+                  const move = hasOdds ? oddsMove(oddsFirst.sharpOdds, oddsLast.sharpOdds) : null
+                  const reaction = hasOdds ? lineReaction(closing.gap, move) : null
                   return (
                   <>
                     <div style={{ fontSize:'.5rem', marginBottom:3 }}>
@@ -708,9 +716,10 @@ export default function SharpMoney({ sport }) {
                     {hasOdds && (
                       <div style={{ fontSize:'.5rem', marginBottom:4 }}>
                         <span style={{ color:'#404060' }}>Line </span>
-                        <span style={{ color:'#8080a0', fontWeight:700 }}>{opening.sharpOdds}</span>
-                        <span style={{ color:'#404060' }}> {'->'} </span>
-                        <span style={{ color:'#8080a0', fontWeight:700 }}>{closing.sharpOdds}</span>
+                        <span style={{ color:'#8080a0', fontWeight:700 }}>{oddsFirst.sharpOdds}</span>
+                        <span style={{ color:'#404060' }}> ({oddsFirst.checkTime}) {'->'} </span>
+                        <span style={{ color:'#8080a0', fontWeight:700 }}>{oddsLast.sharpOdds}</span>
+                        <span style={{ color:'#404060' }}> ({oddsLast.checkTime})</span>
                         {move !== null && move !== 0 && (
                           <span style={{ color:'#606080', marginLeft:5 }}>({move>0?'+':''}{move})</span>
                         )}
