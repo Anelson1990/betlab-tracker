@@ -730,11 +730,11 @@ export default function SharpMoney({ sport }) {
                         )}
                       </div>
                     )}
-                    <ResponsiveContainer width="100%" height={44}>
-                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap, odds:parseOdds(p.sharpOdds)}))} margin={{top:2,right:6,bottom:0,left:-30}}>
+                    <ResponsiveContainer width="100%" height={52}>
+                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap, odds:parseOdds(p.sharpOdds)}))} margin={{top:4,right:6,bottom:0,left:-30}}>
                         <XAxis dataKey="checkTime" tick={{fontSize:7,fill:'#404060'}} axisLine={false} tickLine={false} />
-                        <YAxis yAxisId="gap" hide domain={['dataMin - 3','dataMax + 3']} />
-                        <YAxis yAxisId="odds" hide domain={['dataMin - 15','dataMax + 15']} />
+                        <YAxis yAxisId="gap" hide domain={[dataMin => dataMin - 1, dataMax => dataMax + 1]} />
+                        <YAxis yAxisId="odds" hide domain={[dataMin => dataMin - 4, dataMax => dataMax + 4]} />
                         <Tooltip contentStyle={{background:'#0e0e1e',border:'1px solid #1a1a30',borderRadius:6,fontSize:'.55rem'}} labelStyle={{color:'#a78bfa'}}
                           formatter={(v,name)=>name==='gap'?[`${v}%`,'Gap']:[v>0?`+${v}`:`${v}`,'Odds']} />
                         <Line yAxisId="gap" type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{r:3,fill:'#a78bfa'}} />
