@@ -349,6 +349,11 @@ export default function SharpMoney({ sport }) {
     const l = closingSaved.filter(p=>p.result==='loss').length
     const updated = JSON.parse(JSON.stringify(data))
     updated.days = updated.days.filter(d => d.date !== date)
+    // Mark the date so loadData's seed-merge can never resurrect it. Without
+    // this, archiving a seed day removes it from active storage but leaves it
+    // absent from the deleted list -- so on the very next load it gets merged
+    // back in from SEED, then re-graded and double-counted against history.
+    markDateDeleted(DELETED_KEY, date)
     save(updated)
     setHistory(verify)
     setGradeLog([`${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`])
@@ -358,6 +363,16 @@ export default function SharpMoney({ sport }) {
     try {
       const parsed = JSON.parse(pasteInput.trim())
       if (!parsed.date || !parsed.picks) { setPasteError('JSON must have "date" and "picks" fields'); return }
+      // Guard against double-counting: if this date is already archived, its
+      // picks are already in history and already counted in stats. Re-adding
+      // them to active data would count the same games twice.
+      let existingHist
+      try { existingHist = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{"days":[]}') }
+      catch { existingHist = { days: [] } }
+      if (existingHist.days.some(d => d.date === parsed.date)) {
+        setPasteError(`${parsed.date} is already archived in History — pasting again would double-count it. Delete it from History first if you need to redo that day.`)
+        return
+      }
       const updated = JSON.parse(JSON.stringify(data))
       const existing = updated.days.find(d => d.date === parsed.date)
       const withIds = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
