@@ -285,7 +285,14 @@ export default function SharpMoney({ sport }) {
       if (pick.result !== 'pending') continue
       const nameField = pick.sharpPick || pick.bet || pick.side || ''
       const teamAbbr = nameField.split(' ')[0]
-      if (!teamAbbr) { log.push(`${pick.game}: no pick name`); continue }
+      // 'none' is a legitimate entry (game had no real sharp lean) but it can
+      // never be graded — mark it explicitly rather than leaving it pending
+      // forever and blocking the day from archiving.
+      if (!teamAbbr || teamAbbr.toLowerCase() === 'none') {
+        pick.result = 'nograde'
+        log.push(`${pick.game}: no side to grade (marked no-grade)`)
+        continue
+      }
       const m = matchGame(sport, games, teamAbbr)
       if (!m) { log.push(`${pick.game}: game not found`); continue }
       if (!m.final) { log.push(`${pick.game}: not final yet`); continue }
@@ -541,6 +548,26 @@ export default function SharpMoney({ sport }) {
                     </button>
                   </div>
                 </div>
+
+                {/* List each stuck game individually so one bad entry (postponed
+                    game, unparseable pick name) can be graded or removed without
+                    nuking the whole day's other picks. */}
+                {[...closingMap.values()].filter(p => p.result === 'pending').map(p => (
+                  <div key={p.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'5px 8px', marginTop:4 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:'.62rem', color:'#e0e0f0', fontWeight:700 }}>{p.sharpPick || p.game}</div>
+                      <div style={{ fontSize:'.46rem', color:'#505070' }}>{p.game} · {p.gap}% · {p.checkTime || '?'}</div>
+                    </div>
+                    <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                      <button onClick={()=>setResult(day.date, p.id, 'win')}
+                        style={{ padding:'2px 7px', borderRadius:4, border:'1px solid #14532d', background:'#0c0c1a', color:'#4ade80', fontSize:'.55rem', fontWeight:700 }}>W</button>
+                      <button onClick={()=>setResult(day.date, p.id, 'loss')}
+                        style={{ padding:'2px 7px', borderRadius:4, border:'1px solid #7f1d1d', background:'#0c0c1a', color:'#f87171', fontSize:'.55rem', fontWeight:700 }}>L</button>
+                      <button onClick={()=>{ if(window.confirm(`Remove ${p.game} from ${day.date}? Use this for postponed games or entries that can't be graded.`)) deleteGame(day.date, p.game) }}
+                        style={{ padding:'2px 7px', borderRadius:4, border:'1px solid #7f1d1d', background:'rgba(248,113,113,.08)', color:'#f87171', fontSize:'.55rem', fontWeight:700 }}>Remove</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )
           })}
