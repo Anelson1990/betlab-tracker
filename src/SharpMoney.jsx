@@ -533,23 +533,29 @@ export default function SharpMoney({ sport }) {
 
       {view === 'today' && (
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-          {data.days.filter(d => {
-            if (d.date === today) return false
-            const closingMap = getClosingPicksMap(d.picks)
-            return [...closingMap.values()].some(p => p.result === 'pending')
-          }).map(day => {
+          {/* Any prior day still sitting in active data — whether or not it
+              still has pending picks. Previously this only showed days WITH
+              pending picks, which meant a fully-graded day that hadn't been
+              archived yet would vanish from the UI entirely: not "today", not
+              in history, no way to reach it. */}
+          {data.days.filter(d => d.date !== today).map(day => {
             const closingMap = getClosingPicksMap(day.picks)
             const pendingCount = [...closingMap.values()].filter(p=>p.result==='pending').length
+            const allGraded = pendingCount === 0
             return (
-              <div key={'stale-'+day.date} style={{ background:'rgba(251,191,36,.08)', border:'1px solid #fbbf24', borderRadius:10, padding:'10px 12px' }}>
+              <div key={'stale-'+day.date} style={{ background: allGraded ? 'rgba(74,222,128,.06)' : 'rgba(251,191,36,.08)', border:`1px solid ${allGraded ? '#14532d' : '#fbbf24'}`, borderRadius:10, padding:'10px 12px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color:'#fbbf24' }}>
-                    {day.date} — {pendingCount} closing pick(s) ungraded
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, color: allGraded ? '#4ade80' : '#fbbf24' }}>
+                    {day.date} — {allGraded ? 'all graded, ready to archive' : `${pendingCount} closing pick(s) ungraded`}
                   </div>
                   <div style={{ display:'flex', gap:5 }}>
                     <button onClick={()=>autoGrade(day.date)} disabled={grading}
                       style={{ padding:'5px 10px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#60a5fa' }}>
                       {grading ? '...' : 'Grade Now'}
+                    </button>
+                    <button onClick={()=>archiveSharpDay(day.date)} disabled={grading}
+                      style={{ padding:'5px 10px', background:'rgba(251,191,36,.15)', border:'1px solid #d97706', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#fbbf24' }}>
+                      Archive
                     </button>
                     <button onClick={()=>{ if(window.confirm(`Delete all of ${day.date}? This cannot be undone.`)) deleteDay(day.date) }}
                       style={{ padding:'5px 10px', background:'rgba(248,113,113,.1)', border:'1px solid #7f1d1d', borderRadius:5, fontSize:'.6rem', fontWeight:700, color:'#f87171' }}>
