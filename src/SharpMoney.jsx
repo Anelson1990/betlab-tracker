@@ -124,6 +124,15 @@ export default function SharpMoney({ sport }) {
 
   const [data, setData] = useState(loadData)
   const [view, setView] = useState('today')
+  const [expandedDays, setExpandedDays] = useState(new Set())
+  const toggleDay = (date) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev)
+      if (next.has(date)) next.delete(date)
+      else next.add(date)
+      return next
+    })
+  }
   const [grading, setGrading] = useState(false)
   const [gradeLog, setGradeLog] = useState([])
   const [showAdd, setShowAdd] = useState(false)
@@ -756,20 +765,26 @@ export default function SharpMoney({ sport }) {
             const closingMap = getClosingPicksMap(day.picks)
             const closingList = [...closingMap.values()]
             const wins = closingList.filter(p=>p.result==='win').length
-            const graded = closingList.filter(p=>p.result==='win'||p.result==='loss').length
+            const losses = closingList.filter(p=>p.result==='loss').length
+            const graded = wins + losses
             const wr = graded ? Math.round((wins/graded)*100) : null
+            const isOpen = expandedDays.has(day.date)
             return (
               <div key={day.date} style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, overflow:'hidden' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px 6px' }}>
-                  <div>
-                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{day.date}</div>
-                    <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{closingList.length} games · {day.picks.length} total checkpoints · {graded} graded</div>
+                <div onClick={()=>toggleDay(day.date)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', cursor:'pointer' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ color:'#505070', fontSize:'.7rem', transform: isOpen?'rotate(90deg)':'none', transition:'transform .15s', display:'inline-block' }}>›</span>
+                    <div>
+                      <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#f0f0f8' }}>{day.date}</div>
+                      <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{closingList.length} games · {graded} graded</div>
+                    </div>
                   </div>
                   <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                    {wr !== null && <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:wr>=55?'#4ade80':'#f87171' }}>{wr}% WR</div>}
+                    {graded > 0 && <div style={{ fontSize:'.55rem', color:'#505070' }}>{wins}-{losses}</div>}
+                    {wr !== null && <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:wr>=55?'#4ade80':'#f87171' }}>{wr}%</div>}
                   </div>
                 </div>
-                {closingList.map(p => (
+                {isOpen && closingList.map(p => (
                   <div key={p.id} style={{ padding:'6px 12px', borderTop:'1px solid #1a1a2e', fontSize:'.65rem', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div>
                       <div style={{ color:'#e0e0f0', marginBottom:2 }}>{p.game} — {p.sharpPick}</div>
