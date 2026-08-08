@@ -730,7 +730,7 @@ export default function SharpMoney({ sport }) {
                         )}
                       </div>
                     )}
-                    <ResponsiveContainer width="100%" height={52}>
+                    <ResponsiveContainer width="100%" height={110}>
                       <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap, odds:parseOdds(p.sharpOdds)}))} margin={{top:4,right:6,bottom:0,left:-30}}>
                         <XAxis dataKey="checkTime" tick={{fontSize:7,fill:'#404060'}} axisLine={false} tickLine={false} />
                         <YAxis yAxisId="gap" hide domain={[dataMin => dataMin - 1, dataMax => dataMax + 1]} />
