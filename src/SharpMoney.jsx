@@ -91,6 +91,38 @@ function getDeletedDates(dKey) {
   try { return new Set(JSON.parse(localStorage.getItem(dKey) || '[]')) }
   catch { return new Set() }
 }
+
+// Convert American odds ("-140", "+152", "even") to a number for comparison.
+// Returns null if unparseable so callers can skip cleanly.
+function parseOdds(o) {
+  if (o === null || o === undefined) return null
+  const s = String(o).trim().toLowerCase()
+  if (!s) return null
+  if (s === 'even' || s === 'ev' || s === 'pk') return 100
+  const n = parseInt(s.replace(/[^0-9+-]/g, ''), 10)
+  return Number.isNaN(n) ? null : n
+}
+
+// How far the line moved from first to last checkpoint, in cents. Positive =
+// the sharp side got MORE expensive (book respecting the money). Near zero =
+// line frozen despite the money.
+function oddsMove(firstOdds, lastOdds) {
+  const a = parseOdds(firstOdds), b = parseOdds(lastOdds)
+  if (a === null || b === null) return null
+  return b - a
+}
+
+// The read that actually matters: a big gap with a line that DIDN'T move
+// suggests the book isn't respecting that money (often heavy recreational
+// volume). A line that moved on the sharp side is the book taking it
+// seriously. Only fires when there's a real gap AND parseable odds.
+function lineReaction(gap, move) {
+  if (move === null || gap < 10) return null
+  const absMove = Math.abs(move)
+  if (absMove <= 3) return { label: 'line frozen', color: '#f87171', note: 'big money, book unmoved' }
+  if (absMove >= 12) return { label: 'line moved hard', color: '#4ade80', note: 'book respecting it' }
+  return { label: 'line drifted', color: '#fbbf24', note: 'mild book response' }
+}
 function markDateDeleted(dKey, date) {
   try {
     const s = getDeletedDates(dKey)
@@ -442,6 +474,37 @@ export default function SharpMoney({ sport }) {
     get wr() { return this.total ? Math.round((this.wins/this.total)*100) : 0 },
   }
 
+  // Win rate grouped by how the LINE reacted to the money. Needs first-vs-last
+  // checkpoint per game, so it walks full days rather than the collapsed
+  // closing-picks list. Only games with 2+ checkpoints, parseable odds, and a
+  // real gap (>=10) can produce a reaction, so this set is smaller than the
+  // overall graded count -- expect it to build slowly.
+  const lineReactionStats = (() => {
+    const buckets = {
+      'line frozen': { w:0, l:0 },
+      'line drifted': { w:0, l:0 },
+      'line moved hard': { w:0, l:0 },
+    }
+    const allDays = [...data.days, ...history.days]
+    for (const day of allDays) {
+      const byGame = {}
+      day.picks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+      for (const picks of Object.values(byGame)) {
+        if (picks.length < 2) continue
+        const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
+        const first = sorted[0], last = sorted[sorted.length-1]
+        if (last.result !== 'win' && last.result !== 'loss') continue
+        const reaction = lineReaction(last.gap, oddsMove(first.sharpOdds, last.sharpOdds))
+        if (!reaction) continue
+        buckets[reaction.label][last.result === 'win' ? 'w' : 'l'] += 1
+      }
+    }
+    return Object.entries(buckets).map(([label, v]) => {
+      const total = v.w + v.l
+      return { label, wins: v.w, losses: v.l, total, wr: total ? Math.round((v.w/total)*100) : null }
+    })
+  })()
+
   const alignmentStats = ['confirms','conflicts','neutral'].reduce((acc, key) => {
     const live = gradedPicks.filter(p => p.confirms === key)
     const liveW = live.filter(p=>p.result==='win').length
@@ -628,32 +691,62 @@ export default function SharpMoney({ sport }) {
                   </div>
                 </div>
 
-                {sorted.length >= 2 && (
+                {sorted.length >= 2 && (() => {
+                  const move = oddsMove(opening.sharpOdds, closing.sharpOdds)
+                  const reaction = lineReaction(closing.gap, move)
+                  const hasOdds = parseOdds(opening.sharpOdds) !== null && parseOdds(closing.sharpOdds) !== null
+                  return (
                   <>
-                    <div style={{ fontSize:'.5rem', marginBottom:4 }}>
-                      <span style={{ color:'#404060' }}>Opened </span>
+                    <div style={{ fontSize:'.5rem', marginBottom:3 }}>
+                      <span style={{ color:'#404060' }}>Gap </span>
                       <span style={{ color: openTier ? openTier.color : '#404060', fontWeight:700 }}>{opening.gap}% ({openTier ? openTier.label : 'none'})</span>
-                      <span style={{ color:'#404060' }}> {'->'} Closed </span>
+                      <span style={{ color:'#404060' }}> {'->'} </span>
                       <span style={{ color: closeTier ? closeTier.color : '#404060', fontWeight:700 }}>{closing.gap}% ({closeTier ? closeTier.label : 'none'})</span>
                       {movedTier && <span style={{ color:'#a78bfa', marginLeft:5 }}>· moved tiers</span>}
                       {trend !== 0 && <span style={{ color: trend>0?'#4ade80':'#f87171', marginLeft:5, fontWeight:700 }}>{trend>0?`+${trend}`:`${trend}`}</span>}
                     </div>
+                    {hasOdds && (
+                      <div style={{ fontSize:'.5rem', marginBottom:4 }}>
+                        <span style={{ color:'#404060' }}>Line </span>
+                        <span style={{ color:'#8080a0', fontWeight:700 }}>{opening.sharpOdds}</span>
+                        <span style={{ color:'#404060' }}> {'->'} </span>
+                        <span style={{ color:'#8080a0', fontWeight:700 }}>{closing.sharpOdds}</span>
+                        {move !== null && move !== 0 && (
+                          <span style={{ color:'#606080', marginLeft:5 }}>({move>0?'+':''}{move})</span>
+                        )}
+                        {reaction && (
+                          <span style={{ color:reaction.color, marginLeft:6, fontWeight:700 }}>
+                            · {reaction.label} — {reaction.note}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <ResponsiveContainer width="100%" height={44}>
-                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap}))} margin={{top:2,right:6,bottom:0,left:-30}}>
+                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap, odds:parseOdds(p.sharpOdds)}))} margin={{top:2,right:6,bottom:0,left:-30}}>
                         <XAxis dataKey="checkTime" tick={{fontSize:7,fill:'#404060'}} axisLine={false} tickLine={false} />
-                        <YAxis hide domain={['dataMin - 3','dataMax + 3']} />
-                        <Tooltip contentStyle={{background:'#0e0e1e',border:'1px solid #1a1a30',borderRadius:6,fontSize:'.55rem'}} labelStyle={{color:'#a78bfa'}} formatter={(v)=>[`${v}%`,'Gap']} />
-                        <Line type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{r:3,fill:'#a78bfa'}} />
+                        <YAxis yAxisId="gap" hide domain={['dataMin - 3','dataMax + 3']} />
+                        <YAxis yAxisId="odds" hide domain={['dataMin - 15','dataMax + 15']} />
+                        <Tooltip contentStyle={{background:'#0e0e1e',border:'1px solid #1a1a30',borderRadius:6,fontSize:'.55rem'}} labelStyle={{color:'#a78bfa'}}
+                          formatter={(v,name)=>name==='gap'?[`${v}%`,'Gap']:[v>0?`+${v}`:`${v}`,'Odds']} />
+                        <Line yAxisId="gap" type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{r:3,fill:'#a78bfa'}} />
+                        {hasOdds && <Line yAxisId="odds" type="monotone" dataKey="odds" stroke="#38bdf8" strokeWidth={1.5} strokeDasharray="3 3" dot={{r:2,fill:'#38bdf8'}} />}
                       </LineChart>
                     </ResponsiveContainer>
+                    {hasOdds && (
+                      <div style={{ display:'flex', gap:10, justifyContent:'center', marginTop:2 }}>
+                        <span style={{ fontSize:'.42rem', color:'#a78bfa' }}>— gap %</span>
+                        <span style={{ fontSize:'.42rem', color:'#38bdf8' }}>-- odds</span>
+                      </div>
+                    )}
                   </>
-                )}
+                  )
+                })()}
 
                 <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
                   {sorted.map(p => (
                     <div key={p.id} style={{ display:'flex', alignItems:'center', gap:3, background: p.id===closing.id ? 'rgba(167,139,250,.15)' : '#0c0c1a', border:`1px solid ${p.id===closing.id?'#4c1d95':'#1a1a30'}`, borderRadius:5, padding:'2px 6px' }}>
                       <span style={{ fontSize:'.5rem', color: p.id===closing.id ? '#a78bfa' : '#505070', fontWeight: p.id===closing.id?800:400 }}>
-                        {p.checkTime||'?'}: {p.gap}%{p.id===closing.id?' (closing)':''}
+                        {p.checkTime||'?'}: {p.gap}%{p.sharpOdds ? ` @ ${p.sharpOdds}` : ''}{p.id===closing.id?' (closing)':''}
                       </span>
                       <button onClick={()=>deletePick(today, p.id)} style={{ background:'none', border:'none', color:'#7f1d1d', fontSize:'.55rem', padding:0, marginLeft:2, cursor:'pointer' }}>X</button>
                     </div>
@@ -886,6 +979,31 @@ export default function SharpMoney({ sport }) {
                   <div style={{ fontSize:'.6rem', color:s.color }}>{s.label}</div>
                   <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
                     {a.total === 0 ? '— no data' : `${a.wins}-${a.losses} · ${a.wr}% WR`}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:3 }}>Line Reaction to Sharp Money</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Did the book move the line when the money came in? Needs 2+ checkpoints with odds and a 10%+ gap, so this builds slower than the other stats.
+            </div>
+            {[
+              { label:'line moved hard', display:'Line moved hard', sub:'book respecting it', color:'#4ade80' },
+              { label:'line drifted', display:'Line drifted', sub:'mild response', color:'#fbbf24' },
+              { label:'line frozen', display:'Line frozen', sub:'big money, book unmoved', color:'#f87171' },
+            ].map(s => {
+              const r = lineReactionStats.find(x => x.label === s.label)
+              return (
+                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                  <div>
+                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.display}</div>
+                    <div style={{ fontSize:'.42rem', color:'#404060' }}>{s.sub}</div>
+                  </div>
+                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
+                    {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
                   </div>
                 </div>
               )
