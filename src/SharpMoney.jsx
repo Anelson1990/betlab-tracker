@@ -243,7 +243,21 @@ export default function SharpMoney({ sport }) {
     setGradeLog([`${won?'WIN':'LOSS'} POTD ${entry.game} — ${m.awayAbbr} ${m.awayScore} @ ${m.homeAbbr} ${m.homeScore}`])
     setPotdGrading(false)
   }
+  // Log a deliberate no-play day. Tracked so the record shows when the model
+  // correctly sat out, rather than leaving a silent gap. Never counts toward
+  // W-L since potdGraded filters to win/loss only.
+  const addNoPlay = () => {
+    savePotd([...potdEntries, {
+      id: Date.now().toString(), date: today, game: '—', pick: 'NO PLAY',
+      odds: '', notes: potdForm.notes || 'No qualifying signal — model declined to fire.',
+      result: 'noplay',
+    }])
+    setPotdForm({ game:'', pick:'', odds:'', notes:'' })
+    setShowPotdAdd(false)
+  }
+
   const potdGraded = potdEntries.filter(e => e.result === 'win' || e.result === 'loss')
+  const potdNoPlays = potdEntries.filter(e => e.result === 'noplay').length
   const potdWins = potdGraded.filter(e => e.result === 'win').length
   const potdWR = potdGraded.length ? Math.round((potdWins/potdGraded.length)*100) : 0
 
@@ -804,7 +818,7 @@ export default function SharpMoney({ sport }) {
                 <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.3rem', fontWeight:800, color: potdGraded.length===0?'#404060':potdWR>=55?'#4ade80':'#f87171' }}>
                   {potdGraded.length===0 ? '—' : `${potdWR}%`}
                 </div>
-                <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase' }}>{potdWins}-{potdGraded.length-potdWins} · {potdGraded.length} graded</div>
+                <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase' }}>{potdWins}-{potdGraded.length-potdWins} · {potdGraded.length} graded{potdNoPlays>0 ? ` · ${potdNoPlays} no-play` : ''}</div>
               </div>
             </div>
             <div style={{ display:'flex', gap:4 }}>
@@ -840,6 +854,7 @@ export default function SharpMoney({ sport }) {
                 <input value={potdForm.notes} onChange={e=>setPotdForm(f=>({...f,notes:e.target.value}))} placeholder="Why (sharp movement + model read)" style={IS} />
                 <div style={{ display:'flex', gap:4 }}>
                   <button onClick={addPotd} style={{ flex:1, padding:8, background:'#4c1d95', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:700, color:'#fff' }}>Add</button>
+                  <button onClick={addNoPlay} title="Log today as a deliberate no-play day" style={{ flex:1, padding:8, background:'rgba(100,116,139,.18)', border:'1px solid #334155', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:700, color:'#94a3b8' }}>No Play</button>
                   <button onClick={()=>{setShowPotdAdd(false);setPotdForm({game:'',pick:'',odds:'',notes:''})}} style={{ flex:1, padding:8, background:'#1a1a30', border:'none', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.68rem', fontWeight:700, color:'#505070' }}>Cancel</button>
                 </div>
               </div>
@@ -860,19 +875,25 @@ export default function SharpMoney({ sport }) {
                   <div style={{ fontSize:'.46rem', color:'#505070' }}>{entry.game} · {entry.date}</div>
                   {entry.notes && <div style={{ fontSize:'.52rem', color:'#8080a0', marginTop:3, lineHeight:1.4 }}>{entry.notes}</div>}
                 </div>
-                <div style={{ fontSize:'1.1rem', fontWeight:800, color: entry.result==='win'?'#4ade80':entry.result==='loss'?'#f87171':'#fbbf24' }}>
-                  {entry.result==='win'?'W':entry.result==='loss'?'L':'?'}
+                <div style={{ fontSize:'1.1rem', fontWeight:800, color: entry.result==='win'?'#4ade80':entry.result==='loss'?'#f87171':entry.result==='noplay'?'#64748b':'#fbbf24' }}>
+                  {entry.result==='win'?'W':entry.result==='loss'?'L':entry.result==='noplay'?'—':'?'}
                 </div>
               </div>
               <div style={{ display:'flex', gap:3, alignItems:'center', marginTop:6, justifyContent:'flex-end' }}>
                 <button onClick={()=>deletePotd(entry.id)} style={{ padding:'3px 7px', background:'rgba(248,113,113,.08)', border:'1px solid #7f1d1d', borderRadius:4, color:'#f87171', fontSize:'.5rem', marginRight:'auto' }}>Delete</button>
-                {entry.result==='pending' && (
-                  <button onClick={()=>autoGradePotd(entry)} disabled={potdGrading} style={{ padding:'3px 8px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:4, color:'#60a5fa', fontSize:'.55rem', fontWeight:700 }}>
-                    {potdGrading ? '...' : 'Auto Grade'}
-                  </button>
+                {entry.result==='noplay' ? (
+                  <span style={{ fontSize:'.5rem', color:'#64748b', fontStyle:'italic' }}>sat out — not counted in W-L</span>
+                ) : (
+                  <>
+                    {entry.result==='pending' && (
+                      <button onClick={()=>autoGradePotd(entry)} disabled={potdGrading} style={{ padding:'3px 8px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:4, color:'#60a5fa', fontSize:'.55rem', fontWeight:700 }}>
+                        {potdGrading ? '...' : 'Auto Grade'}
+                      </button>
+                    )}
+                    <button onClick={()=>setPotdResult(entry.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${entry.result==='win'?'#14532d':'#1a2a1a'}`, background:entry.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.6rem', opacity:entry.result==='win'?1:0.4 }}>W</button>
+                    <button onClick={()=>setPotdResult(entry.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${entry.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:entry.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.6rem', opacity:entry.result==='loss'?1:0.4 }}>L</button>
+                  </>
                 )}
-                <button onClick={()=>setPotdResult(entry.id, 'win')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${entry.result==='win'?'#14532d':'#1a2a1a'}`, background:entry.result==='win'?'rgba(74,222,128,.2)':'#0c0c1a', fontSize:'.6rem', opacity:entry.result==='win'?1:0.4 }}>W</button>
-                <button onClick={()=>setPotdResult(entry.id, 'loss')} style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${entry.result==='loss'?'#7f1d1d':'#1a2a1a'}`, background:entry.result==='loss'?'rgba(248,113,113,.2)':'#0c0c1a', fontSize:'.6rem', opacity:entry.result==='loss'?1:0.4 }}>L</button>
               </div>
             </div>
           ))}
