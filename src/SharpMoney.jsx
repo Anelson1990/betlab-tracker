@@ -218,7 +218,10 @@ export default function SharpMoney({ sport }) {
       if (!entry.game || !entry.pick) { setPotdPasteError('JSON must have "game" and "pick" fields'); return }
       savePotd([...potdEntries, {
         id: Date.now().toString(), date: entry.date || today, game: entry.game, pick: entry.pick,
-        odds: entry.odds || '', notes: entry.notes || '', result: 'pending',
+        odds: entry.odds || '', notes: entry.notes || '',
+        // Respect an explicit result if provided (e.g. "noplay" for a
+        // backdated sat-out day, or a already-known win/loss); default pending.
+        result: ['win','loss','noplay'].includes(entry.result) ? entry.result : 'pending',
       }])
       setPotdPasteInput(''); setPotdPasteError(''); setShowPotdPaste(false)
     } catch { setPotdPasteError('Invalid JSON — check format') }
