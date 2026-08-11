@@ -123,6 +123,15 @@ function lineReaction(gap, move) {
   if (absMove >= 12) return { label: 'line moved hard', color: '#4ade80', note: 'book respecting it' }
   return { label: 'line drifted', color: '#fbbf24', note: 'mild book response' }
 }
+// A 1-2 run loss is close enough to be normal baseball variance -- the read
+// wasn't necessarily wrong, the game just didn't break your way. A 5+ run
+// margin is a real miss worth reconsidering. Only meaningful on losses.
+function marginRead(result, margin) {
+  if (result !== 'loss' || margin === undefined || margin === null) return null
+  if (margin <= 2) return { label: 'close — variance', color: '#94a3b8' }
+  if (margin <= 4) return { label: 'moderate margin', color: '#fbbf24' }
+  return { label: 'blowout — real miss', color: '#f87171' }
+}
 function markDateDeleted(dKey, date) {
   try {
     const s = getDeletedDates(dKey)
@@ -243,8 +252,10 @@ export default function SharpMoney({ sport }) {
     if (!m) { setGradeLog([`${entry.game}: game not found.`]); setPotdGrading(false); return }
     if (!m.final) { setGradeLog([`${entry.game}: not final yet.`]); setPotdGrading(false); return }
     const won = decideWin(m)
-    savePotd(potdEntries.map(e => e.id === entry.id ? { ...e, result: won ? 'win' : 'loss' } : e))
-    setGradeLog([`${won?'WIN':'LOSS'} POTD ${entry.game} — ${m.awayAbbr} ${m.awayScore} @ ${m.homeAbbr} ${m.homeScore}`])
+    const finalScore = `${m.awayAbbr} ${m.awayScore} - ${m.homeAbbr} ${m.homeScore}`
+    const margin = Math.abs(m.awayScore - m.homeScore)
+    savePotd(potdEntries.map(e => e.id === entry.id ? { ...e, result: won ? 'win' : 'loss', finalScore, margin } : e))
+    setGradeLog([`${won?'WIN':'LOSS'} POTD ${entry.game} — ${finalScore} (margin ${margin})`])
     setPotdGrading(false)
   }
   // Log a deliberate no-play day. Tracked so the record shows when the model
@@ -357,6 +368,10 @@ export default function SharpMoney({ sport }) {
       if (!m.final) { log.push(`${pick.game}: not final yet`); continue }
       const won = decideWin(m)
       pick.result = won ? 'win' : 'loss'
+      // Store the actual final score + margin so a 1-run loss (variance) reads
+      // differently from a blowout (the read was actually wrong).
+      pick.finalScore = `${m.awayAbbr} ${m.awayScore} - ${m.homeAbbr} ${m.homeScore}`
+      pick.margin = Math.abs(m.awayScore - m.homeScore)
       log.push(`${won?'WIN':'LOSS'} ${pick.game} (closing ${pick.checkTime||''}) - ${m.awayAbbr} ${m.awayScore} @ ${m.homeAbbr} ${m.homeScore} - Sharp on ${teamAbbr}`)
     }
 
@@ -710,6 +725,7 @@ export default function SharpMoney({ sport }) {
             const movedTier = openTier?.label !== closeTier?.label
             const tierColor = closeTier ? closeTier.color : '#404060'
             const tierBorder = closeTier ? closeTier.border : '#1a1a2e'
+            const mRead = marginRead(closing.result, closing.margin)
             return (
               <div key={game} style={{ background:'#09090f', border:`1px solid ${tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
                 <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
@@ -718,6 +734,12 @@ export default function SharpMoney({ sport }) {
                     <div style={{ fontSize:'.46rem', color:'#505070' }}>
                       {game} {closing.signal ? '· '+closing.signal : closing.confirms==='confirms' ? '· confirms' : closing.confirms==='conflicts' ? '· conflicts' : ''}
                     </div>
+                    {closing.finalScore && (
+                      <div style={{ fontSize:'.5rem', marginTop:3 }}>
+                        <span style={{ color:'#8080a0' }}>{closing.finalScore}</span>
+                        {mRead && <span style={{ color:mRead.color, marginLeft:5, fontWeight:700 }}>· {mRead.label}</span>}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign:'right' }}>
                     <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.2rem', fontWeight:800, color:tierColor }}>{closing.gap}%</div>
@@ -892,6 +914,15 @@ export default function SharpMoney({ sport }) {
                   <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.9rem', fontWeight:800, color:'#f0f0f8' }}>{entry.pick}{entry.odds ? ` (${entry.odds})` : ''}</div>
                   <div style={{ fontSize:'.46rem', color:'#505070' }}>{entry.game} · {entry.date}</div>
                   {entry.notes && <div style={{ fontSize:'.52rem', color:'#8080a0', marginTop:3, lineHeight:1.4 }}>{entry.notes}</div>}
+                  {entry.finalScore && (() => {
+                    const mRead = marginRead(entry.result, entry.margin)
+                    return (
+                      <div style={{ fontSize:'.5rem', marginTop:3 }}>
+                        <span style={{ color:'#8080a0' }}>{entry.finalScore}</span>
+                        {mRead && <span style={{ color:mRead.color, marginLeft:5, fontWeight:700 }}>· {mRead.label}</span>}
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div style={{ fontSize:'1.1rem', fontWeight:800, color: entry.result==='win'?'#4ade80':entry.result==='loss'?'#f87171':entry.result==='noplay'?'#64748b':'#fbbf24' }}>
                   {entry.result==='win'?'W':entry.result==='loss'?'L':entry.result==='noplay'?'—':'?'}
@@ -946,17 +977,26 @@ export default function SharpMoney({ sport }) {
                     {wr !== null && <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:wr>=55?'#4ade80':'#f87171' }}>{wr}%</div>}
                   </div>
                 </div>
-                {isOpen && closingList.map(p => (
+                {isOpen && closingList.map(p => {
+                  const mRead = marginRead(p.result, p.margin)
+                  return (
                   <div key={p.id} style={{ padding:'6px 12px', borderTop:'1px solid #1a1a2e', fontSize:'.65rem', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div>
                       <div style={{ color:'#e0e0f0', marginBottom:2 }}>{p.game} — {p.sharpPick}</div>
                       <div style={{ color:'#5050a0', fontSize:'.55rem' }}>Closing gap: {p.gap}% ({p.checkTime||'?'}) | {p.confirms}</div>
+                      {p.finalScore && (
+                        <div style={{ fontSize:'.5rem', marginTop:2 }}>
+                          <span style={{ color:'#8080a0' }}>{p.finalScore}</span>
+                          {mRead && <span style={{ color:mRead.color, marginLeft:5, fontWeight:700 }}>· {mRead.label}</span>}
+                        </div>
+                      )}
                     </div>
                     <div style={{ color:p.result==='win'?'#4ade80':p.result==='loss'?'#f87171':'#fbbf24', fontWeight:800 }}>
                       {p.result==='win'?'W':p.result==='loss'?'L':'?'}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )
           })}
