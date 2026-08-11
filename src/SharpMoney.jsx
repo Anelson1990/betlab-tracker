@@ -15,11 +15,15 @@ function tierFor(gap) {
   return GROUPS.find(g => gap >= g.min && gap <= g.max) || null
 }
 
-const MLB_BASELINE = {
-  asOf: 'Jun 30',
-  byGroup: { '1-9%': { w: 0, l: 0 }, '10-19%': { w: 5, l: 2 }, '20-29%': { w: 5, l: 6 }, '30-39%': { w: 3, l: 4 }, '40-49%': { w: 9, l: 4 }, '50%+': { w: 10, l: 6 } },
-  alignment: { confirms: { w: 25, l: 9 }, conflicts: { w: 3, l: 6 }, neutral: { w: 5, l: 4 } },
-}
+// The old MLB_BASELINE (hardcoded totals "through Jun 30") was computed using
+// a gap formula ("distance from 50/50") that was found to be WRONG and
+// corrected around Jul 10 2026 to the current one (money% minus bets%). A
+// gap of "76" under the old formula and a gap of "76" now do not represent
+// the same thing, so mixing that baseline into current tier stats would
+// silently corrupt them. Both sports now start stats from zero baseline;
+// the June/early-July data itself stays fully visible in History (nothing
+// is deleted), it's just excluded from the Stats tab's calculations below.
+const FORMULA_FIX_DATE = '2026-07-10'
 const EMPTY_BASELINE = {
   asOf: null,
   byGroup: { '1-9%': { w: 0, l: 0 }, '10-19%': { w: 0, l: 0 }, '20-29%': { w: 0, l: 0 }, '30-39%': { w: 0, l: 0 }, '40-49%': { w: 0, l: 0 }, '50%+': { w: 0, l: 0 } },
@@ -143,7 +147,7 @@ function markDateDeleted(dKey, date) {
 export default function SharpMoney({ sport }) {
   const meta = SPORTS.find(s => s.key === sport) || SPORTS[0]
   const isMlb = sport === 'mlb'
-  const BASELINE_STATS = isMlb ? MLB_BASELINE : EMPTY_BASELINE
+  const BASELINE_STATS = EMPTY_BASELINE
   const STORAGE_KEY = `betlab-sharp-v2-${sport}`
   const HISTORY_KEY = `betlab-sharp-history-v1-${sport}`
   const DELETED_KEY = `betlab-sharp-deleted-v1-${sport}`
@@ -481,8 +485,15 @@ export default function SharpMoney({ sport }) {
     } catch { setPasteError('Invalid JSON — check format') }
   }
 
-  const closingPicksAll = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)]
+  // Stats only count days on/after the formula fix -- older days stay fully
+  // visible in the History tab (nothing deleted), just excluded here so they
+  // don't corrupt tier/alignment win rates with incompatible gap values.
+  const statsEligibleDays = (days) => isMlb
+    ? days.filter(d => parseCardDate(d.date) >= FORMULA_FIX_DATE)
+    : days
+  const closingPicksAll = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
   const gradedPicks = closingPicksAll.filter(p => p.result === 'win' || p.result === 'loss')
+  const excludedDayCount = isMlb ? [...data.days, ...history.days].filter(d => parseCardDate(d.date) < FORMULA_FIX_DATE).length : 0
 
   const groupStats = GROUPS.map(g => {
     const livePicks = gradedPicks.filter(p => p.gap >= g.min && p.gap <= g.max)
@@ -1007,10 +1018,15 @@ export default function SharpMoney({ sport }) {
         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
 
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
               <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070' }}>Overall {meta.label} Sharp Performance</div>
-              {isMlb && <div style={{ fontSize:'.44rem', color:'#404060' }}>baseline {BASELINE_STATS.asOf} + live, closing picks only</div>}
+              <div style={{ fontSize:'.44rem', color:'#404060' }}>closing picks only</div>
             </div>
+            {excludedDayCount > 0 && (
+              <div style={{ fontSize:'.44rem', color:'#64748b', marginBottom:8, lineHeight:1.4 }}>
+                {excludedDayCount} day(s) before Jul 10 excluded — those used an older gap formula, not comparable to current tiers. Still viewable in History.
+              </div>
+            )}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
               {[
                 { val: overallStats.total, lbl: 'Total Graded' },
