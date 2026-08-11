@@ -169,6 +169,7 @@ export default function SharpMoney({ sport }) {
   const [gradeLog, setGradeLog] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [showPaste, setShowPaste] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState('')
   const [editDate, setEditDate] = useState('')
@@ -565,9 +566,23 @@ export default function SharpMoney({ sport }) {
             <button onClick={()=>setShowPaste(!showPaste)} style={{ padding:'6px 12px', background:'rgba(74,222,128,.1)', border:'1px solid #14532d', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#4ade80' }}>
               Paste JSON
             </button>
+            <button onClick={()=>setShowExport(!showExport)} style={{ padding:'6px 12px', background:'rgba(167,139,250,.1)', border:'1px solid #4c1d95', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.7rem', fontWeight:700, textTransform:'uppercase', color:'#a78bfa' }}>
+              Export
+            </button>
           </div>
         </div>
 
+        {showExport && (
+          <div style={{ marginTop:8, background:'#0c0c1a', border:'1px solid #4c1d95', borderRadius:8, padding:10 }}>
+            <div style={{ fontSize:'.5rem', color:'#a78bfa', marginBottom:6, lineHeight:1.4 }}>
+              Every {meta.label} pick, active + archived, all fields (gap, odds, checkpoints, results). Copy this and paste it to Claude for a real trend analysis — the app's Stats tab only computes single-variable breakdowns, not combinations like "confirms + 40%+ gap" together.
+            </div>
+            <textarea readOnly value={JSON.stringify({ sport, active: data.days, history: history.days }, null, 1)}
+              onClick={e => e.target.select()}
+              style={{ width:'100%', minHeight:120, background:'#060610', border:'1px solid #1a1a2e', borderRadius:6, padding:8, color:'#8ee08e', fontSize:'.6rem', fontFamily:'monospace', resize:'vertical', boxSizing:'border-box' }} />
+            <div style={{ fontSize:'.44rem', color:'#505070', marginTop:4 }}>Tap the box, select all, copy.</div>
+          </div>
+        )}
         <div style={{ display:'flex', gap:4 }}>
           {[['today','Today'],['potd','POTD'],['history','History'],['stats','Stats']].map(([v,l]) => (
             <button key={v} onClick={()=>setView(v)} style={{ flex:1, padding:'6px 2px', fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.6rem', fontWeight:700, textTransform:'uppercase', border:'1px solid', borderRadius:5, background:view===v?'#1a1a30':'#0c0c1a', color:view===v?'#f0f0f8':'#404060', borderColor:view===v?'#2a2a50':'#1a1a30' }}>{l}</button>
