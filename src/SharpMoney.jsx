@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { SEED_SHARP } from './sharp.js'
 import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin } from './sportApi.js'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import * as driveSync from './driveSync.js'
 
 const GROUPS = [
   { label: '1-9%',   min: 1,  max: 9,  color: '#64748b', bg: 'rgba(100,116,139,.1)', border: '#334155' },
@@ -183,6 +184,19 @@ export default function SharpMoney({ sport }) {
   const [showAdd, setShowAdd] = useState(false)
   const [showPaste, setShowPaste] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const [driveConnected, setDriveConnected] = useState(driveSync.isConnected())
+  const [driveStatus, setDriveStatus] = useState('')
+
+  const connectDrive = async () => {
+    try {
+      setDriveStatus('Connecting...')
+      await driveSync.connect()
+      setDriveConnected(true)
+      setDriveStatus('Connected — future archives will sync to Drive.')
+    } catch (e) {
+      setDriveStatus(driveSync.isConfigured() ? `Connection failed: ${e.message || e}` : 'Not set up yet — add your Client ID in driveSync.js first.')
+    }
+  }
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState('')
   const [editDate, setEditDate] = useState('')
@@ -388,7 +402,7 @@ export default function SharpMoney({ sport }) {
     setGrading(false)
   }
 
-  const archiveSharpDay = (date) => {
+  const archiveSharpDay = async (date) => {
     const day = data.days.find(d => d.date === date)
     if (!day) { setGradeLog([`${date}: nothing to archive`]); return }
     if (day.picks.length === 0) { setGradeLog([`${date}: no picks`]); return }
@@ -425,7 +439,19 @@ export default function SharpMoney({ sport }) {
     markDateDeleted(DELETED_KEY, date)
     save(updated)
     setHistory(verify)
-    setGradeLog([`${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`])
+    let logLine = `${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`
+
+    // Best-effort Drive sync -- never lets a Drive failure undo or block the
+    // local archive above, which already succeeded and is the source of truth.
+    if (driveConnected) {
+      try {
+        await driveSync.syncDayToDrive(sport, saved)
+        logLine += ' Synced to Drive.'
+      } catch (e) {
+        logLine += ` Drive sync failed (${e.message || e}) -- local archive is still safe.`
+      }
+    }
+    setGradeLog([logLine])
   }
 
   const loadJSON = async () => {
@@ -607,6 +633,16 @@ export default function SharpMoney({ sport }) {
               onClick={e => e.target.select()}
               style={{ width:'100%', minHeight:120, background:'#060610', border:'1px solid #1a1a2e', borderRadius:6, padding:8, color:'#8ee08e', fontSize:'.6rem', fontFamily:'monospace', resize:'vertical', boxSizing:'border-box' }} />
             <div style={{ fontSize:'.44rem', color:'#505070', marginTop:4 }}>Tap the box, select all, copy.</div>
+
+            <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid #1a1a2e' }}>
+              <div style={{ fontSize:'.5rem', color:'#a78bfa', marginBottom:6, lineHeight:1.4 }}>
+                Or connect Google Drive once — every future "Archive Day" automatically sends that day's data there too, so Claude can read your real history directly in any conversation, no copy/paste needed.
+              </div>
+              <button onClick={connectDrive} disabled={driveConnected} style={{ padding:'6px 12px', background: driveConnected ? 'rgba(74,222,128,.1)' : 'rgba(37,99,235,.15)', border:`1px solid ${driveConnected ? '#14532d' : '#2563eb'}`, borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color: driveConnected ? '#4ade80' : '#60a5fa' }}>
+                {driveConnected ? 'Drive Connected' : 'Connect Google Drive'}
+              </button>
+              {driveStatus && <div style={{ fontSize:'.46rem', color:'#8080a0', marginTop:5 }}>{driveStatus}</div>}
+            </div>
           </div>
         )}
         <div style={{ display:'flex', gap:4 }}>
