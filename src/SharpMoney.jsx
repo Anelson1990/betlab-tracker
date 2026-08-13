@@ -184,18 +184,19 @@ export default function SharpMoney({ sport }) {
   const [showAdd, setShowAdd] = useState(false)
   const [showPaste, setShowPaste] = useState(false)
   const [showExport, setShowExport] = useState(false)
-  const [driveConnected, setDriveConnected] = useState(driveSync.isConnected())
   const [driveStatus, setDriveStatus] = useState('')
+  const [driveExporting, setDriveExporting] = useState(false)
 
-  const connectDrive = async () => {
+  const exportToDrive = async () => {
+    setDriveExporting(true)
+    setDriveStatus('Exporting...')
     try {
-      setDriveStatus('Connecting...')
-      await driveSync.connect()
-      setDriveConnected(true)
-      setDriveStatus('Connected — future archives will sync to Drive.')
+      await driveSync.exportToDrive(sport, { sport, active: data.days, history: history.days })
+      setDriveStatus(`Sent to Drive: BetLab Sharp Data / ${sport.toUpperCase()} / ${sport}-export.json`)
     } catch (e) {
-      setDriveStatus(driveSync.isConfigured() ? `Connection failed: ${e.message || e}` : 'Not set up yet — add your Client ID in driveSync.js first.')
+      setDriveStatus(driveSync.isConfigured() ? `Export failed: ${e.message || e}` : 'Not set up yet — add your Client ID in driveSync.js first.')
     }
+    setDriveExporting(false)
   }
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState('')
@@ -439,19 +440,7 @@ export default function SharpMoney({ sport }) {
     markDateDeleted(DELETED_KEY, date)
     save(updated)
     setHistory(verify)
-    let logLine = `${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`
-
-    // Best-effort Drive sync -- never lets a Drive failure undo or block the
-    // local archive above, which already succeeded and is the source of truth.
-    if (driveConnected) {
-      try {
-        await driveSync.syncDayToDrive(sport, saved)
-        logLine += ' Synced to Drive.'
-      } catch (e) {
-        logLine += ` Drive sync failed (${e.message || e}) -- local archive is still safe.`
-      }
-    }
-    setGradeLog([logLine])
+    setGradeLog([`${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`])
   }
 
   const loadJSON = async () => {
@@ -636,10 +625,10 @@ export default function SharpMoney({ sport }) {
 
             <div style={{ marginTop:10, paddingTop:10, borderTop:'1px solid #1a1a2e' }}>
               <div style={{ fontSize:'.5rem', color:'#a78bfa', marginBottom:6, lineHeight:1.4 }}>
-                Or connect Google Drive once — every future "Archive Day" automatically sends that day's data there too, so Claude can read your real history directly in any conversation, no copy/paste needed.
+                Sends everything for {meta.label} — active + archived — to your Drive, in its own {meta.label} folder inside "BetLab Sharp Data". Claude can read it directly from there in any conversation, no copy/paste needed. Tap anytime you want your Drive copy refreshed.
               </div>
-              <button onClick={connectDrive} disabled={driveConnected} style={{ padding:'6px 12px', background: driveConnected ? 'rgba(74,222,128,.1)' : 'rgba(37,99,235,.15)', border:`1px solid ${driveConnected ? '#14532d' : '#2563eb'}`, borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color: driveConnected ? '#4ade80' : '#60a5fa' }}>
-                {driveConnected ? 'Drive Connected' : 'Connect Google Drive'}
+              <button onClick={exportToDrive} disabled={driveExporting} style={{ padding:'6px 12px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color:'#60a5fa' }}>
+                {driveExporting ? 'Sending...' : 'Export to Drive'}
               </button>
               {driveStatus && <div style={{ fontSize:'.46rem', color:'#8080a0', marginTop:5 }}>{driveStatus}</div>}
             </div>
