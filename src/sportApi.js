@@ -61,19 +61,33 @@ export async function fetchGames(sport, isoDate) {
   return sport === 'mlb' ? fetchMlbGames(isoDate) : fetchEspnGames(sport, isoDate)
 }
 
+// Betting-site/sharp-splits abbreviations that don't match MLB's own API
+// abbreviation. Confirmed real case: Arizona is commonly written "ARI" on
+// splits sites, but MLB's API uses "AZ" -- exact match failed, and the old
+// substring-fallback logic then matched "ARI" against "Mariners" (M-ARI-NERS)
+// as a false positive, silently grading a Colorado @ Arizona pick against
+// Seattle @ Yankees' actual result. Checked all 30 teams: this is the only
+// mismatch, but the alias map stays open for any future ones found.
+const MLB_ABBR_ALIASES = { ARI: 'AZ' }
+
 // Returns { found, final, homeAbbr, awayAbbr, homeScore, awayScore, pickedHome, pickedAbbr }
 // or null if the team couldn't be matched to a game.
 export function matchGame(sport, games, teamAbbr) {
   if (!teamAbbr) return null
-  const a = teamAbbr.toUpperCase()
+  let a = teamAbbr.toUpperCase()
 
   if (sport === 'mlb') {
+    a = MLB_ABBR_ALIASES[a] || a
+    // Exact abbreviation match ONLY. The previous fallback (checking if the
+    // search term appeared as a substring anywhere in a team's full name)
+    // caused a real, confirmed silent misgrade -- "ARI" matched inside
+    // "Mariners" and attributed Seattle @ Yankees' score to a Colorado @
+    // Arizona pick. Failing to match and returning null (pick stays pending,
+    // visible in the app) is far safer than a wrong but confident match.
     const game = games.find(g => {
       const h = g.teams?.home?.team?.abbreviation?.toUpperCase() || ''
       const aw = g.teams?.away?.team?.abbreviation?.toUpperCase() || ''
-      const hn = g.teams?.home?.team?.teamName?.toUpperCase() || ''
-      const an = g.teams?.away?.team?.teamName?.toUpperCase() || ''
-      return h === a || aw === a || hn.includes(a) || an.includes(a)
+      return h === a || aw === a
     })
     if (!game) return null
     const ha = game.teams?.home?.team?.abbreviation?.toUpperCase()
