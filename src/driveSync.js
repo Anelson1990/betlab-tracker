@@ -10,7 +10,7 @@
 //    (e.g. https://betlab-tracker.vercel.app)
 // 5. Paste the resulting Client ID below.
 
-const CLIENT_ID = 'PASTE_YOUR_CLIENT_ID_HERE.apps.googleusercontent.com'
+const CLIENT_ID = '970334634113-55oun78htt9dl4lud35k5lb3cgb4q7gi.apps.googleusercontent.com'
 const SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const FOLDER_NAME = 'BetLab Sharp Data'
 
