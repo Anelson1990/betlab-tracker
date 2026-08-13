@@ -108,6 +108,32 @@ function parseOdds(o) {
   return Number.isNaN(n) ? null : n
 }
 
+// Which team a checkpoint's pick is actually on, e.g. "BOS ML" -> "BOS".
+function pickSide(p) {
+  const field = p.sharpPick || p.bet || p.side || ''
+  const first = field.split(' ')[0]
+  return first ? first.toUpperCase() : null
+}
+
+// Odds are only meaningfully comparable across checkpoints if they're on the
+// SAME side. A real case this catches: BOS @ TOR on Aug 13 -- the sharp lean
+// flipped from TOR (9 AM) to BOS (1 PM). Naively diffing "first odds" vs
+// "last odds" compared TOR's price to BOS's price -- two different teams --
+// and produced a confident-looking but meaningless CLV/line-reaction number.
+// This finds the longest run of SAME-SIDE checkpoints ending at the closing
+// pick, so odds comparisons only ever happen within one continuous side.
+function sameSideOddsRun(sortedPicks) {
+  if (sortedPicks.length === 0) return []
+  const closingSide = pickSide(sortedPicks[sortedPicks.length - 1])
+  if (!closingSide) return []
+  const run = []
+  for (let i = sortedPicks.length - 1; i >= 0; i--) {
+    if (pickSide(sortedPicks[i]) !== closingSide) break
+    run.unshift(sortedPicks[i])
+  }
+  return run.filter(p => parseOdds(p.sharpOdds) !== null)
+}
+
 // How far the line moved from first to last checkpoint, in cents. Positive =
 // the sharp side got MORE expensive (book respecting the money). Near zero =
 // line frozen despite the money.
@@ -578,7 +604,7 @@ export default function SharpMoney({ sport }) {
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
         const last = sorted[sorted.length-1]
         if (last.result !== 'win' && last.result !== 'loss') continue
-        const withOdds = sorted.filter(p => parseOdds(p.sharpOdds) !== null)
+        const withOdds = sameSideOddsRun(sorted)
         if (withOdds.length < 2) continue
         const reaction = lineReaction(last.gap, oddsMove(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds))
         if (!reaction) continue
@@ -607,7 +633,7 @@ export default function SharpMoney({ sport }) {
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
         const last = sorted[sorted.length-1]
         if (last.result !== 'win' && last.result !== 'loss') continue
-        const withOdds = sorted.filter(p => parseOdds(p.sharpOdds) !== null)
+        const withOdds = sameSideOddsRun(sorted)
         if (withOdds.length < 2) continue
         const clv = calcCLV(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds)
         if (!clv) continue
@@ -838,18 +864,25 @@ export default function SharpMoney({ sport }) {
                 </div>
 
                 {sorted.length >= 2 && (() => {
-                  // Use the first and last checkpoints that actually HAVE odds,
-                  // not just the first/last overall -- otherwise a day where
-                  // odds started being recorded midway through shows nothing.
-                  const withOdds = sorted.filter(p => parseOdds(p.sharpOdds) !== null)
+                  // Only compare odds within a continuous same-side run ending
+                  // at the closing pick -- if the sharp lean flipped teams
+                  // during the day, an earlier checkpoint's price belongs to a
+                  // DIFFERENT team and isn't comparable to the close at all.
+                  const withOdds = sameSideOddsRun(sorted)
                   const oddsFirst = withOdds[0]
                   const oddsLast = withOdds[withOdds.length - 1]
                   const hasOdds = withOdds.length >= 2
+                  const sideFlipped = sorted.length >= 2 && pickSide(sorted[0]) !== pickSide(sorted[sorted.length-1])
                   const move = hasOdds ? oddsMove(oddsFirst.sharpOdds, oddsLast.sharpOdds) : null
                   const reaction = hasOdds ? lineReaction(closing.gap, move) : null
                   const clv = hasOdds ? calcCLV(oddsFirst.sharpOdds, oddsLast.sharpOdds) : null
                   return (
                   <>
+                    {sideFlipped && (
+                      <div style={{ fontSize:'.46rem', color:'#a78bfa', marginBottom:3 }}>
+                        ⚠ sharp side flipped today ({pickSide(sorted[0])} → {pickSide(sorted[sorted.length-1])}) — line/CLV below only covers the {pickSide(sorted[sorted.length-1])} run
+                      </div>
+                    )}
                     <div style={{ fontSize:'.5rem', marginBottom:3 }}>
                       <span style={{ color:'#404060' }}>Gap </span>
                       <span style={{ color: openTier ? openTier.color : '#404060', fontWeight:700 }}>{opening.gap}% ({openTier ? openTier.label : 'none'})</span>
