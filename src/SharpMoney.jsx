@@ -128,6 +128,31 @@ function lineReaction(gap, move) {
   if (absMove >= 12) return { label: 'line moved hard', color: '#4ade80', note: 'book respecting it' }
   return { label: 'line drifted', color: '#fbbf24', note: 'mild book response' }
 }
+
+// Convert American odds to implied probability (0-1), WITHOUT removing vig --
+// fine here since we're comparing two prices on the same side of the same
+// market, so any constant vig cancels out in the comparison either way.
+function impliedProb(americanOdds) {
+  const o = parseOdds(americanOdds)
+  if (o === null) return null
+  return o < 0 ? Math.abs(o) / (Math.abs(o) + 100) : 100 / (o + 100)
+}
+
+// Closing Line Value: did your entry price beat where the market actually
+// closed? This is a distinct, more established metric than line-reaction --
+// CLV is skill-independent of whether the bet itself wins, because the
+// closing line is the market's most information-complete price. Positive
+// CLV means you got a worse implied probability than the close (i.e. better
+// odds for you) -- you were paid more for the same risk than a bettor who
+// waited until close.
+function calcCLV(entryOdds, closeOdds) {
+  const pEntry = impliedProb(entryOdds), pClose = impliedProb(closeOdds)
+  if (pEntry === null || pClose === null) return null
+  // Positive = you beat the close (your price implied lower probability,
+  // i.e. you got paid more for the same side than the closing bettor did).
+  const clvPct = Math.round((pClose - pEntry) * 1000) / 10
+  return { clvPct, beat: clvPct > 0 }
+}
 // A 1-2 run loss is close enough to be normal baseball variance -- the read
 // wasn't necessarily wrong, the game just didn't break your way. A 5+ run
 // margin is a real miss worth reconsidering. Only meaningful on losses.
@@ -566,6 +591,35 @@ export default function SharpMoney({ sport }) {
     })
   })()
 
+  // Closing Line Value stats: win rate for picks that beat the close vs
+  // picks that didn't. Distinct from line-reaction -- this is the
+  // established metric (does your entry price beat the market's final,
+  // most information-complete price), tracked as its own signal independent
+  // of gap size or tier.
+  const clvStats = (() => {
+    const buckets = { beat: { w:0, l:0 }, worse: { w:0, l:0 } }
+    const allDays = [...data.days, ...history.days]
+    for (const day of allDays) {
+      const byGame = {}
+      day.picks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+      for (const picks of Object.values(byGame)) {
+        if (picks.length < 2) continue
+        const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
+        const last = sorted[sorted.length-1]
+        if (last.result !== 'win' && last.result !== 'loss') continue
+        const withOdds = sorted.filter(p => parseOdds(p.sharpOdds) !== null)
+        if (withOdds.length < 2) continue
+        const clv = calcCLV(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds)
+        if (!clv) continue
+        buckets[clv.beat ? 'beat' : 'worse'][last.result === 'win' ? 'w' : 'l'] += 1
+      }
+    }
+    return Object.entries(buckets).map(([label, v]) => {
+      const total = v.w + v.l
+      return { label, wins: v.w, losses: v.l, total, wr: total ? Math.round((v.w/total)*100) : null }
+    })
+  })()
+
   const alignmentStats = ['confirms','conflicts','neutral'].reduce((acc, key) => {
     const live = gradedPicks.filter(p => p.confirms === key)
     const liveW = live.filter(p=>p.result==='win').length
@@ -793,6 +847,7 @@ export default function SharpMoney({ sport }) {
                   const hasOdds = withOdds.length >= 2
                   const move = hasOdds ? oddsMove(oddsFirst.sharpOdds, oddsLast.sharpOdds) : null
                   const reaction = hasOdds ? lineReaction(closing.gap, move) : null
+                  const clv = hasOdds ? calcCLV(oddsFirst.sharpOdds, oddsLast.sharpOdds) : null
                   return (
                   <>
                     <div style={{ fontSize:'.5rem', marginBottom:3 }}>
@@ -816,6 +871,11 @@ export default function SharpMoney({ sport }) {
                         {reaction && (
                           <span style={{ color:reaction.color, marginLeft:6, fontWeight:700 }}>
                             · {reaction.label} — {reaction.note}
+                          </span>
+                        )}
+                        {clv && (
+                          <span style={{ color: clv.beat ? '#4ade80' : '#f87171', marginLeft:6, fontWeight:700 }}>
+                            · CLV {clv.beat?'+':''}{clv.clvPct}%
                           </span>
                         )}
                       </div>
@@ -1125,6 +1185,30 @@ export default function SharpMoney({ sport }) {
               { label:'line frozen', display:'Line frozen', sub:'big money, book unmoved', color:'#f87171' },
             ].map(s => {
               const r = lineReactionStats.find(x => x.label === s.label)
+              return (
+                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                  <div>
+                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.display}</div>
+                    <div style={{ fontSize:'.42rem', color:'#404060' }}>{s.sub}</div>
+                  </div>
+                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
+                    {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:3 }}>Closing Line Value</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Did your entry price beat where the line actually closed? Skill-independent of whether the pick itself won — the closing line is the market's most information-complete price, so consistently beating it is real evidence of a good read.
+            </div>
+            {[
+              { label:'beat', display:'Beat the close', sub:'entry price better than closing price', color:'#4ade80' },
+              { label:'worse', display:'Worse than close', sub:'line moved away from your entry', color:'#f87171' },
+            ].map(s => {
+              const r = clvStats.find(x => x.label === s.label)
               return (
                 <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
                   <div>
