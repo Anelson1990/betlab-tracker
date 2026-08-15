@@ -61,24 +61,36 @@ export async function fetchGames(sport, isoDate) {
   return sport === 'mlb' ? fetchMlbGames(isoDate) : fetchEspnGames(sport, isoDate)
 }
 
-// Betting-site/sharp-splits abbreviations that don't match MLB's own API
-// abbreviation. Confirmed real case: Arizona is commonly written "ARI" on
-// splits sites, but MLB's API uses "AZ" -- exact match failed, and the old
-// substring-fallback logic then matched "ARI" against "Mariners" (M-ARI-NERS)
-// as a false positive, silently grading a Colorado @ Arizona pick against
-// Seattle @ Yankees' actual result. Checked all 30 teams: this is the only
-// mismatch, but the alias map stays open for any future ones found.
-const MLB_ABBR_ALIASES = { ARI: 'AZ' }
+// Betting-site/sharp-splits abbreviations that don't match a sport's own API
+// abbreviation. Two confirmed real cases so far, same bug pattern each time:
+// MLB: Arizona is commonly written "ARI" on splits sites, but MLB's API uses
+//   "AZ" -- exact match failed, and the old substring-fallback logic then
+//   matched "ARI" against "Mariners" (M-ARI-NERS) as a false positive,
+//   silently grading a Colorado @ Arizona pick against Seattle @ Yankees'
+//   actual result.
+// NFL: Washington is commonly written "WAS", but ESPN's API uses "WSH" --
+//   this one just failed to match at all (correctly, since the substring
+//   fallback was already removed by the time this was found) rather than
+//   silently misgrading, but still blocked Auto Grade from working.
+// Kept as per-sport maps since abbreviation quirks are sport/API-specific;
+// add to the relevant map immediately if another mismatch is ever found
+// rather than reintroducing any kind of fuzzy/substring fallback.
+const ABBR_ALIASES = {
+  mlb: { ARI: 'AZ' },
+  nfl: { WAS: 'WSH' },
+  nba: {},
+  nhl: {},
+}
 
 // Returns { found, final, homeAbbr, awayAbbr, homeScore, awayScore, pickedHome, pickedAbbr }
 // or null if the team couldn't be matched to a game.
 export function matchGame(sport, games, teamAbbr) {
   if (!teamAbbr) return null
   let a = teamAbbr.toUpperCase()
+  a = (ABBR_ALIASES[sport] && ABBR_ALIASES[sport][a]) || a
 
   if (sport === 'mlb') {
-    a = MLB_ABBR_ALIASES[a] || a
-    // Exact abbreviation match ONLY. The previous fallback (checking if the
+    // Exact abbreviation match ONLY. A previous fallback (checking if the
     // search term appeared as a substring anywhere in a team's full name)
     // caused a real, confirmed silent misgrade -- "ARI" matched inside
     // "Mariners" and attributed Seattle @ Yankees' score to a Colorado @
