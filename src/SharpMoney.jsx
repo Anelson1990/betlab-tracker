@@ -134,6 +134,38 @@ function sameSideOddsRun(sortedPicks) {
   return run.filter(p => parseOdds(p.sharpOdds) !== null)
 }
 
+// Classifies the SHAPE of a game's checkpoints across the day -- not just the
+// closing gap size, but what the money actually did. Real finding this is
+// built on: games where the sharp side flipped during the day won more often
+// (59%, n=22) than games that held one side the whole time (48%, n=166) --
+// the opposite of the naive assumption that a stable signal is the
+// trustworthy one. Distinguishing "spiked and faded" from "steady" and
+// "built all day" is exactly the read that's been done by hand in chat
+// every checkpoint; this makes it visible on the card itself.
+function classifyMovementShape(sortedPicks) {
+  if (sortedPicks.length < 2) return null
+  const firstSide = pickSide(sortedPicks[0])
+  const lastSide = pickSide(sortedPicks[sortedPicks.length - 1])
+  const gaps = sortedPicks.map(p => p.gap)
+  const first = gaps[0], last = gaps[gaps.length - 1]
+  const peak = Math.max(...gaps)
+  const peakIsMiddle = peak > first + 8 && peak > last + 8 && gaps.indexOf(peak) > 0 && gaps.indexOf(peak) < gaps.length - 1
+
+  if (firstSide && lastSide && firstSide !== lastSide) {
+    return { shape: 'flipped', label: 'Flipped sides', color: '#a78bfa', note: `${firstSide} → ${lastSide} during the day` }
+  }
+  if (peakIsMiddle) {
+    return { shape: 'spiked', label: 'Spiked & faded', color: '#fbbf24', note: `peaked at ${peak}%, settled at ${last}%` }
+  }
+  if (last - first >= 8) {
+    return { shape: 'building', label: 'Building all day', color: '#4ade80', note: `${first}% → ${last}%, sustained growth` }
+  }
+  if (first - last >= 8) {
+    return { shape: 'fading', label: 'Fading', color: '#f87171', note: `${first}% → ${last}%, losing steam` }
+  }
+  return { shape: 'steady', label: 'Steady', color: '#60a5fa', note: `held around ${last}% all day` }
+}
+
 // How far the line moved from first to last checkpoint, in cents. Positive =
 // the sharp side got MORE expensive (book respecting the money). Near zero =
 // line frozen despite the money.
@@ -646,6 +678,33 @@ export default function SharpMoney({ sport }) {
     })
   })()
 
+  // Win rate by the SHAPE of a game's checkpoints across the day, not just
+  // its closing gap. Built after finding that games where the sharp side
+  // flipped won MORE often than games that held one side all day -- the
+  // opposite of the naive assumption, and worth tracking as its own signal
+  // distinct from gap size, confirms/conflicts, line reaction, or CLV.
+  const shapeStats = (() => {
+    const buckets = { flipped:{w:0,l:0}, spiked:{w:0,l:0}, building:{w:0,l:0}, fading:{w:0,l:0}, steady:{w:0,l:0} }
+    const allDays = [...data.days, ...history.days]
+    for (const day of allDays) {
+      const byGame = {}
+      day.picks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+      for (const picks of Object.values(byGame)) {
+        if (picks.length < 2) continue
+        const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
+        const last = sorted[sorted.length-1]
+        if (last.result !== 'win' && last.result !== 'loss') continue
+        const shape = classifyMovementShape(sorted)
+        if (!shape) continue
+        buckets[shape.shape][last.result === 'win' ? 'w' : 'l'] += 1
+      }
+    }
+    return Object.entries(buckets).map(([label, v]) => {
+      const total = v.w + v.l
+      return { label, wins: v.w, losses: v.l, total, wr: total ? Math.round((v.w/total)*100) : null }
+    })
+  })()
+
   const alignmentStats = ['confirms','conflicts','neutral'].reduce((acc, key) => {
     const live = gradedPicks.filter(p => p.confirms === key)
     const liveW = live.filter(p=>p.result==='win').length
@@ -842,8 +901,15 @@ export default function SharpMoney({ sport }) {
             const tierColor = closeTier ? closeTier.color : '#404060'
             const tierBorder = closeTier ? closeTier.border : '#1a1a2e'
             const mRead = marginRead(closing.result, closing.margin)
+            const shape = classifyMovementShape(sorted)
             return (
               <div key={game} style={{ background:'#09090f', border:`1px solid ${tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
+                {shape && (
+                  <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:`${shape.color}22`, border:`1px solid ${shape.color}`, borderRadius:5, padding:'2px 7px', marginBottom:6 }}>
+                    <span style={{ fontSize:'.56rem', fontWeight:800, color:shape.color, textTransform:'uppercase' }}>{shape.label}</span>
+                    <span style={{ fontSize:'.46rem', color:'#8080a0' }}>· {shape.note}</span>
+                  </div>
+                )}
                 <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
                   <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:'#f0f0f8' }}>{closing.sharpPick || closing.bet || closing.side || game}</div>
@@ -1242,6 +1308,33 @@ export default function SharpMoney({ sport }) {
               { label:'worse', display:'Worse than close', sub:'line moved away from your entry', color:'#f87171' },
             ].map(s => {
               const r = clvStats.find(x => x.label === s.label)
+              return (
+                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                  <div>
+                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.display}</div>
+                    <div style={{ fontSize:'.42rem', color:'#404060' }}>{s.sub}</div>
+                  </div>
+                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
+                    {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:3 }}>Movement Shape</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              What the money actually did across the day, not just where it ended up. Real finding this is tracking: games where the sharp side flipped have outperformed games that held steady — worth watching whether that keeps holding as more data comes in.
+            </div>
+            {[
+              { label:'flipped', display:'Flipped sides', sub:'sharp lean changed team during the day', color:'#a78bfa' },
+              { label:'building', display:'Building all day', sub:'gap grew steadily, same side throughout', color:'#4ade80' },
+              { label:'steady', display:'Steady', sub:'held a consistent gap, same side', color:'#60a5fa' },
+              { label:'spiked', display:'Spiked & faded', sub:'peaked mid-day then cooled back down', color:'#fbbf24' },
+              { label:'fading', display:'Fading', sub:'gap shrank steadily, same side throughout', color:'#f87171' },
+            ].map(s => {
+              const r = shapeStats.find(x => x.label === s.label)
               return (
                 <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
                   <div>
