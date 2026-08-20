@@ -523,7 +523,20 @@ export default function SharpMoney({ sport }) {
     markDateDeleted(DELETED_KEY, date)
     save(updated)
     setHistory(verify)
-    setGradeLog([`${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`])
+    let logLine = `${date} archived to history (${w}-${l} on closing picks). Verified ${saved.picks.length} total checkpoints saved.`
+
+    // Best-effort Drive sync of just THIS day -- never re-uploads the whole
+    // history, and a Drive failure here can never undo or block the local
+    // archive above, which already succeeded and is the source of truth.
+    if (driveSync.isConfigured()) {
+      try {
+        await driveSync.syncDayToDrive(sport, saved)
+        logLine += ' Synced to Drive.'
+      } catch (e) {
+        logLine += ` Drive sync skipped (${e.message || e}) -- local archive is still safe.`
+      }
+    }
+    setGradeLog([logLine])
   }
 
   const loadJSON = async () => {

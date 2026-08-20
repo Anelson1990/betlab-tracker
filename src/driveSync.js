@@ -103,10 +103,13 @@ export async function exportToDrive(sport, exportObj) {
 
   const filename = `${sport}-export.json`
   const content = JSON.stringify({ ...exportObj, exportedAt: new Date().toISOString() }, null, 2)
-  const existingId = await findFile(filename, sportFolderId)
+  await uploadFile(filename, content, sportFolderId)
+}
 
+async function uploadFile(filename, content, parentId) {
+  const existingId = await findFile(filename, parentId)
   const boundary = 'betlab_boundary'
-  const metadata = existingId ? { name: filename } : { name: filename, parents: [sportFolderId] }
+  const metadata = existingId ? { name: filename } : { name: filename, parents: [parentId] }
   const body =
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
     `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`
@@ -122,4 +125,25 @@ export async function exportToDrive(sport, exportObj) {
   })
   if (!res.ok) throw new Error(`Drive upload failed: ${res.status} ${await res.text()}`)
   return res.json()
+}
+
+// Sends just ONE archived day, not the whole history -- avoids re-uploading
+// everything every time. Lands in a "days" subfolder so it never collides
+// with the full-snapshot export file. Auto-called from Archive Day; connects
+// on first use if not already connected (must be triggered from a real click
+// for the OAuth popup to work, which Archive Day already is).
+export async function syncDayToDrive(sport, day) {
+  if (!isConfigured()) return { skipped: 'not configured' }
+  if (!accessToken) {
+    await loadGis()
+    await requestToken()
+  }
+
+  const rootId = await getOrCreateFolder(ROOT_FOLDER_NAME, null)
+  const sportFolderId = await getOrCreateFolder(sport.toUpperCase(), rootId)
+  const daysFolderId = await getOrCreateFolder('days', sportFolderId)
+
+  const filename = `${sport}-${day.date.replace(/\s+/g, '-')}.json`
+  const content = JSON.stringify({ sport, ...day, syncedAt: new Date().toISOString() }, null, 2)
+  return uploadFile(filename, content, daysFolderId)
 }
