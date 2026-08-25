@@ -992,6 +992,8 @@ export default function SharpMoney({ sport }) {
             const movedTier = openTier?.label !== closeTier?.label
             const tierColor = closeTier ? closeTier.color : '#404060'
             const tierBorder = closeTier ? closeTier.border : '#1a1a2e'
+            const closingOldGap = closing.rawMoney != null ? oldGapFor(closing.rawMoney) : null
+            const closeOldTier = closingOldGap != null ? tierFor(closingOldGap) : null
             const mRead = marginRead(closing.result, closing.margin)
             const shape = classifyMovementShape(sorted)
             return (
@@ -1016,8 +1018,19 @@ export default function SharpMoney({ sport }) {
                     )}
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.2rem', fontWeight:800, color:tierColor }}>{closing.gap}%</div>
-                    <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase' }}>{closeTier ? closeTier.label : 'no tier'} · closing</div>
+                    <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'baseline' }}>
+                      {closingOldGap != null && (
+                        <div>
+                          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.2rem', fontWeight:800, color:'#fbbf24' }}>{closingOldGap}%</div>
+                          <div style={{ fontSize:'.36rem', color:'#78716c', textTransform:'uppercase' }}>old · {closeOldTier ? closeOldTier.label : 'no tier'}</div>
+                        </div>
+                      )}
+                      <div>
+                        <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.2rem', fontWeight:800, color:tierColor }}>{closing.gap}%</div>
+                        <div style={{ fontSize:'.36rem', color:'#404060', textTransform:'uppercase' }}>new · {closeTier ? closeTier.label : 'no tier'}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase', marginTop:2 }}>closing</div>
                   </div>
                 </div>
 
