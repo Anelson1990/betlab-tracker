@@ -684,6 +684,30 @@ export default function SharpMoney({ sport }) {
     get wr() { return this.total ? Math.round((this.wins/this.total)*100) : 0 },
   }
 
+  // Sharp-vs-model ALIGNMENT (confirms/conflicts/neutral) is formula-agnostic
+  // -- it only asks "did the sharp pick agree with the model," which doesn't
+  // depend on which gap formula was used. So unlike the gap-tier stats above,
+  // this pulls from ALL live picks with no FORMULA_FIX_DATE restriction.
+  //
+  // The baseline (OLD_FORMULA_BASELINE.alignment) was hardcoded because the
+  // live app's own storage had lost the Jun 14-30 period at the time. If
+  // live storage now genuinely has NO days at or before that baseline's
+  // asOf date, the period truly is still missing locally and the baseline
+  // fills the real gap. If live storage DOES have those early days (e.g.
+  // restored from a fuller Drive backup), counting both would double-count
+  // the same real picks -- so the baseline is skipped entirely in that case.
+  const liveHasBaselinePeriod = [...data.days, ...history.days]
+    .some(d => parseCardDate(d.date) <= parseCardDate(OLD_FORMULA_BASELINE.asOf))
+  const alignmentAllTime = ['confirms','conflicts','neutral'].reduce((acc, key) => {
+    const live = allClosingPicksEver.filter(p => p.confirms === key && (p.result==='win'||p.result==='loss'))
+    const liveW = live.filter(p=>p.result==='win').length
+    const liveL = live.length - liveW
+    const base = liveHasBaselinePeriod ? { w:0, l:0 } : (OLD_FORMULA_BASELINE.alignment[key] || { w:0, l:0 })
+    const wins = base.w + liveW, losses = base.l + liveL, total = wins + losses
+    acc[key] = { wins, losses, total, wr: total ? Math.round((wins/total)*100) : 0 }
+    return acc
+  }, {})
+
   // Win rate grouped by how the LINE reacted to the money. Needs first-vs-last
   // checkpoint per game, so it walks full days rather than the collapsed
   // closing-picks list. Only games with 2+ checkpoints, parseable odds, and a
@@ -1377,6 +1401,26 @@ export default function SharpMoney({ sport }) {
               {g.picks === 0 && <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center' }}>No graded picks in this range yet</div>}
             </div>
           ))}
+
+          <div style={{ background:'#09090f', border:'1px solid #713f12', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#fbbf24', marginBottom:3 }}>Sharp vs Model Alignment (All-Time)</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Formula-agnostic — only asks whether the sharp pick agreed with the model, independent of which gap formula was in use. Spans full history{liveHasBaselinePeriod ? '' : `, includes the recovered ${OLD_FORMULA_BASELINE.asOf} baseline for the earliest period`}.
+            </div>
+            {['confirms','conflicts','neutral'].map(key => {
+              const a = alignmentAllTime[key]
+              const label = key==='confirms'?'Confirms Models':key==='conflicts'?'Conflicts Models':'Neutral'
+              const color = key==='confirms'?'#4ade80':key==='conflicts'?'#f87171':'#94a3b8'
+              return (
+                <div key={key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                  <div style={{ fontSize:'.6rem', color }}>{label}</div>
+                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
+                    {a.total === 0 ? '— no data yet' : `${a.wins}-${a.losses} · ${a.wr}% WR`}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
 
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:8 }}>Sharp vs Model Alignment</div>
