@@ -16,6 +16,29 @@ function tierFor(gap) {
   return GROUPS.find(g => gap >= g.min && gap <= g.max) || null
 }
 
+// OLD FORMULA gap: distance from 50/50 on the money% side alone. This is
+// DIFFERENT math from the current gap (money% minus bets%) -- a game with
+// old_gap=76 and new_gap=76 do NOT mean the same thing, which is exactly
+// why mixing them into one tier bucket silently corrupted stats before
+// (see FORMULA_FIX_DATE below). Kept as a fully separate, parallel stat.
+function oldGapFor(moneyPct) {
+  if (moneyPct == null) return null
+  return Math.abs(moneyPct - 50)
+}
+
+// Real, recovered baseline for the OLD formula era (through Jun 30 2026),
+// recovered Aug 25 2026 from git history (commit 16ece8e) after being
+// removed from live stats on Aug 11 -- removed correctly, since mixing it
+// into NEW-formula tiers was the actual bug, but the numbers themselves
+// were real and validated at the time ("confirmed durable in Airtable").
+// Tracked here on its own, clearly labeled, never combined with new-formula
+// tiers or overall record.
+const OLD_FORMULA_BASELINE = {
+  asOf: 'Jun 30',
+  byGroup: { '1-9%': { w:0,l:0 }, '10-19%': { w: 5, l: 2 }, '20-29%': { w: 5, l: 6 }, '30-39%': { w: 3, l: 4 }, '40-49%': { w: 9, l: 4 }, '50%+': { w: 10, l: 6 } },
+  alignment: { confirms: { w: 25, l: 9 }, conflicts: { w: 3, l: 6 }, neutral: { w: 5, l: 4 } },
+}
+
 // The old MLB_BASELINE (hardcoded totals "through Jun 30") was computed using
 // a gap formula ("distance from 50/50") that was found to be WRONG and
 // corrected around Jul 10 2026 to the current one (money% minus bets%). A
@@ -629,6 +652,38 @@ export default function SharpMoney({ sport }) {
     get wr() { return this.total ? Math.round((this.wins/this.total)*100) : 0 },
   }
 
+  // OLD FORMULA tracking -- fully separate from everything above. Pulls from
+  // ALL days regardless of FORMULA_FIX_DATE (unlike the new-formula stats),
+  // because old_gap only needs raw money%, which doesn't change meaning
+  // across that cutoff -- only the GAP FORMULA changed, not what money% means.
+  // Only picks with a real rawMoney field can compute this; picks logged
+  // before this field existed simply don't contribute (not zero, just absent).
+  const allClosingPicksEver = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)]
+  const oldFormulaPicks = allClosingPicksEver
+    .filter(p => (p.result === 'win' || p.result === 'loss') && p.rawMoney != null)
+    .map(p => ({ ...p, oldGap: oldGapFor(p.rawMoney) }))
+
+  const oldGroupStats = GROUPS.map(g => {
+    const livePicks = oldFormulaPicks.filter(p => p.oldGap >= g.min && p.oldGap <= g.max)
+    const liveWins = livePicks.filter(p => p.result === 'win').length
+    const liveLosses = livePicks.length - liveWins
+    const base = OLD_FORMULA_BASELINE.byGroup[g.label] || { w: 0, l: 0 }
+    const wins = base.w + liveWins
+    const losses = base.l + liveLosses
+    const picks = wins + losses
+    const wr = picks ? Math.round((wins/picks)*100) : 0
+    return { ...g, picks, wins, losses, wr }
+  })
+  const oldBaseW = Object.values(OLD_FORMULA_BASELINE.byGroup).reduce((s,g)=>s+g.w,0)
+  const oldBaseL = Object.values(OLD_FORMULA_BASELINE.byGroup).reduce((s,g)=>s+g.l,0)
+  const oldLiveW = oldFormulaPicks.filter(p=>p.result==='win').length
+  const oldLiveL = oldFormulaPicks.filter(p=>p.result==='loss').length
+  const oldOverallStats = {
+    wins: oldBaseW + oldLiveW, losses: oldBaseL + oldLiveL,
+    get total() { return this.wins + this.losses },
+    get wr() { return this.total ? Math.round((this.wins/this.total)*100) : 0 },
+  }
+
   // Win rate grouped by how the LINE reacted to the money. Needs first-vs-last
   // checkpoint per game, so it walks full days rather than the collapsed
   // closing-picks list. Only games with 2+ checkpoints, parseable odds, and a
@@ -951,6 +1006,7 @@ export default function SharpMoney({ sport }) {
                   const oddsFirst = withOdds[0]
                   const oddsLast = withOdds[withOdds.length - 1]
                   const hasOdds = withOdds.length >= 2
+                  const hasOldGap = sorted.some(p => p.rawMoney != null)
                   const sideFlipped = sorted.length >= 2 && pickSide(sorted[0]) !== pickSide(sorted[sorted.length-1])
                   const move = hasOdds ? oddsMove(oddsFirst.sharpOdds, oddsLast.sharpOdds) : null
                   const reaction = hasOdds ? lineReaction(closing.gap, move) : null
@@ -993,22 +1049,22 @@ export default function SharpMoney({ sport }) {
                       </div>
                     )}
                     <ResponsiveContainer width="100%" height={110}>
-                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap, odds:parseOdds(p.sharpOdds)}))} margin={{top:4,right:6,bottom:0,left:-30}}>
+                      <LineChart data={sorted.map(p=>({checkTime:p.checkTime||'?', gap:p.gap, oldGap: p.rawMoney!=null ? oldGapFor(p.rawMoney) : null, odds:parseOdds(p.sharpOdds)}))} margin={{top:4,right:6,bottom:0,left:-30}}>
                         <XAxis dataKey="checkTime" tick={{fontSize:7,fill:'#404060'}} axisLine={false} tickLine={false} />
                         <YAxis yAxisId="gap" hide domain={[dataMin => dataMin - 1, dataMax => dataMax + 1]} />
                         <YAxis yAxisId="odds" hide domain={[dataMin => dataMin - 4, dataMax => dataMax + 4]} />
-                        <Tooltip contentStyle={{background:'#0e0e1e',border:'1px solid #1a1a30',borderRadius:6,fontSize:'.55rem'}} labelStyle={{color:'#a78bfa'}}
-                          formatter={(v,name)=>name==='gap'?[`${v}%`,'Gap']:[v>0?`+${v}`:`${v}`,'Odds']} />
-                        <Line yAxisId="gap" type="monotone" dataKey="gap" stroke="#a78bfa" strokeWidth={2} dot={{r:3,fill:'#a78bfa'}} />
+                        <Tooltip contentStyle={{background:'#0e0e1e',border:'1px solid #1a1a30',borderRadius:6,fontSize:'.55rem'}} labelStyle={{color:'#60a5fa'}}
+                          formatter={(v,name)=>name==='gap'?[`${v}%`,'New Gap']:name==='oldGap'?[`${v}%`,'Old Gap']:[v>0?`+${v}`:`${v}`,'Odds']} />
+                        <Line yAxisId="gap" type="monotone" dataKey="gap" stroke="#60a5fa" strokeWidth={2} dot={{r:3,fill:'#60a5fa'}} />
+                        {hasOldGap && <Line yAxisId="gap" type="monotone" dataKey="oldGap" stroke="#fbbf24" strokeWidth={2} strokeDasharray="5 3" dot={{r:3,fill:'#fbbf24'}} connectNulls />}
                         {hasOdds && <Line yAxisId="odds" type="monotone" dataKey="odds" stroke="#38bdf8" strokeWidth={1.5} strokeDasharray="3 3" dot={{r:2,fill:'#38bdf8'}} />}
                       </LineChart>
                     </ResponsiveContainer>
-                    {hasOdds && (
-                      <div style={{ display:'flex', gap:10, justifyContent:'center', marginTop:2 }}>
-                        <span style={{ fontSize:'.42rem', color:'#a78bfa' }}>— gap %</span>
-                        <span style={{ fontSize:'.42rem', color:'#38bdf8' }}>-- odds</span>
-                      </div>
-                    )}
+                    <div style={{ display:'flex', gap:10, justifyContent:'center', marginTop:2, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:'.42rem', color:'#60a5fa' }}>— new gap %</span>
+                      {hasOldGap && <span style={{ fontSize:'.42rem', color:'#fbbf24' }}>┄ old gap %</span>}
+                      {hasOdds && <span style={{ fontSize:'.42rem', color:'#38bdf8' }}>-- odds</span>}
+                    </div>
                   </>
                   )
                 })()}
@@ -1238,6 +1294,10 @@ export default function SharpMoney({ sport }) {
             </div>
           </div>
 
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, textTransform:'uppercase', color:'#60a5fa', marginTop:4, marginBottom:2, borderBottom:'2px solid #1e40af', paddingBottom:4 }}>
+            🔵 New Formula — money% minus bets%
+          </div>
+
           {groupStats.map(g => (
             <div key={g.label} style={{ background:'#09090f', border:`1px solid ${g.border}`, borderRadius:10, padding:12 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -1256,6 +1316,57 @@ export default function SharpMoney({ sport }) {
                 <>
                   <div style={{ height:6, background:'#1a1a30', borderRadius:3, overflow:'hidden', marginBottom:6 }}>
                     <div style={{ height:'100%', width:`${g.wr}%`, background:g.color, borderRadius:3 }} />
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.5rem', color:'#505070' }}>
+                    <span>{g.wins}W · {g.picks-g.wins}L</span>
+                    <span>{g.wr >= 55 ? 'Edge' : g.wr >= 50 ? 'Breakeven' : 'Below 50%'}</span>
+                  </div>
+                </>
+              )}
+              {g.picks === 0 && <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center' }}>No graded picks in this range yet</div>}
+            </div>
+          ))}
+
+          <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.8rem', fontWeight:800, textTransform:'uppercase', color:'#fbbf24', marginTop:10, marginBottom:2, borderBottom:'2px solid #713f12', paddingBottom:4 }}>
+            🟡 Old Formula — distance from 50/50 on money%
+          </div>
+          <div style={{ fontSize:'.44rem', color:'#404060', marginBottom:4, lineHeight:1.4 }}>
+            Different math from the formula above — a game can land in different tiers under each.
+            Baseline from real, validated Jun 30 data recovered from git history; live picks only add
+            in for days where raw money% was captured (not every day has this yet).
+          </div>
+          <div style={{ background:'#09090f', border:'1px solid #713f12', borderRadius:10, padding:12, marginBottom:2 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+              {[
+                { val: oldOverallStats.total, lbl: 'Total Graded' },
+                { val: `${oldOverallStats.wins}-${oldOverallStats.losses}`, lbl: 'W-L' },
+                { val: `${oldOverallStats.wr}%`, lbl: 'Win Rate' },
+              ].map(s => (
+                <div key={s.lbl} style={{ textAlign:'center', background:'#0c0c1a', borderRadius:6, padding:'8px 4px' }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.1rem', fontWeight:800, color:'#fbbf24', lineHeight:1 }}>{s.val}</div>
+                  <div style={{ fontSize:'.38rem', color:'#404060', textTransform:'uppercase', letterSpacing:'.06em', marginTop:3 }}>{s.lbl}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {oldGroupStats.map(g => (
+            <div key={`old-${g.label}`} style={{ background:'#09090f', border:'1px solid #713f12', borderRadius:10, padding:12 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.88rem', fontWeight:800, color:'#fbbf24' }}>{g.label} Gap</div>
+                  <div style={{ fontSize:'.44rem', color:'#404060', textTransform:'uppercase' }}>{g.picks} picks graded</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'1.4rem', fontWeight:800, color: g.picks===0?'#404060':g.wr>=55?'#4ade80':'#f87171', lineHeight:1 }}>
+                    {g.picks === 0 ? '—' : `${g.wr}%`}
+                  </div>
+                  <div style={{ fontSize:'.4rem', color:'#404060', textTransform:'uppercase' }}>Win Rate</div>
+                </div>
+              </div>
+              {g.picks > 0 && (
+                <>
+                  <div style={{ height:6, background:'#1a1a30', borderRadius:3, overflow:'hidden', marginBottom:6 }}>
+                    <div style={{ height:'100%', width:`${g.wr}%`, background:'#fbbf24', borderRadius:3 }} />
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.5rem', color:'#505070' }}>
                     <span>{g.wins}W · {g.picks-g.wins}L</span>
