@@ -3,6 +3,7 @@ import { CHECKLIST } from './data.js'
 import { SPORTS } from './sportApi.js'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import SharpMoney from './SharpMoney.jsx'
+import Potd from './Potd.jsx'
 import ChecklistTab from './Checklist.jsx'
 import Knowledge from './Knowledge.jsx'
 
@@ -89,6 +90,7 @@ export default function App() {
 
   const tabs = [
     ['sharp','💰 Sharp'],
+    ['potd','🏆 POTD'],
     ['stats','📈 Stats'],
     ['checklist','✅ Checklist'],
     ['learn','📖 Learn'],
@@ -180,6 +182,9 @@ export default function App() {
           <SharpMoney key={activeSport} sport={activeSport} />
         </>
       )}
+
+      {/* POTD TAB — standalone, cross-sport play-of-the-day tracker */}
+      {tab === 'potd' && <Potd />}
 
       {/* STATS TAB — bankroll tracker, calendar, line graph, adjustable goal meter. Nothing else. */}
       {tab === 'stats' && (
