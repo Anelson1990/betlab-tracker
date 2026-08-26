@@ -138,6 +138,21 @@ function pickSide(p) {
   return first ? first.toUpperCase() : null
 }
 
+// Market types tracked per pick, stored as pick.market: 'ml' | 'spread' | 'total'.
+// Defaults to 'ml' for backward compat with every pick logged before this field
+// existed. 'spread' is sport-labeled (Run Line for MLB, Puck Line for NHL,
+// Spread for NFL/NBA) but uses IDENTICAL underlying logic -- same gap math,
+// same tier thresholds, same graph. Only the display label changes.
+const MARKET_LABELS = {
+  mlb: { ml: 'Moneyline', spread: 'Run Line', total: 'Total' },
+  nhl: { ml: 'Moneyline', spread: 'Puck Line', total: 'Total' },
+  nfl: { ml: 'Moneyline', spread: 'Spread', total: 'Total' },
+  nba: { ml: 'Moneyline', spread: 'Spread', total: 'Total' },
+}
+function marketLabel(sportKey, market) {
+  return (MARKET_LABELS[sportKey] || MARKET_LABELS.mlb)[market || 'ml'] || 'Moneyline'
+}
+
 // Odds are only meaningfully comparable across checkpoints if they're on the
 // SAME side. A real case this catches: BOS @ TOR on Aug 13 -- the sharp lean
 // flipped from TOR (9 AM) to BOS (1 PM). Naively diffing "first odds" vs
@@ -625,7 +640,8 @@ export default function SharpMoney({ sport }) {
   const statsEligibleDays = (days) => isMlb
     ? days.filter(d => parseCardDate(d.date) >= FORMULA_FIX_DATE)
     : days
-  const closingPicksAll = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
+  const isMlPick = p => (p.market || 'ml') === 'ml'
+  const closingPicksAll = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))].filter(isMlPick)
   const gradedPicks = closingPicksAll.filter(p => p.result === 'win' || p.result === 'loss')
   const excludedDayCount = isMlb ? [...data.days, ...history.days].filter(d => parseCardDate(d.date) < FORMULA_FIX_DATE).length : 0
 
@@ -652,13 +668,35 @@ export default function SharpMoney({ sport }) {
     get wr() { return this.total ? Math.round((this.wins/this.total)*100) : 0 },
   }
 
+  // SPREAD/PUCKLINE/RUNLINE and TOTAL tracking -- reuses the exact same gap
+  // math and tier thresholds as moneyline (a 20% gap means the same thing
+  // structurally regardless of market), but kept in fully separate buckets,
+  // same principle as old/new formula and as the ML market filter above.
+  // No baseline for either -- starting from zero real data, unlike ML which
+  // has weeks of history behind it.
+  function computeMarketStats(marketKey) {
+    const picks = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
+      .filter(p => p.market === marketKey && (p.result === 'win' || p.result === 'loss'))
+    const byTier = GROUPS.map(g => {
+      const sub = picks.filter(p => p.gap >= g.min && p.gap <= g.max)
+      const w = sub.filter(p=>p.result==='win').length
+      const l = sub.length - w
+      return { ...g, picks: sub.length, wins: w, losses: l, wr: sub.length ? Math.round((w/sub.length)*100) : 0 }
+    })
+    const w = picks.filter(p=>p.result==='win').length
+    const l = picks.length - w
+    return { picks, byTier, wins: w, losses: l, total: picks.length, wr: picks.length ? Math.round((w/picks.length)*100) : 0 }
+  }
+  const spreadStats = computeMarketStats('spread')
+  const totalStats = computeMarketStats('total')
+
   // OLD FORMULA tracking -- fully separate from everything above. Pulls from
   // ALL days regardless of FORMULA_FIX_DATE (unlike the new-formula stats),
   // because old_gap only needs raw money%, which doesn't change meaning
   // across that cutoff -- only the GAP FORMULA changed, not what money% means.
   // Only picks with a real rawMoney field can compute this; picks logged
   // before this field existed simply don't contribute (not zero, just absent).
-  const allClosingPicksEver = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)]
+  const allClosingPicksEver = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)].filter(isMlPick)
   const oldFormulaPicks = allClosingPicksEver
     .filter(p => (p.result === 'win' || p.result === 'loss') && p.rawMoney != null)
     .map(p => ({ ...p, oldGap: oldGapFor(p.rawMoney) }))
@@ -996,14 +1034,22 @@ export default function SharpMoney({ sport }) {
             const closeOldTier = closingOldGap != null ? tierFor(closingOldGap) : null
             const mRead = marginRead(closing.result, closing.margin)
             const shape = classifyMovementShape(sorted)
+            const pickMarket = closing.market || 'ml'
             return (
               <div key={game} style={{ background:'#09090f', border:`1px solid ${tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
-                {shape && (
-                  <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:`${shape.color}22`, border:`1px solid ${shape.color}`, borderRadius:5, padding:'2px 7px', marginBottom:6 }}>
-                    <span style={{ fontSize:'.56rem', fontWeight:800, color:shape.color, textTransform:'uppercase' }}>{shape.label}</span>
-                    <span style={{ fontSize:'.46rem', color:'#8080a0' }}>· {shape.note}</span>
-                  </div>
-                )}
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml') ? 6 : 0 }}>
+                  {pickMarket !== 'ml' && (
+                    <div style={{ display:'inline-flex', alignItems:'center', background: pickMarket==='spread' ? '#164e6322' : '#4c1d9522', border:`1px solid ${pickMarket==='spread' ? '#22d3ee' : '#c084fc'}`, borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.5rem', fontWeight:800, color: pickMarket==='spread' ? '#22d3ee' : '#c084fc' }}>{marketLabel(sport, pickMarket)}</span>
+                    </div>
+                  )}
+                  {shape && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:`${shape.color}22`, border:`1px solid ${shape.color}`, borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:shape.color, textTransform:'uppercase' }}>{shape.label}</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>· {shape.note}</span>
+                    </div>
+                  )}
+                </div>
                 <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
                   <div style={{ flex:1 }}>
                     <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.92rem', fontWeight:800, color:'#f0f0f8' }}>{closing.sharpPick || closing.bet || closing.side || game}</div>
@@ -1529,6 +1575,31 @@ export default function SharpMoney({ sport }) {
               )
             })}
           </div>
+
+          {[
+            { stats: spreadStats, label: marketLabel(sport, 'spread'), color: '#22d3ee' },
+            { stats: totalStats, label: marketLabel(sport, 'total'), color: '#c084fc' },
+          ].map(({ stats, label, color }) => (
+            <div key={label} style={{ background:'#09090f', border:`1px solid ${stats.total ? color+'55' : '#1a1a2e'}`, borderRadius:10, padding:12 }}>
+              <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color, marginBottom:3 }}>{label} Performance</div>
+              <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8 }}>
+                Same gap math and tiers as Moneyline, tracked in its own separate bucket. Starting fresh, no historical baseline.
+              </div>
+              {stats.total === 0 ? (
+                <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'10px 0' }}>No graded {label.toLowerCase()} picks yet</div>
+              ) : (
+                <>
+                  <div style={{ fontSize:'.6rem', color:'#a0a0c0', marginBottom:6 }}>{stats.wins}-{stats.losses} overall · {stats.wr}% WR ({stats.total} picks)</div>
+                  {stats.byTier.filter(t => t.picks > 0).map(t => (
+                    <div key={t.label} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid #0d0d1a' }}>
+                      <div style={{ fontSize:'.56rem', color:'#8080a0' }}>{t.label}</div>
+                      <div style={{ fontSize:'.56rem', color:'#a0a0c0' }}>{t.wins}-{t.losses} · {t.wr}% (n={t.picks})</div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
