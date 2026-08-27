@@ -767,10 +767,22 @@ export default function SharpMoney({ sport }) {
 
   const IS = { background:'#0c0c1a', border:'1px solid #1a1a30', borderRadius:6, padding:'7px 10px', fontSize:'.68rem', color:'#f0f0f8', outline:'none', width:'100%' }
 
+  const [marketFilter, setMarketFilter] = useState('ml') // ml | spread | total
+
+  // CRITICAL FIX: previously grouped by game name ALONE, meaning ML/spread/
+  // total entries for the SAME game got bucketed together and sorted as if
+  // they were sequential checkpoints of one series -- creating fake
+  // "movement" between entirely different markets (e.g. an ML gap at 9 AM
+  // compared against a totally unrelated spread gap also at 9 AM, plotted
+  // as if the line moved between them). Now keyed by game+market so each
+  // market gets its own fully independent checkpoint history and graph.
   const todayGameGroups = (() => {
     const byGame = {}
-    todayPicks.forEach(p => { (byGame[p.game] ||= []).push(p) })
-    return Object.entries(byGame).map(([game, picks]) => {
+    todayPicks
+      .filter(p => (p.market || 'ml') === marketFilter)
+      .forEach(p => { const key = `${p.game}__${p.market||'ml'}`; (byGame[key] ||= []).push(p) })
+    return Object.values(byGame).map(picks => {
+      const game = picks[0].game
       const sorted = [...picks].sort((a,b) => checkpointOrder(a.checkTime) - checkpointOrder(b.checkTime))
       const opening = sorted[0]
       const closing = sorted[sorted.length - 1]
@@ -939,9 +951,21 @@ export default function SharpMoney({ sport }) {
             )
           })}
 
+          <div style={{ display:'flex', gap:4, marginTop:4 }}>
+            {[['ml','Moneyline'],['spread',marketLabel(sport,'spread')],['total','Total']].map(([key,label]) => (
+              <button key={key} onClick={()=>setMarketFilter(key)} style={{
+                flex:1, padding:'6px 4px', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif",
+                fontSize:'.62rem', fontWeight:700, textTransform:'uppercase',
+                background: marketFilter===key ? (key==='spread'?'rgba(34,211,238,.15)':key==='total'?'rgba(192,132,252,.15)':'rgba(37,99,235,.15)') : '#0c0c1a',
+                border: `1px solid ${marketFilter===key ? (key==='spread'?'#22d3ee':key==='total'?'#c084fc':'#2563eb') : '#1a1a2e'}`,
+                color: marketFilter===key ? (key==='spread'?'#22d3ee':key==='total'?'#c084fc':'#60a5fa') : '#505070',
+              }}>{label}</button>
+            ))}
+          </div>
+
           {todayGameGroups.length === 0 && (
             <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:8, padding:16, textAlign:'center', fontSize:'.6rem', color:'#404060' }}>
-              No {meta.label} sharp picks logged today. Tap + Add or paste JSON.
+              No {marketFilter==='ml'?'Moneyline':marketFilter==='spread'?marketLabel(sport,'spread'):'Total'} picks logged today for {meta.label}. Tap + Add or paste JSON.
             </div>
           )}
 
