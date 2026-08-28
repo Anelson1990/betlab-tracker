@@ -99,12 +99,20 @@ function checkpointOrder(ct) {
   return i === -1 ? 999 : i
 }
 
+// Shared composite key: game name alone is NOT enough to identify a real
+// "closing pick" once ML/spread/total tracking exists for the same game.
+// Used consistently everywhere a pick needs to be matched back to its
+// specific market's closing entry, not just its game.
+function marketKey(p) {
+  return `${p.game}__${p.market || 'ml'}`
+}
 function getClosingPicksMap(picks) {
   const map = new Map()
   for (const p of picks) {
-    const cur = map.get(p.game)
+    const key = marketKey(p)
+    const cur = map.get(key)
     if (!cur || checkpointOrder(p.checkTime) >= checkpointOrder(cur.checkTime)) {
-      map.set(p.game, p)
+      map.set(key, p)
     }
   }
   return map
@@ -410,7 +418,7 @@ export default function SharpMoney({ sport }) {
     const closingMap = getClosingPicksMap(updDay.picks)
 
     for (const pick of updDay.picks) {
-      const isClosing = closingMap.get(pick.game)?.id === pick.id
+      const isClosing = closingMap.get(marketKey(pick))?.id === pick.id
       if (!isClosing) continue
       if (pick.result !== 'pending') continue
       const nameField = pick.sharpPick || pick.bet || pick.side || ''
@@ -436,7 +444,7 @@ export default function SharpMoney({ sport }) {
     }
 
     log.push('Auto-grade complete')
-    const stillPending = updDay.picks.filter(p => closingMap.get(p.game)?.id === p.id && p.result==='pending').length
+    const stillPending = updDay.picks.filter(p => closingMap.get(marketKey(p))?.id === p.id && p.result==='pending').length
     if (stillPending > 0) log.push(`${stillPending} closing pick(s) still pending - not ready to archive`)
     else log.push('All closing picks graded - ready to archive')
     save(updated)
@@ -449,7 +457,7 @@ export default function SharpMoney({ sport }) {
     if (!day) { setGradeLog([`${date}: nothing to archive`]); return }
     if (day.picks.length === 0) { setGradeLog([`${date}: no picks`]); return }
     const closingMap = getClosingPicksMap(day.picks)
-    const pending = day.picks.filter(p => closingMap.get(p.game)?.id === p.id && p.result==='pending').length
+    const pending = day.picks.filter(p => closingMap.get(marketKey(p))?.id === p.id && p.result==='pending').length
     if (pending > 0) { setGradeLog([`${date}: ${pending} closing pick(s) still pending. Grade them first.`]); return }
 
     let hist
