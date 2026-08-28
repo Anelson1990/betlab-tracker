@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SEED_SHARP } from './sharp.js'
-import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin } from './sportApi.js'
+import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin, decideTotal } from './sportApi.js'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import * as driveSync from './driveSync.js'
 
@@ -422,7 +422,16 @@ export default function SharpMoney({ sport }) {
       if (!isClosing) continue
       if (pick.result !== 'pending') continue
       const nameField = pick.sharpPick || pick.bet || pick.side || ''
-      const teamAbbr = nameField.split(' ')[0]
+      const isTotal = (pick.market === 'total') || /^(over|under)\b/i.test(nameField)
+      // For ML/spread, the team to search for IS the first word of the pick
+      // ("NYY ML", "NYY -1.5"). For totals, the pick text has no team at all
+      // ("Over 8.5") -- the OLD code took the first word here regardless,
+      // which for a total pick extracted the literal string "Over" and tried
+      // to find a team abbreviated "OVER", which obviously never exists.
+      // Real fix: for totals, pull either team from the GAME field instead,
+      // since matchGame only needs a valid team belonging to the right game,
+      // not the specific side that was picked.
+      const teamAbbr = isTotal ? (pick.game || '').split('@')[0].trim().split(' ')[0] : nameField.split(' ')[0]
       // 'none' is a legitimate entry (game had no real sharp lean) but it can
       // never be graded — mark it explicitly rather than leaving it pending
       // forever and blocking the day from archiving.
@@ -434,7 +443,10 @@ export default function SharpMoney({ sport }) {
       const m = matchGame(sport, games, teamAbbr)
       if (!m) { log.push(`${pick.game}: game not found`); continue }
       if (!m.final) { log.push(`${pick.game}: not final yet`); continue }
-      const won = decideWin(m)
+      // Totals use completely different math than win/loss -- combined score
+      // vs a line, not which side won. decideWin has zero concept of this.
+      const won = isTotal ? decideTotal(m, nameField) : decideWin(m)
+      if (won === null && isTotal) { log.push(`${pick.game}: exact push on the total, marked no-grade`); pick.result = 'nograde'; continue }
       pick.result = won ? 'win' : 'loss'
       // Store the actual final score + margin so a 1-run loss (variance) reads
       // differently from a blowout (the read was actually wrong).

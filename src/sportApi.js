@@ -137,3 +137,19 @@ export function decideWin(m) {
   if (!m || !m.final) return null
   return m.pickedHome ? m.homeScore > m.awayScore : m.awayScore > m.homeScore
 }
+
+// Grades an Over/Under pick. Completely different math from decideWin --
+// doesn't care which side was picked at all, only the combined score
+// versus the line. Returns true (won), false (lost), or null (push --
+// combined score landed exactly on the line, a real possible outcome
+// worth handling explicitly rather than silently miscounting as a loss).
+export function decideTotal(m, pickText) {
+  if (!m || !m.final) return null
+  const match = String(pickText || '').match(/(over|under)\s*([\d.]+)/i)
+  if (!match) return null
+  const side = match[1].toLowerCase()
+  const line = parseFloat(match[2])
+  const total = m.homeScore + m.awayScore
+  if (total === line) return null // push
+  return side === 'over' ? total > line : total < line
+}
