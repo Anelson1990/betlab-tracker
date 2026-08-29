@@ -76,6 +76,7 @@ MLB's own `gamePk`, which is unique per game.
 | `poisson_model.py` | lambda calc, Poisson NRFI probability, combination |
 | `calibration.py` | apply a fitted calibrator + reliability/Brier/Wilson diagnostics |
 | `train_calibration.py` | **offline**, run manually — 3-way chronological split, fits the elastic-net calibrator, picks the threshold, reports a genuine holdout number |
+| `walk_forward_test.py` | **offline**, run manually — expanding-window walk-forward validation across the whole season, pools every out-of-sample prediction, asserts the no-leak invariant every fold |
 | `tracking.py` | real/paper/all-graded stores, kept separate, `game_pk` dedup |
 | `run_daily.py` | the Colab entrypoint — run this daily |
 | `test_core_math.py` | offline unit tests, no network/Colab/sklearn needed |
@@ -101,6 +102,40 @@ before its own calibration layer existed. It'll say so in the output.
 4. Re-run `train_calibration.py` periodically (e.g. monthly) as more
    games get graded — it always re-derives the threshold from a fresh
    holdout, it never just keeps the old one.
+
+**Walk-forward, no-leak validation** (a stronger check than
+`train_calibration.py`'s single 3-way split — this re-fits repeatedly
+through the season and pools every out-of-sample prediction into one
+report):
+
+```bash
+python3 walk_forward_test.py
+```
+
+Expanding-window: starts with the first `--min-train-games` games
+(default 150), predicts the next `--step-days` days (default 7) using
+only data strictly before them, then folds those days into training and
+repeats through the rest of the season. Every fold asserts
+`max(train date) < min(test date)` before it's allowed to run — that
+invariant is actually structurally guaranteed by the date-sorted,
+expanding-window construction (a bug would have to break the fold
+construction itself to trip it), but the assertion stays in as a loud
+failure instead of a silent one if that ever changes. Prints per-fold
+win rate (watch for suspiciously large swings or a suspiciously *good*
+early fold — both are leak smells) plus the same pooled reliability
+table and Wilson CIs as `train_calibration.py`'s holdout report.
+
+Run `python3 walk_forward_test.py --self-test` first (no real data
+needed) — it runs the exact same harness against two synthetic datasets,
+one with a realistic weak signal and one with the actual outcome leaked
+into a feature, and prints both reports side by side. On this repo's
+run: clean data scored a Brier of 0.251 (~coinflip-uninformative, fold
+WRs bouncing 46–59% with no consistent edge — expected for a synthetic
+dataset with only a faint signal) versus 0.002 and 100% WR every single
+fold on the leaked data. That's the calibration for what a real leak
+looks like in this report's output — if a real run ever produces numbers
+that clean, it means an upstream feature has already seen the answer,
+not that the model got good.
 
 **Testing without touching real data at all:**
 ```bash
