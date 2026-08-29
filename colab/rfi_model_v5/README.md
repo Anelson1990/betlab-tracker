@@ -137,6 +137,34 @@ looks like in this report's output — if a real run ever produces numbers
 that clean, it means an upstream feature has already seen the answer,
 not that the model got good.
 
+**Model comparison: logistic regression vs. gradient boosting.**
+`walk_forward_test.py` also fits a `HistGradientBoostingClassifier`
+through the identical folds as the elastic-net logistic regression
+(`--model both`, the default; use `--model logistic` or `--model gbm` to
+run just one) and prints a head-to-head table. v4's header dropped
+XGBoost outright ("overfit, poisoning ensemble, 0 real bets ever")
+without ever measuring it against the same walk-forward harness the
+logistic model gets — this makes that an actual measurement instead of
+an assumption.
+
+On the self-test's synthetic weak-signal dataset here, GBM scored a
+Brier of **0.316 — worse than the 0.25 coinflip-uninformative
+baseline** — with most confidence buckets flagged overconfident and a
+pooled WR of 47.3% at the 0.55 threshold (below breakeven), despite
+`early_stopping='auto'` and L2 regularization. Logistic regression
+stayed close to 0.25 on the same data. That's a real, reproduced
+instance of the overfitting failure mode v4 flagged for XGBoost — with
+only 13 features and a few hundred rows per fold, a boosted-tree model
+has room to fit noise that a more heavily regularized linear model
+resists. Both models correctly caught the leaked dataset (GBM even more
+starkly: Brier 0.0000).
+
+This isn't a verdict that GBM can never work here — it's evidence that,
+on the data volumes realistic for this project, it needs to *earn* a
+spot over the simpler model by beating it in the head-to-head table on
+your actual graded games, not be added on the assumption that more
+complexity helps.
+
 **Testing without touching real data at all:**
 ```bash
 cd colab/rfi_model_v5
