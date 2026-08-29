@@ -74,7 +74,9 @@ def main():
     print('\nLoading calibration model...')
     cal_bundle = calibration.load_calibration_bundle(config.CAL_FILE)
     if cal_bundle:
-        print(f'  Calibration loaded (trained {cal_bundle["trained_date"]} | '
+        model_type = cal_bundle.get('model_type', 'logistic')  # older bundles predate this key
+        print(f'  Calibration loaded: {model_type} '
+              f'(trained {cal_bundle["trained_date"]} | '
               f'{cal_bundle["n_training"]} fit games | '
               f'holdout threshold {cal_bundle["selected_threshold"]:.2f} | '
               f'holdout OOS edge: {cal_bundle["oos_edge"]:+.4f})')

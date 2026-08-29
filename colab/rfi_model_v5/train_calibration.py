@@ -56,11 +56,13 @@ real historical games; a calibrator fit on a handful of days is not
 going to be trustworthy no matter how the split is done.
 """
 
+import argparse
 import json
 import sys
 from datetime import datetime
 
 import numpy as np
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
@@ -70,6 +72,42 @@ from config import CAL_FILE, TRAIN_GAMES_FILE, STAKE, PAYOUT
 from calibration import FEATURE_NAMES, build_feature_row, calibration_report, wilson_ci
 
 BREAKEVEN_WR = STAKE / (STAKE + PAYOUT)
+
+
+def fit_model(model_type, X_fit_s, y_fit):
+    """
+    Returns a fitted model. 'logistic' tunes C/l1_ratio via
+    TimeSeriesSplit-CV (LogisticRegressionCV) since that's cheap to do
+    once here. 'gbm' uses the SAME fixed, deliberately-regularized
+    hyperparameters validated in walk_forward_test.py's fit_gbm — reusing
+    an untested new hyperparameter search here would make the live model
+    something walk_forward_test.py never actually evaluated.
+    """
+    if model_type == 'logistic':
+        # NOTE: on sklearn >= 1.8 this prints a FutureWarning that
+        # `penalty=` is redundant once l1_ratios is a list of floats —
+        # harmless, the fit is correct either way; left explicit for
+        # compatibility with older sklearn where it's required.
+        model = LogisticRegressionCV(
+            Cs=10, cv=TimeSeriesSplit(n_splits=5), penalty='elasticnet',
+            solver='saga', l1_ratios=[0.1, 0.5, 0.9], max_iter=5000,
+            scoring='neg_brier_score',
+        )
+        model.fit(X_fit_s, y_fit)
+        print(f'  Chosen C: {model.C_[0]:.4f}  |  l1_ratio: {model.l1_ratio_[0]:.2f}')
+        return model
+    elif model_type == 'gbm':
+        model = HistGradientBoostingClassifier(
+            max_iter=300, learning_rate=0.05, max_leaf_nodes=15,
+            l2_regularization=1.0, early_stopping='auto', validation_fraction=0.15,
+            n_iter_no_change=15, random_state=0,
+        )
+        model.fit(X_fit_s, y_fit)
+        print(f'  Fitted HistGradientBoostingClassifier '
+              f'({model.n_iter_ if hasattr(model, "n_iter_") else "?"} iterations)')
+        return model
+    else:
+        raise ValueError(f"model_type must be 'logistic' or 'gbm', got {model_type!r}")
 
 
 def load_training_rows(path=TRAIN_GAMES_FILE):
@@ -129,8 +167,12 @@ def pick_threshold_by_expected_roi(probs, outcomes, min_n=20,
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', choices=['logistic', 'gbm'], default='logistic')
+    args = parser.parse_args()
+
     print('=' * 65)
-    print('  RFI v5 — CALIBRATION TRAINING')
+    print(f'  RFI v5 — CALIBRATION TRAINING ({args.model})')
     print('=' * 65)
 
     try:
@@ -158,24 +200,13 @@ def main():
 
     scaler = StandardScaler().fit(X_fit)
     X_fit_s = scaler.transform(X_fit)
+    # Scaling is applied regardless of model_type: required for logistic,
+    # harmless for GBM (tree splits are invariant to a monotonic
+    # per-feature transform) — keeps one code path for both, and means
+    # apply_calibration() in calibration.py needs zero changes either way.
 
-    print('\n  Fitting elastic-net logistic calibrator '
-          '(TimeSeriesSplit CV for hyperparameters)...')
-    # NOTE: on sklearn >= 1.8 this prints a FutureWarning that `penalty=`
-    # is redundant once l1_ratios is a list of floats — harmless, the fit
-    # is correct either way; left explicit here for compatibility with
-    # older sklearn where `penalty='elasticnet'` is required.
-    model = LogisticRegressionCV(
-        Cs=10,
-        cv=TimeSeriesSplit(n_splits=5),
-        penalty='elasticnet',
-        solver='saga',
-        l1_ratios=[0.1, 0.5, 0.9],
-        max_iter=5000,
-        scoring='neg_brier_score',
-    )
-    model.fit(X_fit_s, y_fit)
-    print(f'  Chosen C: {model.C_[0]:.4f}  |  l1_ratio: {model.l1_ratio_[0]:.2f}')
+    print(f'\n  Fitting {args.model} calibrator...')
+    model = fit_model(args.model, X_fit_s, y_fit)
 
     # --- Threshold selection (its own fold, never seen by the fit above) ---
     X_thresh_s = scaler.transform(X_thresh)
@@ -228,6 +259,7 @@ def main():
 
     bundle = {
         'model': model,
+        'model_type': args.model,
         'scaler': scaler,
         'feature_names': FEATURE_NAMES,
         'trained_date': datetime.now().strftime('%Y-%m-%d'),
