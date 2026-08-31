@@ -517,6 +517,52 @@ export default function SharpMoney({ sport }) {
     setGradeLog([logLine])
   }
 
+  // Auto-corrects a pick whose sharpPick text has gone stale -- if the gap
+  // for the CURRENTLY NAMED side is negative, real money has moved to the
+  // OTHER side, and the label needs to re-flip to match. Without this, a
+  // game that reverses TWICE in one day (flip, then flip back) only gets
+  // caught by the FIRST flip -- the second reversal just shows as a
+  // negative gap on a stale name, which is confusing and easy to misread
+  // (confirmed real case: DET @ MIN, Aug 30 -- flipped MIN->DET at 1 PM,
+  // then drifted back toward MIN by 3 PM without the label updating).
+  function reflipIfNegative(p) {
+    if (p.gap === undefined || p.gap === null || p.gap >= 0) return p
+    const market = p.market || 'ml'
+    const field = (p.sharpPick || p.bet || p.side || '').trim()
+    const parts = field.split(' ')
+    const firstWord = (parts[0] || '').toUpperCase()
+    const flippedNote = 'Auto re-flipped — gap on the named side went negative, real money was on the other side.'
+
+    if (market === 'total') {
+      if (firstWord !== 'OVER' && firstWord !== 'UNDER') return p
+      const newSide = firstWord === 'OVER' ? 'Under' : 'Over'
+      const rest = parts.slice(1).join(' ')
+      return { ...p, sharpPick: `${newSide} ${rest}`.trim(), gap: Math.abs(p.gap),
+              rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
+              signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
+    }
+
+    if (!p.game || !p.game.includes('@')) return p
+    const teams = p.game.split('@').map(s => s.trim())
+    const other = teams.find(t => t.toUpperCase() !== firstWord)
+    if (!other) return p // can't safely determine the flip target, leave as-is rather than guess
+
+    if (market === 'spread') {
+      const lineNum = parseFloat(parts[1])
+      if (!isNaN(lineNum)) {
+        const flippedLine = -lineNum
+        const sign = flippedLine >= 0 ? '+' : ''
+        return { ...p, sharpPick: `${other} ${sign}${flippedLine}`, gap: Math.abs(p.gap),
+                rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
+                signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
+      }
+    }
+    const rest = parts.slice(1).join(' ')
+    return { ...p, sharpPick: `${other} ${rest}`.trim(), gap: Math.abs(p.gap),
+            rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
+            signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
+  }
+
   const loadJSON = async () => {
     try {
       const parsed = JSON.parse(pasteInput.trim())
@@ -533,7 +579,7 @@ export default function SharpMoney({ sport }) {
       }
       const updated = JSON.parse(JSON.stringify(data))
       const existing = updated.days.find(d => d.date === parsed.date)
-      const withIds = parsed.picks.map((p,i) => ({ ...p, id: p.id || Date.now().toString()+i }))
+      const withIds = parsed.picks.map((p,i) => reflipIfNegative({ ...p, id: p.id || Date.now().toString()+i }))
       if (existing) {
         const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}|${p.checkTime||''}`
         const seen = new Set(existing.picks.map(sig))
