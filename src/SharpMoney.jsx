@@ -676,6 +676,34 @@ export default function SharpMoney({ sport }) {
   const spreadStats = computeMarketStats('spread')
   const totalStats = computeMarketStats('total')
 
+  // Gap SIZE distribution by market -- separate question from win rate.
+  // Tests whether one market structurally produces bigger/rarer extreme
+  // signals than another, independent of whether those signals actually
+  // predict outcomes. ML restricted to statsEligibleDays (Jul 10+) to stay
+  // apples-to-apples with spread/total, which never had an old-formula
+  // era -- comparing magnitude across genuinely different formulas would
+  // be meaningless, same lesson as everywhere else old/new formula matters.
+  function computeGapDistribution(marketKey) {
+    const picks = marketKey === 'ml'
+      ? [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))].filter(isMlPick)
+      : [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)].filter(p => p.market === marketKey)
+    const gaps = picks.map(p => Math.abs(p.gap)).filter(g => !isNaN(g))
+    if (!gaps.length) return { n: 0, mean: 0, median: 0, pct20: 0, pct40: 0 }
+    const sorted = [...gaps].sort((a,b) => a-b)
+    const mid = Math.floor(sorted.length/2)
+    const median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2
+    return {
+      n: gaps.length,
+      mean: gaps.reduce((s,g)=>s+g,0)/gaps.length,
+      median,
+      pct20: gaps.filter(g=>g>=20).length/gaps.length*100,
+      pct40: gaps.filter(g=>g>=40).length/gaps.length*100,
+    }
+  }
+  const gapDistML = computeGapDistribution('ml')
+  const gapDistSpread = computeGapDistribution('spread')
+  const gapDistTotal = computeGapDistribution('total')
+
   // OLD FORMULA tracking -- fully separate from everything above. Pulls from
   // ALL days regardless of FORMULA_FIX_DATE (unlike the new-formula stats),
   // because old_gap only needs raw money%, which doesn't change meaning
@@ -1506,6 +1534,32 @@ export default function SharpMoney({ sport }) {
               )}
             </div>
           ))}
+
+          <div style={{ background:'#09090f', border:'1px solid #92400e55', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#fb923c', marginBottom:3 }}>Gap Size by Market</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              A different question from win rate — does one market produce bigger, rarer extreme signals than another, regardless of whether those signals actually win? Moneyline restricted to Jul 10+ to stay comparable with Spread/Total, which never had an old-formula era.
+            </div>
+            {[
+              { d: gapDistML, label: 'Moneyline' },
+              { d: gapDistSpread, label: marketLabel(sport, 'spread') },
+              { d: gapDistTotal, label: 'Total' },
+            ].map(({ d, label }) => (
+              <div key={label} style={{ padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <div style={{ fontSize:'.6rem', color:'#e0e0f0', fontWeight:700 }}>{label}</div>
+                  <div style={{ fontSize:'.5rem', color:'#606080' }}>n={d.n}</div>
+                </div>
+                {d.n === 0 ? (
+                  <div style={{ fontSize:'.52rem', color:'#404060' }}>No data yet</div>
+                ) : (
+                  <div style={{ fontSize:'.52rem', color:'#a0a0c0', marginTop:2 }}>
+                    mean {d.mean.toFixed(1)}% · median {d.median.toFixed(1)}% · {d.pct20.toFixed(0)}% hit 20%+ · <span style={{ color: d.pct40>0?'#fb923c':'#606080', fontWeight: d.pct40>0?700:400 }}>{d.pct40.toFixed(0)}% hit 40%+</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
