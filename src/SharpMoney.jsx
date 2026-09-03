@@ -704,6 +704,23 @@ export default function SharpMoney({ sport }) {
   const gapDistSpread = computeGapDistribution('spread')
   const gapDistTotal = computeGapDistribution('total')
 
+  // Real, validated combo pattern (Sep 2 cross-analysis, n=46, 70% WR,
+  // clearly the strongest result out of 78 combinations tested that day --
+  // most others were noise at small sample size). Gate strictly on the
+  // literal string "confirms" -- a real data-quality issue found the same
+  // day showed other tools writing momentum/trend labels (e.g.
+  // "strengthened", "flipped") into this same field, which are a
+  // DIFFERENT concept (already covered by Movement Shape) and must never
+  // be treated as model-alignment confirmation.
+  function isHotComboPick(p) {
+    return (p.market || 'ml') === 'ml' && p.gap >= 30 && p.confirms === 'confirms'
+  }
+  const hotComboPicks = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
+    .filter(isMlPick).filter(isHotComboPick).filter(p => p.result === 'win' || p.result === 'loss')
+  const hotComboW = hotComboPicks.filter(p => p.result === 'win').length
+  const hotComboStats = { wins: hotComboW, losses: hotComboPicks.length - hotComboW, total: hotComboPicks.length,
+    wr: hotComboPicks.length ? Math.round(hotComboW/hotComboPicks.length*100) : 0 }
+
   // OLD FORMULA tracking -- fully separate from everything above. Pulls from
   // ALL days regardless of FORMULA_FIX_DATE (unlike the new-formula stats),
   // because old_gap only needs raw money%, which doesn't change meaning
@@ -1073,9 +1090,18 @@ export default function SharpMoney({ sport }) {
             const mRead = marginRead(closing.result, closing.margin)
             const shape = classifyMovementShape(sorted)
             const pickMarket = closing.market || 'ml'
+            const isHotCombo = isHotComboPick(closing)
             return (
-              <div key={game} style={{ background:'#09090f', border:`1px solid ${tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml') ? 6 : 0 }}>
+              <div key={game} style={{ background:'#09090f', border:`1px solid ${isHotCombo ? '#facc15' : tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo) ? 6 : 0 }}>
+                  {isHotCombo && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#facc1522', border:'1px solid #facc15', borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:'#facc15', textTransform:'uppercase' }}>⭐ Tracked Combo</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
+                        · 30%+ gap + confirms model · {hotComboStats.total ? `${hotComboStats.wins}-${hotComboStats.losses} (${hotComboStats.wr}%) all-time` : 'building history'}
+                      </span>
+                    </div>
+                  )}
                   {pickMarket !== 'ml' && (
                     <div style={{ display:'inline-flex', alignItems:'center', background: pickMarket==='spread' ? '#164e6322' : '#4c1d9522', border:`1px solid ${pickMarket==='spread' ? '#22d3ee' : '#c084fc'}`, borderRadius:5, padding:'2px 7px' }}>
                       <span style={{ fontSize:'.5rem', fontWeight:800, color: pickMarket==='spread' ? '#22d3ee' : '#c084fc' }}>{marketLabel(sport, pickMarket)}</span>
@@ -1534,6 +1560,20 @@ export default function SharpMoney({ sport }) {
               )}
             </div>
           ))}
+
+          <div style={{ background:'#09090f', border:'1px solid #facc1555', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#facc15', marginBottom:3 }}>⭐ Tracked Combo — 30%+ Gap + Confirms Model</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Real, validated pattern from the Sep 2 cross-analysis — the single strongest result out of 78 combinations tested that day, still worth confirming it holds as more data comes in. Moneyline only, restricted to real "confirms" model-alignment tags (not the unrelated momentum-label values some other tool wrote into this field around Aug 26-31).
+            </div>
+            {hotComboStats.total === 0 ? (
+              <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks in this combo yet</div>
+            ) : (
+              <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
+                {hotComboStats.wins}-{hotComboStats.losses} · <span style={{ color: hotComboStats.wr>=55?'#4ade80':hotComboStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{hotComboStats.wr}% WR</span> ({hotComboStats.total} picks)
+              </div>
+            )}
+          </div>
 
           <div style={{ background:'#09090f', border:'1px solid #92400e55', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#fb923c', marginBottom:3 }}>Gap Size by Market</div>
