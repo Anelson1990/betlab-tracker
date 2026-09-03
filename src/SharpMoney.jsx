@@ -791,7 +791,7 @@ export default function SharpMoney({ sport }) {
     const allDays = [...data.days, ...history.days]
     for (const day of allDays) {
       const byGame = {}
-      day.picks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+      day.picks.forEach(p => { (byGame[marketKey(p)] ||= []).push(p) }) // FIXED: was grouping by game alone, silently mixing ML/spread/total checkpoints
       for (const picks of Object.values(byGame)) {
         if (picks.length < 2) continue
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
@@ -820,7 +820,7 @@ export default function SharpMoney({ sport }) {
     const allDays = [...data.days, ...history.days]
     for (const day of allDays) {
       const byGame = {}
-      day.picks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+      day.picks.forEach(p => { (byGame[marketKey(p)] ||= []).push(p) }) // FIXED: was grouping by game alone, silently mixing ML/spread/total checkpoints
       for (const picks of Object.values(byGame)) {
         if (picks.length < 2) continue
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
@@ -849,7 +849,7 @@ export default function SharpMoney({ sport }) {
     const allDays = [...data.days, ...history.days]
     for (const day of allDays) {
       const byGame = {}
-      day.picks.forEach(p => { (byGame[p.game] ||= []).push(p) })
+      day.picks.forEach(p => { (byGame[marketKey(p)] ||= []).push(p) }) // FIXED: was grouping by game alone, silently mixing ML/spread/total checkpoints
       for (const picks of Object.values(byGame)) {
         if (picks.length < 2) continue
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
