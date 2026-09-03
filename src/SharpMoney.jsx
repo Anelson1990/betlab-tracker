@@ -777,94 +777,65 @@ export default function SharpMoney({ sport }) {
     return acc
   }, {})
 
-  // Win rate grouped by how the LINE reacted to the money. Needs first-vs-last
-  // checkpoint per game, so it walks full days rather than the collapsed
-  // closing-picks list. Only games with 2+ checkpoints, parseable odds, and a
-  // real gap (>=10) can produce a reaction, so this set is smaller than the
-  // overall graded count -- expect it to build slowly.
-  const lineReactionStats = (() => {
-    const buckets = {
-      'line frozen': { w:0, l:0 },
-      'line drifted': { w:0, l:0 },
-      'line moved hard': { w:0, l:0 },
-    }
+  // Shared engine for the three multi-checkpoint stats (Line Reaction, CLV,
+  // Movement Shape). Takes a marketFilter so each can be computed
+  // separately per market -- user wants full market separation everywhere,
+  // not just pooled-but-uncontaminated, since this is a data-gathering
+  // year rather than a live-betting one and thin per-market cells are an
+  // acceptable, even preferable, tradeoff for a complete dataset later.
+  function computeCheckpointStats(marketFilter, kind) {
+    const buckets = kind === 'reaction'
+      ? { 'line frozen': { w:0, l:0 }, 'line drifted': { w:0, l:0 }, 'line moved hard': { w:0, l:0 } }
+      : kind === 'clv'
+      ? { beat: { w:0, l:0 }, worse: { w:0, l:0 } }
+      : { flipped:{w:0,l:0}, spiked:{w:0,l:0}, building:{w:0,l:0}, fading:{w:0,l:0}, steady:{w:0,l:0} }
     const allDays = [...data.days, ...history.days]
     for (const day of allDays) {
       const byGame = {}
-      day.picks.forEach(p => { (byGame[marketKey(p)] ||= []).push(p) }) // FIXED: was grouping by game alone, silently mixing ML/spread/total checkpoints
+      day.picks.forEach(p => {
+        if ((p.market || 'ml') !== marketFilter) return
+        (byGame[marketKey(p)] ||= []).push(p)
+      })
       for (const picks of Object.values(byGame)) {
         if (picks.length < 2) continue
         const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
         const last = sorted[sorted.length-1]
         if (last.result !== 'win' && last.result !== 'loss') continue
+
+        if (kind === 'shape') {
+          const shape = classifyMovementShape(sorted)
+          if (!shape) continue
+          buckets[shape.shape][last.result === 'win' ? 'w' : 'l'] += 1
+          continue
+        }
         const withOdds = sameSideOddsRun(sorted)
         if (withOdds.length < 2) continue
-        const reaction = lineReaction(last.gap, oddsMove(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds))
-        if (!reaction) continue
-        buckets[reaction.label][last.result === 'win' ? 'w' : 'l'] += 1
+        if (kind === 'reaction') {
+          const reaction = lineReaction(last.gap, oddsMove(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds))
+          if (!reaction) continue
+          buckets[reaction.label][last.result === 'win' ? 'w' : 'l'] += 1
+        } else {
+          const clv = calcCLV(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds)
+          if (!clv) continue
+          buckets[clv.beat ? 'beat' : 'worse'][last.result === 'win' ? 'w' : 'l'] += 1
+        }
       }
     }
     return Object.entries(buckets).map(([label, v]) => {
       const total = v.w + v.l
       return { label, wins: v.w, losses: v.l, total, wr: total ? Math.round((v.w/total)*100) : null }
     })
-  })()
+  }
 
-  // Closing Line Value stats: win rate for picks that beat the close vs
-  // picks that didn't. Distinct from line-reaction -- this is the
-  // established metric (does your entry price beat the market's final,
-  // most information-complete price), tracked as its own signal independent
-  // of gap size or tier.
-  const clvStats = (() => {
-    const buckets = { beat: { w:0, l:0 }, worse: { w:0, l:0 } }
-    const allDays = [...data.days, ...history.days]
-    for (const day of allDays) {
-      const byGame = {}
-      day.picks.forEach(p => { (byGame[marketKey(p)] ||= []).push(p) }) // FIXED: was grouping by game alone, silently mixing ML/spread/total checkpoints
-      for (const picks of Object.values(byGame)) {
-        if (picks.length < 2) continue
-        const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
-        const last = sorted[sorted.length-1]
-        if (last.result !== 'win' && last.result !== 'loss') continue
-        const withOdds = sameSideOddsRun(sorted)
-        if (withOdds.length < 2) continue
-        const clv = calcCLV(withOdds[0].sharpOdds, withOdds[withOdds.length-1].sharpOdds)
-        if (!clv) continue
-        buckets[clv.beat ? 'beat' : 'worse'][last.result === 'win' ? 'w' : 'l'] += 1
-      }
-    }
-    return Object.entries(buckets).map(([label, v]) => {
-      const total = v.w + v.l
-      return { label, wins: v.w, losses: v.l, total, wr: total ? Math.round((v.w/total)*100) : null }
-    })
-  })()
-
-  // Win rate by the SHAPE of a game's checkpoints across the day, not just
-  // its closing gap. Built after finding that games where the sharp side
-  // flipped won MORE often than games that held one side all day -- the
-  // opposite of the naive assumption, and worth tracking as its own signal
-  // distinct from gap size, confirms/conflicts, line reaction, or CLV.
-  const shapeStats = (() => {
-    const buckets = { flipped:{w:0,l:0}, spiked:{w:0,l:0}, building:{w:0,l:0}, fading:{w:0,l:0}, steady:{w:0,l:0} }
-    const allDays = [...data.days, ...history.days]
-    for (const day of allDays) {
-      const byGame = {}
-      day.picks.forEach(p => { (byGame[marketKey(p)] ||= []).push(p) }) // FIXED: was grouping by game alone, silently mixing ML/spread/total checkpoints
-      for (const picks of Object.values(byGame)) {
-        if (picks.length < 2) continue
-        const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
-        const last = sorted[sorted.length-1]
-        if (last.result !== 'win' && last.result !== 'loss') continue
-        const shape = classifyMovementShape(sorted)
-        if (!shape) continue
-        buckets[shape.shape][last.result === 'win' ? 'w' : 'l'] += 1
-      }
-    }
-    return Object.entries(buckets).map(([label, v]) => {
-      const total = v.w + v.l
-      return { label, wins: v.w, losses: v.l, total, wr: total ? Math.round((v.w/total)*100) : null }
-    })
-  })()
+  const lineReactionStatsML = computeCheckpointStats('ml', 'reaction')
+  const lineReactionStatsSpread = computeCheckpointStats('spread', 'reaction')
+  const lineReactionStatsTotal = computeCheckpointStats('total', 'reaction')
+  const clvStatsML = computeCheckpointStats('ml', 'clv')
+  const clvStatsSpread = computeCheckpointStats('spread', 'clv')
+  const clvStatsTotal = computeCheckpointStats('total', 'clv')
+  const shapeStatsML = computeCheckpointStats('ml', 'shape')
+  const shapeStatsSpread = computeCheckpointStats('spread', 'shape')
+  const shapeStatsTotal = computeCheckpointStats('total', 'shape')
 
   const alignmentStats = ['confirms','conflicts','neutral'].reduce((acc, key) => {
     const live = gradedPicks.filter(p => p.confirms === key)
@@ -1463,23 +1434,31 @@ export default function SharpMoney({ sport }) {
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:3 }}>Line Reaction to Sharp Money</div>
             <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
-              Did the book move the line when the money came in? Needs 2+ checkpoints with odds and a 10%+ gap, so this builds slower than the other stats.
+              Did the book move the line when the money came in? Needs 2+ checkpoints with odds and a 10%+ gap, so this builds slower than the other stats. Split by market — spread/total will start thin and build up over time.
             </div>
-            {[
-              { label:'line moved hard', display:'Line moved hard', sub:'book respecting it', color:'#4ade80' },
-              { label:'line drifted', display:'Line drifted', sub:'mild response', color:'#fbbf24' },
-              { label:'line frozen', display:'Line frozen', sub:'big money, book unmoved', color:'#f87171' },
-            ].map(s => {
-              const r = lineReactionStats.find(x => x.label === s.label)
+            {['ml','spread','total'].map(mk => {
+              const stats = mk==='ml'?lineReactionStatsML:mk==='spread'?lineReactionStatsSpread:lineReactionStatsTotal
               return (
-                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
-                  <div>
-                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.display}</div>
-                    <div style={{ fontSize:'.42rem', color:'#404060' }}>{s.sub}</div>
-                  </div>
-                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
-                    {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
-                  </div>
+                <div key={mk} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:'.52rem', fontWeight:700, color:'#8080a0', textTransform:'uppercase', marginBottom:4 }}>{mk==='ml'?'Moneyline':marketLabel(sport,mk)}</div>
+                  {[
+                    { label:'line moved hard', display:'Line moved hard', sub:'book respecting it', color:'#4ade80' },
+                    { label:'line drifted', display:'Line drifted', sub:'mild response', color:'#fbbf24' },
+                    { label:'line frozen', display:'Line frozen', sub:'big money, book unmoved', color:'#f87171' },
+                  ].map(s => {
+                    const r = stats.find(x => x.label === s.label)
+                    return (
+                      <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0d0d1a' }}>
+                        <div>
+                          <div style={{ fontSize:'.56rem', color:s.color }}>{s.display}</div>
+                          <div style={{ fontSize:'.4rem', color:'#404060' }}>{s.sub}</div>
+                        </div>
+                        <div style={{ fontSize:'.56rem', color:'#a0a0c0' }}>
+                          {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -1488,22 +1467,30 @@ export default function SharpMoney({ sport }) {
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:3 }}>Closing Line Value</div>
             <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
-              Did your entry price beat where the line actually closed? Skill-independent of whether the pick itself won — the closing line is the market's most information-complete price, so consistently beating it is real evidence of a good read.
+              Did your entry price beat where the line actually closed? Skill-independent of whether the pick itself won — the closing line is the market's most information-complete price, so consistently beating it is real evidence of a good read. Split by market.
             </div>
-            {[
-              { label:'beat', display:'Beat the close', sub:'entry price better than closing price', color:'#4ade80' },
-              { label:'worse', display:'Worse than close', sub:'line moved away from your entry', color:'#f87171' },
-            ].map(s => {
-              const r = clvStats.find(x => x.label === s.label)
+            {['ml','spread','total'].map(mk => {
+              const stats = mk==='ml'?clvStatsML:mk==='spread'?clvStatsSpread:clvStatsTotal
               return (
-                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
-                  <div>
-                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.display}</div>
-                    <div style={{ fontSize:'.42rem', color:'#404060' }}>{s.sub}</div>
-                  </div>
-                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
-                    {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
-                  </div>
+                <div key={mk} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:'.52rem', fontWeight:700, color:'#8080a0', textTransform:'uppercase', marginBottom:4 }}>{mk==='ml'?'Moneyline':marketLabel(sport,mk)}</div>
+                  {[
+                    { label:'beat', display:'Beat the close', sub:'entry price better than closing price', color:'#4ade80' },
+                    { label:'worse', display:'Worse than close', sub:'line moved away from your entry', color:'#f87171' },
+                  ].map(s => {
+                    const r = stats.find(x => x.label === s.label)
+                    return (
+                      <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0d0d1a' }}>
+                        <div>
+                          <div style={{ fontSize:'.56rem', color:s.color }}>{s.display}</div>
+                          <div style={{ fontSize:'.4rem', color:'#404060' }}>{s.sub}</div>
+                        </div>
+                        <div style={{ fontSize:'.56rem', color:'#a0a0c0' }}>
+                          {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -1512,25 +1499,33 @@ export default function SharpMoney({ sport }) {
           <div style={{ background:'#09090f', border:'1px solid #1a1a2e', borderRadius:10, padding:12 }}>
             <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#505070', marginBottom:3 }}>Movement Shape</div>
             <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
-              What the money actually did across the day, not just where it ended up. Real finding this is tracking: games where the sharp side flipped have outperformed games that held steady — worth watching whether that keeps holding as more data comes in.
+              What the money actually did across the day, not just where it ended up. Split by market — a shape's real meaning may differ between moneyline and totals, worth tracking separately rather than assuming they behave the same.
             </div>
-            {[
-              { label:'flipped', display:'Flipped sides', sub:'sharp lean changed team during the day', color:'#a78bfa' },
-              { label:'building', display:'Building all day', sub:'gap grew steadily, same side throughout', color:'#4ade80' },
-              { label:'steady', display:'Steady', sub:'held a consistent gap, same side', color:'#60a5fa' },
-              { label:'spiked', display:'Spiked & faded', sub:'peaked mid-day then cooled back down', color:'#fbbf24' },
-              { label:'fading', display:'Fading', sub:'gap shrank steadily, same side throughout', color:'#f87171' },
-            ].map(s => {
-              const r = shapeStats.find(x => x.label === s.label)
+            {['ml','spread','total'].map(mk => {
+              const stats = mk==='ml'?shapeStatsML:mk==='spread'?shapeStatsSpread:shapeStatsTotal
               return (
-                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #0d0d1a' }}>
-                  <div>
-                    <div style={{ fontSize:'.6rem', color:s.color }}>{s.display}</div>
-                    <div style={{ fontSize:'.42rem', color:'#404060' }}>{s.sub}</div>
-                  </div>
-                  <div style={{ fontSize:'.6rem', color:'#a0a0c0' }}>
-                    {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
-                  </div>
+                <div key={mk} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:'.52rem', fontWeight:700, color:'#8080a0', textTransform:'uppercase', marginBottom:4 }}>{mk==='ml'?'Moneyline':marketLabel(sport,mk)}</div>
+                  {[
+                    { label:'flipped', display:'Flipped sides', sub:'sharp lean changed team during the day', color:'#a78bfa' },
+                    { label:'building', display:'Building all day', sub:'gap grew steadily, same side throughout', color:'#4ade80' },
+                    { label:'steady', display:'Steady', sub:'held a consistent gap, same side', color:'#60a5fa' },
+                    { label:'spiked', display:'Spiked & faded', sub:'peaked mid-day then cooled back down', color:'#fbbf24' },
+                    { label:'fading', display:'Fading', sub:'gap shrank steadily, same side throughout', color:'#f87171' },
+                  ].map(s => {
+                    const r = stats.find(x => x.label === s.label)
+                    return (
+                      <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #0d0d1a' }}>
+                        <div>
+                          <div style={{ fontSize:'.56rem', color:s.color }}>{s.display}</div>
+                          <div style={{ fontSize:'.4rem', color:'#404060' }}>{s.sub}</div>
+                        </div>
+                        <div style={{ fontSize:'.56rem', color:'#a0a0c0' }}>
+                          {!r || r.total === 0 ? '— no data yet' : `${r.wins}-${r.losses} · ${r.wr}% WR`}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
