@@ -721,6 +721,26 @@ export default function SharpMoney({ sport }) {
   const hotComboStats = { wins: hotComboW, losses: hotComboPicks.length - hotComboW, total: hotComboPicks.length,
     wr: hotComboPicks.length ? Math.round(hotComboW/hotComboPicks.length*100) : 0 }
 
+  // Real, EARLY hypothesis (Sep 4 investigation) -- not yet validated the way
+  // the 30%+/confirms combo above is. Found while checking whether new-
+  // formula gap MAGNITUDE tiers were flat because new formula adds noise
+  // (user's suspicion) or because magnitude is the wrong thing to measure.
+  // A negative gap means the picked side has LESS money than bets -- the
+  // same "stale pick" signature the reflip fix already treats as
+  // meaningful. Real result on n=6: 5-1 (83% WR) -- genuinely striking but
+  // far too small to trust yet (a single flip swings this ~15+ points).
+  // Tracked here specifically so it accumulates automatically rather than
+  // needing a manual re-check each time -- do not treat this as confirmed
+  // until the sample is meaningfully larger.
+  function isNegativeGapPick(p) {
+    return (p.market || 'ml') === 'ml' && p.gap < 0
+  }
+  const negGapPicks = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
+    .filter(isMlPick).filter(isNegativeGapPick).filter(p => p.result === 'win' || p.result === 'loss')
+  const negGapW = negGapPicks.filter(p => p.result === 'win').length
+  const negGapStats = { wins: negGapW, losses: negGapPicks.length - negGapW, total: negGapPicks.length,
+    wr: negGapPicks.length ? Math.round(negGapW/negGapPicks.length*100) : 0 }
+
   // OLD FORMULA tracking -- fully separate from everything above. Pulls from
   // ALL days regardless of FORMULA_FIX_DATE (unlike the new-formula stats),
   // because old_gap only needs raw money%, which doesn't change meaning
@@ -1062,14 +1082,23 @@ export default function SharpMoney({ sport }) {
             const shape = classifyMovementShape(sorted)
             const pickMarket = closing.market || 'ml'
             const isHotCombo = isHotComboPick(closing)
+            const isNegGap = isNegativeGapPick(closing)
             return (
               <div key={game} style={{ background:'#09090f', border:`1px solid ${isHotCombo ? '#facc15' : tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo) ? 6 : 0 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap) ? 6 : 0 }}>
                   {isHotCombo && (
                     <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#facc1522', border:'1px solid #facc15', borderRadius:5, padding:'2px 7px' }}>
                       <span style={{ fontSize:'.56rem', fontWeight:800, color:'#facc15', textTransform:'uppercase' }}>⭐ Tracked Combo</span>
                       <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
                         · 30%+ gap + confirms model · {hotComboStats.total ? `${hotComboStats.wins}-${hotComboStats.losses} (${hotComboStats.wr}%) all-time` : 'building history'}
+                      </span>
+                    </div>
+                  )}
+                  {isNegGap && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#f9731622', border:'1px solid #f97316', borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:'#f97316', textTransform:'uppercase' }}>⚠ Negative Gap</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
+                        · early hypothesis, not yet validated · {negGapStats.total ? `${negGapStats.wins}-${negGapStats.losses} (${negGapStats.wr}%) all-time` : 'building history'}
                       </span>
                     </div>
                   )}
@@ -1566,6 +1595,21 @@ export default function SharpMoney({ sport }) {
             ) : (
               <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
                 {hotComboStats.wins}-{hotComboStats.losses} · <span style={{ color: hotComboStats.wr>=55?'#4ade80':hotComboStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{hotComboStats.wr}% WR</span> ({hotComboStats.total} picks)
+              </div>
+            )}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #f9731655', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#f97316', marginBottom:3 }}>⚠ Negative Gap (Early Hypothesis)</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              NOT yet validated — found Sep 4 while checking whether new-formula gap magnitude tiers were flat because the formula adds noise, or because magnitude is the wrong thing to measure. A negative gap means the picked side has LESS money than bets, the same "stale pick" signature the reflip fix treats as meaningful. Real result at the time: 5-1 (83% WR) on just n=6 — striking but far too small to trust. Tracked here to accumulate automatically; treat as noise until the sample is meaningfully larger.
+            </div>
+            {negGapStats.total === 0 ? (
+              <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks yet</div>
+            ) : (
+              <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
+                {negGapStats.wins}-{negGapStats.losses} · <span style={{ color: negGapStats.wr>=55?'#4ade80':negGapStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{negGapStats.wr}% WR</span> ({negGapStats.total} picks)
+                {negGapStats.total < 20 && <span style={{ color:'#606080' }}> — still too thin to trust</span>}
               </div>
             )}
           </div>
