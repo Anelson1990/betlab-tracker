@@ -741,6 +741,72 @@ export default function SharpMoney({ sport }) {
   const negGapStats = { wins: negGapW, losses: negGapPicks.length - negGapW, total: negGapPicks.length,
     wr: negGapPicks.length ? Math.round(negGapW/negGapPicks.length*100) : 0 }
 
+  // Real findings from the Sep 4 108-combination cross-analysis (gap tier,
+  // old formula, gap sign, confirms, line reaction, and movement shape,
+  // pairwise). Only two combinations cleared BOTH bars -- a real sample
+  // size AND meaningfully away from 50% -- everything else was either
+  // weak or in the n=3-15 range where noise reliably looks like signal
+  // (the same range that produced two patterns earlier this project that
+  // later washed out with more data).
+  function oldTierGoodBad(oldGap) {
+    if (oldGap == null) return null
+    if (oldGap < 20) return 'good'
+    if (oldGap < 40) return 'bad'
+    return 'good'
+  }
+
+  // AVOID: old formula shows real conviction (good tier) but the sharp
+  // side FLIPPED during the day. Real, n=23, 35% WR -- a conviction-
+  // looking old-formula number on a game that already reversed once is a
+  // real warning sign, not a green light. Needs the game's full
+  // checkpoint series (not just the closing pick) to know if it flipped.
+  function isAvoidTierPick(closing, shape) {
+    if ((closing.market || 'ml') !== 'ml') return false
+    const oldGap = closing.rawMoney != null ? Math.abs(closing.rawMoney - 50) : null
+    if (oldGap == null) return false
+    return oldTierGoodBad(oldGap) === 'good' && shape?.shape === 'flipped'
+  }
+
+  // WATCH: any positive new-formula gap that the model also confirms.
+  // Real, n=86, 62% WR -- a broader, larger-sample relative of the
+  // stronger 30%+/confirms combo above (still tracked separately since
+  // it's a genuinely different, wider cut of the data).
+  function isWatchTierPick(closing) {
+    return (closing.market || 'ml') === 'ml' && closing.gap > 0 && closing.confirms === 'confirms'
+  }
+
+  const watchTierPicks = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
+    .filter(isMlPick).filter(isWatchTierPick).filter(p => p.result === 'win' || p.result === 'loss')
+  const watchTierW = watchTierPicks.filter(p => p.result === 'win').length
+  const watchTierStats = { wins: watchTierW, losses: watchTierPicks.length - watchTierW, total: watchTierPicks.length,
+    wr: watchTierPicks.length ? Math.round(watchTierW/watchTierPicks.length*100) : 0 }
+
+  // AVOID tier's stats need the full per-game series (for shape), so this
+  // walks full days the same way computeCheckpointStats does rather than
+  // using the flat closing-picks list.
+  const avoidTierStats = (() => {
+    let w = 0, l = 0
+    const allDays = [...statsEligibleDays(data.days), ...statsEligibleDays(history.days)]
+    for (const day of allDays) {
+      const byGame = {}
+      day.picks.forEach(p => {
+        if ((p.market || 'ml') !== 'ml') return
+        ;(byGame[marketKey(p)] ||= []).push(p)
+      })
+      for (const picks of Object.values(byGame)) {
+        if (picks.length < 2) continue
+        const sorted = [...picks].sort((a,b)=>checkpointOrder(a.checkTime)-checkpointOrder(b.checkTime))
+        const closingPick = sorted[sorted.length-1]
+        if (closingPick.result !== 'win' && closingPick.result !== 'loss') continue
+        const shape = classifyMovementShape(sorted)
+        if (isAvoidTierPick(closingPick, shape)) {
+          if (closingPick.result === 'win') w++; else l++
+        }
+      }
+    }
+    return { wins: w, losses: l, total: w + l, wr: (w + l) ? Math.round(w / (w + l) * 100) : 0 }
+  })()
+
   // OLD FORMULA tracking -- fully separate from everything above. Pulls from
   // ALL days regardless of FORMULA_FIX_DATE (unlike the new-formula stats),
   // because old_gap only needs raw money%, which doesn't change meaning
@@ -1083,14 +1149,32 @@ export default function SharpMoney({ sport }) {
             const pickMarket = closing.market || 'ml'
             const isHotCombo = isHotComboPick(closing)
             const isNegGap = isNegativeGapPick(closing)
+            const isAvoid = isAvoidTierPick(closing, shape)
+            const isWatch = isWatchTierPick(closing) && !isHotCombo // don't double-flag when the stronger combo already fired
             return (
-              <div key={game} style={{ background:'#09090f', border:`1px solid ${isHotCombo ? '#facc15' : tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap) ? 6 : 0 }}>
+              <div key={game} style={{ background:'#09090f', border:`1px solid ${isAvoid ? '#ef4444' : isHotCombo ? '#facc15' : tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap || isAvoid || isWatch) ? 6 : 0 }}>
+                  {isAvoid && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#ef444422', border:'1px solid #ef4444', borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:'#ef4444', textTransform:'uppercase' }}>🚫 Avoid Tier</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
+                        · old formula good + flipped sides · {avoidTierStats.total ? `${avoidTierStats.wins}-${avoidTierStats.losses} (${avoidTierStats.wr}%) all-time` : 'building history'}
+                      </span>
+                    </div>
+                  )}
                   {isHotCombo && (
                     <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#facc1522', border:'1px solid #facc15', borderRadius:5, padding:'2px 7px' }}>
                       <span style={{ fontSize:'.56rem', fontWeight:800, color:'#facc15', textTransform:'uppercase' }}>⭐ Tracked Combo</span>
                       <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
                         · 30%+ gap + confirms model · {hotComboStats.total ? `${hotComboStats.wins}-${hotComboStats.losses} (${hotComboStats.wr}%) all-time` : 'building history'}
+                      </span>
+                    </div>
+                  )}
+                  {isWatch && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#60a5fa22', border:'1px solid #60a5fa', borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:'#60a5fa', textTransform:'uppercase' }}>👀 Watch Tier</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
+                        · positive gap + confirms model · {watchTierStats.total ? `${watchTierStats.wins}-${watchTierStats.losses} (${watchTierStats.wr}%) all-time` : 'building history'}
                       </span>
                     </div>
                   )}
@@ -1595,6 +1679,34 @@ export default function SharpMoney({ sport }) {
             ) : (
               <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
                 {hotComboStats.wins}-{hotComboStats.losses} · <span style={{ color: hotComboStats.wr>=55?'#4ade80':hotComboStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{hotComboStats.wr}% WR</span> ({hotComboStats.total} picks)
+              </div>
+            )}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #ef444455', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#ef4444', marginBottom:3 }}>🚫 Avoid Tier — Old Formula Good + Flipped Sides</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Real result from the Sep 4 108-combination cross-analysis — one of only two combinations that cleared both a real sample size and a meaningful gap from 50%. A conviction-looking old-formula number on a game whose sharp side already reversed once is a real warning sign, not a green light.
+            </div>
+            {avoidTierStats.total === 0 ? (
+              <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks in this combo yet</div>
+            ) : (
+              <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
+                {avoidTierStats.wins}-{avoidTierStats.losses} · <span style={{ color: avoidTierStats.wr>=55?'#4ade80':avoidTierStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{avoidTierStats.wr}% WR</span> ({avoidTierStats.total} picks)
+              </div>
+            )}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #60a5fa55', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#60a5fa', marginBottom:3 }}>👀 Watch Tier — Positive Gap + Confirms Model</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Real result from the same Sep 4 cross-analysis — a broader, larger-sample relative of the stronger 30%+/confirms combo above. Any positive gap the model also confirms, not just the biggest ones.
+            </div>
+            {watchTierStats.total === 0 ? (
+              <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks in this combo yet</div>
+            ) : (
+              <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
+                {watchTierStats.wins}-{watchTierStats.losses} · <span style={{ color: watchTierStats.wr>=55?'#4ade80':watchTierStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{watchTierStats.wr}% WR</span> ({watchTierStats.total} picks)
               </div>
             )}
           </div>
