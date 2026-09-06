@@ -13,6 +13,8 @@
 //    (e.g. https://betlab-tracker.vercel.app -- no trailing slash)
 // 5. Paste the resulting Client ID below.
 
+import { parseCardDate } from './sportApi.js'
+
 const CLIENT_ID = '970334634113-55oun78htt9dl4lud35k5lb3cgb4q7gi.apps.googleusercontent.com'
 const SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const ROOT_FOLDER_NAME = 'BetLab Sharp Data'
@@ -104,6 +106,49 @@ export async function exportToDrive(sport, exportObj) {
   const filename = `${sport}-export.json`
   const content = JSON.stringify({ ...exportObj, exportedAt: new Date().toISOString() }, null, 2)
   await uploadFile(filename, content, sportFolderId)
+}
+
+// Real fix for a real problem: one ever-growing combined file eventually
+// exceeds what a single read can pull back in full -- confirmed directly
+// (Sep 6) when a fresh, correctly-updated export still only ever showed
+// data through Sep 1, because the read itself silently truncates once the
+// file gets large enough, regardless of how much real data exists beyond
+// that point. Splitting into one file per month keeps every individual
+// file small and reliably readable indefinitely, since only the CURRENT
+// month's file keeps growing -- every prior month is a fixed, finished
+// size once that month ends.
+//
+// Reuses parseCardDate (same trusted year-inference logic already used
+// for scheduling/grading) rather than re-deriving month/year from the
+// "MMM DD" label a second, possibly inconsistent way.
+export async function exportToDriveByMonth(sport, exportObj) {
+  if (!isConfigured()) throw new Error('Not set up yet — add your Client ID in driveSync.js')
+  if (!accessToken) {
+    await loadGis()
+    await requestToken()
+  }
+
+  const rootId = await getOrCreateFolder(ROOT_FOLDER_NAME, null)
+  const sportFolderId = await getOrCreateFolder(sport.toUpperCase(), rootId)
+  const monthlyFolderId = await getOrCreateFolder('monthly', sportFolderId)
+
+  const allDays = [...(exportObj.active || []), ...(exportObj.history || [])]
+  const byMonth = {}
+  for (const day of allDays) {
+    const iso = parseCardDate(day.date) // "YYYY-MM-DD"
+    const monthKey = iso.slice(0, 7)    // "YYYY-MM"
+    ;(byMonth[monthKey] ||= []).push(day)
+  }
+
+  const results = []
+  for (const [monthKey, days] of Object.entries(byMonth)) {
+    days.sort((a, b) => parseCardDate(a.date).localeCompare(parseCardDate(b.date)))
+    const filename = `${sport}-${monthKey}.json`
+    const content = JSON.stringify({ sport, month: monthKey, days, exportedAt: new Date().toISOString() }, null, 2)
+    await uploadFile(filename, content, monthlyFolderId)
+    results.push({ month: monthKey, days: days.length })
+  }
+  return results
 }
 
 async function uploadFile(filename, content, parentId) {

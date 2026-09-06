@@ -327,6 +327,24 @@ export default function SharpMoney({ sport }) {
     }
     setDriveExporting(false)
   }
+  // Real fix for the single-file size ceiling confirmed Sep 6 (a fresh,
+  // correctly-updated export still only ever read back through Sep 1,
+  // since the read itself silently truncates once the file gets large
+  // enough). Splits into one file per month instead -- each stays small
+  // and reliably readable indefinitely, since only the current month's
+  // file keeps growing.
+  const exportToDriveMonthly = async () => {
+    setDriveExporting(true)
+    setDriveStatus('Exporting by month...')
+    try {
+      const results = await driveSync.exportToDriveByMonth(sport, { sport, active: data.days, history: history.days })
+      const summary = results.map(r => `${r.month} (${r.days}d)`).join(', ')
+      setDriveStatus(`Sent to Drive: BetLab Sharp Data / ${sport.toUpperCase()} / monthly / — ${summary}`)
+    } catch (e) {
+      setDriveStatus(driveSync.isConfigured() ? `Export failed: ${e.message || e}` : 'Not set up yet — add your Client ID in driveSync.js first.')
+    }
+    setDriveExporting(false)
+  }
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState('')
   const [editDate, setEditDate] = useState('')
@@ -996,9 +1014,17 @@ export default function SharpMoney({ sport }) {
               <div style={{ fontSize:'.5rem', color:'#a78bfa', marginBottom:6, lineHeight:1.4 }}>
                 Sends everything for {meta.label} — active + archived — to your Drive, in its own {meta.label} folder inside "BetLab Sharp Data". Claude can read it directly from there in any conversation, no copy/paste needed. Tap anytime you want your Drive copy refreshed.
               </div>
-              <button onClick={exportToDrive} disabled={driveExporting} style={{ padding:'6px 12px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color:'#60a5fa' }}>
-                {driveExporting ? 'Sending...' : 'Export to Drive'}
-              </button>
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={exportToDrive} disabled={driveExporting} style={{ flex:1, padding:'6px 12px', background:'rgba(37,99,235,.15)', border:'1px solid #2563eb', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color:'#60a5fa' }}>
+                  {driveExporting ? 'Sending...' : 'Export (Full)'}
+                </button>
+                <button onClick={exportToDriveMonthly} disabled={driveExporting} style={{ flex:1, padding:'6px 12px', background:'rgba(74,222,128,.15)', border:'1px solid #4ade80', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.65rem', fontWeight:700, textTransform:'uppercase', color:'#4ade80' }}>
+                  {driveExporting ? 'Sending...' : 'Export by Month'}
+                </button>
+              </div>
+              <div style={{ fontSize:'.44rem', color:'#606080', marginTop:5, lineHeight:1.4 }}>
+                Full export eventually gets too large for Claude to read in one piece — confirmed real limit. Export by Month splits into one small file per month instead (e.g. mlb-2026-09.json), which stays reliably readable no matter how much history accumulates. Prefer this one going forward.
+              </div>
               {driveStatus && <div style={{ fontSize:'.46rem', color:'#8080a0', marginTop:5 }}>{driveStatus}</div>}
             </div>
           </div>
