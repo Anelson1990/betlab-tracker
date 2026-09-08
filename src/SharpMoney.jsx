@@ -785,19 +785,8 @@ export default function SharpMoney({ sport }) {
     return oldTierGoodBad(oldGap) === 'good' && shape?.shape === 'flipped'
   }
 
-  // WATCH: any positive new-formula gap that the model also confirms.
-  // Real, n=86, 62% WR -- a broader, larger-sample relative of the
-  // stronger 30%+/confirms combo above (still tracked separately since
-  // it's a genuinely different, wider cut of the data).
-  function isWatchTierPick(closing) {
-    return (closing.market || 'ml') === 'ml' && closing.gap > 0 && closing.confirms === 'confirms'
-  }
-
-  const watchTierPicks = [...closingPicksAcrossDays(statsEligibleDays(data.days)), ...closingPicksAcrossDays(statsEligibleDays(history.days))]
-    .filter(isMlPick).filter(isWatchTierPick).filter(p => p.result === 'win' || p.result === 'loss')
-  const watchTierW = watchTierPicks.filter(p => p.result === 'win').length
-  const watchTierStats = { wins: watchTierW, losses: watchTierPicks.length - watchTierW, total: watchTierPicks.length,
-    wr: watchTierPicks.length ? Math.round(watchTierW/watchTierPicks.length*100) : 0 }
+  // OLD FORMULA + CONFIRMS moved below allClosingPicksEver's real
+  // definition -- see there for the function and stats computation.
 
   // AVOID tier's stats need the full per-game series (for shape), so this
   // walks full days the same way computeCheckpointStats does rather than
@@ -832,6 +821,34 @@ export default function SharpMoney({ sport }) {
   // Only picks with a real rawMoney field can compute this; picks logged
   // before this field existed simply don't contribute (not zero, just absent).
   const allClosingPicksEver = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)].filter(isMlPick)
+
+  // OLD FORMULA + CONFIRMS: the real signal, replacing the earlier
+  // new-formula version of this tier. Backed out directly from the Sep 7
+  // stats screen: all-time confirms was 55-33 (63%, n=88), new-formula-
+  // only confirms was 9-10 (47%, n=19) -- meaning old-formula-era
+  // confirms alone works out to 46-23, 66.7%, n=69, genuinely STRONGER
+  // than the blended headline number, not just carrying it. New-formula
+  // gap sign showed no real edge here (the version this tier used to
+  // track, 47% WR, n=19) -- replaced rather than kept alongside it, per
+  // instruction not to mix new formula into this specific combination.
+  //
+  // Uses oldGapFor(rawMoney), NOT statsEligibleDays-restricted -- old-
+  // formula gap is valid math on ANY date with rawMoney recorded,
+  // matching exactly how the Old Formula stats section itself scopes
+  // its own data (allClosingPicksEver, full history) -- confirmed by
+  // reading that section's own code before assuming the scoping here.
+  function isWatchTierPick(closing) {
+    if ((closing.market || 'ml') !== 'ml') return false
+    if (closing.rawMoney == null) return false
+    const oldGap = oldGapFor(closing.rawMoney)
+    return oldTierGoodBad(oldGap) === 'good' && closing.confirms === 'confirms'
+  }
+
+  const watchTierPicks = allClosingPicksEver.filter(isWatchTierPick).filter(p => p.result === 'win' || p.result === 'loss')
+  const watchTierW = watchTierPicks.filter(p => p.result === 'win').length
+  const watchTierStats = { wins: watchTierW, losses: watchTierPicks.length - watchTierW, total: watchTierPicks.length,
+    wr: watchTierPicks.length ? Math.round(watchTierW/watchTierPicks.length*100) : 0 }
+
   const oldFormulaPicks = allClosingPicksEver
     .filter(p => (p.result === 'win' || p.result === 'loss') && p.rawMoney != null)
     .map(p => ({ ...p, oldGap: oldGapFor(p.rawMoney) }))
@@ -1200,7 +1217,7 @@ export default function SharpMoney({ sport }) {
                     <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#60a5fa22', border:'1px solid #60a5fa', borderRadius:5, padding:'2px 7px' }}>
                       <span style={{ fontSize:'.56rem', fontWeight:800, color:'#60a5fa', textTransform:'uppercase' }}>👀 Watch Tier</span>
                       <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
-                        · positive gap + confirms model · {watchTierStats.total ? `${watchTierStats.wins}-${watchTierStats.losses} (${watchTierStats.wr}%) all-time` : 'building history'}
+                        · old formula good + confirms model · {watchTierStats.total ? `${watchTierStats.wins}-${watchTierStats.losses} (${watchTierStats.wr}%) all-time` : 'building history'}
                       </span>
                     </div>
                   )}
@@ -1724,9 +1741,9 @@ export default function SharpMoney({ sport }) {
           </div>
 
           <div style={{ background:'#09090f', border:'1px solid #60a5fa55', borderRadius:10, padding:12 }}>
-            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#60a5fa', marginBottom:3 }}>👀 Watch Tier — Positive Gap + Confirms Model</div>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#60a5fa', marginBottom:3 }}>👀 Watch Tier — Old Formula Good + Confirms Model</div>
             <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
-              Real result from the same Sep 4 cross-analysis — a broader, larger-sample relative of the stronger 30%+/confirms combo above. Any positive gap the model also confirms, not just the biggest ones.
+              Replaced Sep 7 — the new-formula version of this tier (positive gap + confirms) came back flat at 47% WR on n=19, in line with every other new-formula test. Backed out from the same day's stats: old-formula-era confirms alone works out to 46-23, 66.7%, n=69 — genuinely stronger than the blended all-time number, not just riding it. This tier now tracks that combination going forward instead.
             </div>
             {watchTierStats.total === 0 ? (
               <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks in this combo yet</div>
