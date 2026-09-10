@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin } from './sportApi.js'
+import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin, resolveTeamAbbr } from './sportApi.js'
 
 const IS = { flex:1, padding:'6px 8px', background:'#0c0c1a', border:'1px solid #1a1a2e', borderRadius:6, color:'#e0e0f0', fontSize:'.68rem', boxSizing:'border-box' }
 const GLOBAL_POTD_KEY = 'betlab-potd-v1'
@@ -95,7 +95,7 @@ export default function Potd() {
     const isoDate = parseCardDate(entry.date)
     const games = await fetchGames(sportKey, isoDate)
     if (!games.length) { setGradeLog([`No ${sportMeta.label} games found for ${entry.date} yet.`]); setGrading(null); return }
-    const teamAbbr = entry.pick.split(' ')[0]
+    const teamAbbr = resolveTeamAbbr(sportKey, entry.pick)
     const m = matchGame(sportKey, games, teamAbbr)
     if (!m) { setGradeLog([`${entry.game}: game not found.`]); setGrading(null); return }
     if (!m.final) { setGradeLog([`${entry.game}: not final yet.`]); setGrading(null); return }

@@ -82,6 +82,67 @@ const ABBR_ALIASES = {
   nhl: {},
 }
 
+// Real, confirmed bug (Sep 9): picks built from full-team-name sources
+// (script pulls, splits sites) get the FULL NAME copied into sharpPick --
+// "Pirates +1.5", not "PIT +1.5" -- and the extraction logic upstream
+// takes the first word of that field as the team to search for. matchGame
+// requires an EXACT abbreviation match by design (a substring fallback
+// caused a real, confirmed silent misgrade before -- see ABBR_ALIASES
+// comment above), so "Pirates" correctly returns null forever, with no
+// error, leaving the pick stuck pending indefinitely. This has now
+// happened twice (once caught for a single POTD pick, then recurred
+// across many Sharp tracker picks in the same session) -- a "be more
+// careful" fix doesn't hold up against a mistake this easy to make
+// again, so this resolves it structurally instead: full team names are
+// recognized here, in the same place abbreviation aliases already are,
+// so every caller (Sharp tracker, POTD) benefits automatically.
+const FULL_NAME_TO_ABBR = {
+  mlb: {
+    'DIAMONDBACKS': 'AZ', 'BRAVES': 'ATL', 'ORIOLES': 'BAL', 'RED SOX': 'BOS',
+    'CUBS': 'CHC', 'WHITE SOX': 'CWS', 'REDS': 'CIN', 'GUARDIANS': 'CLE',
+    'ROCKIES': 'COL', 'TIGERS': 'DET', 'ASTROS': 'HOU', 'ROYALS': 'KC',
+    'ANGELS': 'LAA', 'DODGERS': 'LAD', 'MARLINS': 'MIA', 'BREWERS': 'MIL',
+    'TWINS': 'MIN', 'METS': 'NYM', 'YANKEES': 'NYY', 'ATHLETICS': 'ATH',
+    'PHILLIES': 'PHI', 'PIRATES': 'PIT', 'PADRES': 'SD', 'GIANTS': 'SF',
+    'MARINERS': 'SEA', 'CARDINALS': 'STL', 'RAYS': 'TB', 'RANGERS': 'TEX',
+    'BLUE JAYS': 'TOR', 'NATIONALS': 'WSH',
+  },
+  nfl: {
+    'CARDINALS': 'ARI', 'FALCONS': 'ATL', 'RAVENS': 'BAL', 'BILLS': 'BUF',
+    'PANTHERS': 'CAR', 'BEARS': 'CHI', 'BENGALS': 'CIN', 'BROWNS': 'CLE',
+    'COWBOYS': 'DAL', 'BRONCOS': 'DEN', 'LIONS': 'DET', 'PACKERS': 'GB',
+    'TEXANS': 'HOU', 'COLTS': 'IND', 'JAGUARS': 'JAX', 'CHIEFS': 'KC',
+    'RAIDERS': 'LV', 'CHARGERS': 'LAC', 'RAMS': 'LAR', 'DOLPHINS': 'MIA',
+    'VIKINGS': 'MIN', 'PATRIOTS': 'NE', 'SAINTS': 'NO', 'GIANTS': 'NYG',
+    'JETS': 'NYJ', 'EAGLES': 'PHI', 'STEELERS': 'PIT', '49ERS': 'SF',
+    'SEAHAWKS': 'SEA', 'BUCCANEERS': 'TB', 'TITANS': 'TEN', 'COMMANDERS': 'WSH',
+  },
+  nba: {}, nhl: {},
+}
+
+// Real, correct fix for the full-name problem above: callers used to grab
+// just nameField.split(' ')[0] before matchGame ever saw the text, which
+// is lossy for every multi-word team name (Red Sox, White Sox, Blue Jays)
+// -- "White Sox -1.5" truncated to just "White" long before reaching any
+// lookup, so even a full-name map keyed on "WHITE SOX" could never match.
+// This takes the RAW, untruncated pick text instead and tries the longest
+// real match first: a 3-word, then 2-word, then 1-word prefix against
+// FULL_NAME_TO_ABBR, only falling back to "treat the first word as a
+// literal abbreviation" once no real full-name match is found. Exported
+// so both the Sharp tracker and POTD call this instead of duplicating
+// (and re-breaking) their own extraction logic.
+export function resolveTeamAbbr(sport, rawText) {
+  if (!rawText) return ''
+  const words = rawText.trim().split(/\s+/)
+  const map = FULL_NAME_TO_ABBR[sport] || {}
+  for (const len of [3, 2, 1]) {
+    if (words.length < len) continue
+    const candidate = words.slice(0, len).join(' ').toUpperCase()
+    if (map[candidate]) return map[candidate]
+  }
+  return (words[0] || '').toUpperCase()
+}
+
 // Returns { found, final, homeAbbr, awayAbbr, homeScore, awayScore, pickedHome, pickedAbbr }
 // or null if the team couldn't be matched to a game.
 export function matchGame(sport, games, teamAbbr) {

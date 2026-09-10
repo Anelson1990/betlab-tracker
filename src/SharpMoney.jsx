@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SEED_SHARP } from './sharp.js'
-import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin, decideTotal } from './sportApi.js'
+import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin, decideTotal, resolveTeamAbbr } from './sportApi.js'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import * as driveSync from './driveSync.js'
 
@@ -449,7 +449,7 @@ export default function SharpMoney({ sport }) {
       // Real fix: for totals, pull either team from the GAME field instead,
       // since matchGame only needs a valid team belonging to the right game,
       // not the specific side that was picked.
-      const teamAbbr = isTotal ? (pick.game || '').split('@')[0].trim().split(' ')[0] : nameField.split(' ')[0]
+      const teamAbbr = isTotal ? resolveTeamAbbr(sport, (pick.game || '').split('@')[0].trim()) : resolveTeamAbbr(sport, nameField)
       // 'none' is a legitimate entry (game had no real sharp lean) but it can
       // never be graded — mark it explicitly rather than leaving it pending
       // forever and blocking the day from archiving.
