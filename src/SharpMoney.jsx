@@ -766,6 +766,28 @@ export default function SharpMoney({ sport }) {
   // before this field existed simply don't contribute (not zero, just absent).
   const allClosingPicksEver = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)].filter(isMlPick)
 
+  // RLM (Reverse Line Movement) tracker -- new field, Sep 10. Real, distinct
+  // signal from anything else tracked: the source itself flags when the
+  // book's line has moved AGAINST where the majority of tickets/bets are,
+  // meaning a smaller number of bets are carrying disproportionate real
+  // money and the book is reacting to that weight specifically, not just
+  // "money% happens to be high." Different from Line Reaction (which infers
+  // movement from checkpoints I've logged myself, same-side odds over
+  // time) -- this is the source's own real-time read at a single moment.
+  // NOT restricted to moneyline: real data shows RLM gets flagged mostly
+  // on spread picks (Rays, Rangers, 49ers, Pirates all real spread
+  // examples logged Sep 8-10), so this uses the full closing-picks
+  // population across every market instead of the ML-only pattern used
+  // elsewhere.
+  const allClosingPicksEverAllMarkets = [...closingPicksAcrossDays(data.days), ...closingPicksAcrossDays(history.days)]
+  function isRlmPick(p) {
+    return p.rlm === true
+  }
+  const rlmPicks = allClosingPicksEverAllMarkets.filter(isRlmPick).filter(p => p.result === 'win' || p.result === 'loss')
+  const rlmW = rlmPicks.filter(p => p.result === 'win').length
+  const rlmStats = { wins: rlmW, losses: rlmPicks.length - rlmW, total: rlmPicks.length,
+    wr: rlmPicks.length ? Math.round(rlmW/rlmPicks.length*100) : 0 }
+
   // OLD FORMULA + CONFIRMS: the real signal, replacing the earlier
   // new-formula version of this tier. Backed out directly from the Sep 7
   // stats screen: all-time confirms was 55-33 (63%, n=88), new-formula-
@@ -1138,9 +1160,18 @@ export default function SharpMoney({ sport }) {
             const isNegGap = isNegativeGapPick(closing)
             const isAvoid = isAvoidTierPick(closing, shape)
             const isWatch = isWatchTierPick(closing) && !isHotCombo // don't double-flag when the stronger combo already fired
+            const isRlm = isRlmPick(closing)
             return (
               <div key={game} style={{ background:'#09090f', border:`1px solid ${isAvoid ? '#ef4444' : isHotCombo ? '#facc15' : tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap || isAvoid || isWatch) ? 6 : 0 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap || isAvoid || isWatch || isRlm) ? 6 : 0 }}>
+                  {isRlm && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#34d39922', border:'1px solid #34d399', borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:'#34d399', textTransform:'uppercase' }}>↩ RLM</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
+                        · book moved against the ticket majority · {rlmStats.total ? `${rlmStats.wins}-${rlmStats.losses} (${rlmStats.wr}%) all-time` : 'building history'}
+                      </span>
+                    </div>
+                  )}
                   {isAvoid && (
                     <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#ef444422', border:'1px solid #ef4444', borderRadius:5, padding:'2px 7px' }}>
                       <span style={{ fontSize:'.56rem', fontWeight:800, color:'#ef4444', textTransform:'uppercase' }}>🚫 Avoid Tier</span>
@@ -1694,6 +1725,20 @@ export default function SharpMoney({ sport }) {
             ) : (
               <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
                 {watchTierStats.wins}-{watchTierStats.losses} · <span style={{ color: watchTierStats.wr>=55?'#4ade80':watchTierStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{watchTierStats.wr}% WR</span> ({watchTierStats.total} picks)
+              </div>
+            )}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #34d39955', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#34d399', marginBottom:3 }}>↩ RLM — Reverse Line Movement</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              New field, Sep 10 — the source's own real-time flag that the book's line moved AGAINST where the majority of tickets/bets are, meaning a smaller number of bets are carrying disproportionate real money. Distinct from Line Reaction (which infers movement from my own logged checkpoints over time) — this is the source's read at a single moment. Applies across all markets, not just moneyline, since real RLM tags have shown up mostly on spread picks.
+            </div>
+            {rlmStats.total === 0 ? (
+              <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks yet</div>
+            ) : (
+              <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
+                {rlmStats.wins}-{rlmStats.losses} · <span style={{ color: rlmStats.wr>=55?'#4ade80':rlmStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{rlmStats.wr}% WR</span> ({rlmStats.total} picks)
               </div>
             )}
           </div>
