@@ -104,9 +104,16 @@ export function matchGame(sport, games, teamAbbr) {
     if (!game) return null
     const ha = game.teams?.home?.team?.abbreviation?.toUpperCase()
     const aa = game.teams?.away?.team?.abbreviation?.toUpperCase()
+    // Confirmed real bug (Sep 9): MLB's API uses MULTIPLE distinct strings
+    // for a genuinely finished game -- "Final" AND "Game Over" both appeared
+    // in the same day's real schedule (Pirates@White Sox and Cubs@Brewers
+    // both fully complete, both showing "Game Over" specifically). Checking
+    // only "Final" left every "Game Over" game stuck pending forever with
+    // no error, even though the real result was already available.
+    const detailedState = game.status?.detailedState
     return {
       found: true,
-      final: game.status?.detailedState === 'Final',
+      final: detailedState === 'Final' || detailedState === 'Game Over',
       homeAbbr: ha, awayAbbr: aa,
       homeScore: game.teams?.home?.score, awayScore: game.teams?.away?.score,
       pickedHome: a === ha, pickedAbbr: a === ha ? ha : aa,
