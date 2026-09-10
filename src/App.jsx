@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CHECKLIST } from './data.js'
-import { SPORTS } from './sportApi.js'
+import { SPORTS, mergePicksIntoStorage } from './sportApi.js'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import SharpMoney from './SharpMoney.jsx'
 import Potd from './Potd.jsx'
@@ -40,6 +40,50 @@ const TT = ({ active, payload, label }) => {
 export default function App() {
   const [tab, setTab] = useState('sharp')
   const [activeSport, setActiveSport] = useState('mlb')
+  const [sharpRefreshNonce, setSharpRefreshNonce] = useState(0)
+  const [showMultiSportPaste, setShowMultiSportPaste] = useState(false)
+  const [multiSportInput, setMultiSportInput] = useState('')
+  const [multiSportStatus, setMultiSportStatus] = useState('')
+
+  // Real feature: one paste box that routes each pick to its own sport's
+  // storage instead of needing separate JSON per sport. Groups by each
+  // pick's own "sport" field (defaulting to mlb, matching POTD's existing
+  // convention), then merges each group into that sport's storage using
+  // the exact same shared function the per-sport paste box uses -- no
+  // duplicated merge logic to drift out of sync.
+  const loadMultiSportJSON = () => {
+    try {
+      const parsed = JSON.parse(multiSportInput.trim())
+      if (!parsed.date || !parsed.picks) { setMultiSportStatus('JSON must have "date" and "picks" fields'); return }
+      const bySport = {}
+      for (const p of parsed.picks) {
+        const key = (p.sport || 'mlb').toLowerCase()
+        ;(bySport[key] ||= []).push(p)
+      }
+      const results = []
+      let touchedActiveSport = false
+      for (const [sportKey, picks] of Object.entries(bySport)) {
+        const result = mergePicksIntoStorage(sportKey, { date: parsed.date, picks })
+        if (result.success) {
+          results.push(`${sportKey.toUpperCase()}: added ${result.addedCount}`)
+          if (sportKey === activeSport) touchedActiveSport = true
+        } else {
+          results.push(`${sportKey.toUpperCase()}: ${result.error}`)
+        }
+      }
+      setMultiSportStatus(results.join(' · '))
+      setMultiSportInput('')
+      // Force the currently-viewed sport's SharpMoney to remount and
+      // re-read fresh localStorage, since mergePicksIntoStorage writes
+      // directly to storage and bypasses that component's own React
+      // state -- without this, a paste covering the active sport
+      // wouldn't appear until a manual tab switch.
+      if (touchedActiveSport) setSharpRefreshNonce(n => n + 1)
+    } catch (e) {
+      setMultiSportStatus(`Invalid JSON: ${e.message}`)
+    }
+  }
+
   const [editingAcct, setEditingAcct] = useState(null)
   const [acctInput, setAcctInput] = useState('')
   const [editingGoal, setEditingGoal] = useState(false)
@@ -179,7 +223,25 @@ export default function App() {
               }}>{s.emoji} {s.label}</button>
             ))}
           </div>
-          <SharpMoney key={activeSport} sport={activeSport} />
+          <div style={{ padding:'8px 12px', background:'#07070f', borderBottom:'1px solid #1a1a30' }}>
+            <button onClick={() => setShowMultiSportPaste(v => !v)} style={{
+              width:'100%', padding:'6px 10px', background:'rgba(167,139,250,.12)', border:'1px solid #a78bfa', borderRadius:6,
+              fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.62rem', fontWeight:700, textTransform:'uppercase', color:'#c4b5fd',
+            }}>{showMultiSportPaste ? 'Hide' : 'Paste All Sports'}</button>
+            {showMultiSportPaste && (
+              <div style={{ marginTop:8 }}>
+                <div style={{ fontSize:'.44rem', color:'#606080', marginBottom:6, lineHeight:1.4 }}>
+                  One paste for any mix of sports — each pick routes to its own sport's storage based on its own "sport" field (defaults to mlb if omitted, same as POTD). Still one "date" for the whole paste.
+                </div>
+                <textarea value={multiSportInput} onChange={e=>setMultiSportInput(e.target.value)} rows={5}
+                  placeholder='{"date":"Sep 10","picks":[{"sport":"mlb",...},{"sport":"nfl",...}]}'
+                  style={{ width:'100%', background:'#0c0c1a', border:'1px solid #2a2a50', borderRadius:6, color:'#e0e0f0', fontSize:'.6rem', padding:8, fontFamily:'monospace' }} />
+                <button onClick={loadMultiSportJSON} style={{ marginTop:6, width:'100%', padding:'6px 10px', background:'rgba(167,139,250,.2)', border:'1px solid #a78bfa', borderRadius:6, fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.62rem', fontWeight:700, textTransform:'uppercase', color:'#c4b5fd' }}>Load</button>
+                {multiSportStatus && <div style={{ fontSize:'.46rem', color:'#8080a0', marginTop:6 }}>{multiSportStatus}</div>}
+              </div>
+            )}
+          </div>
+          <SharpMoney key={activeSport + '-' + sharpRefreshNonce} sport={activeSport} />
         </>
       )}
 

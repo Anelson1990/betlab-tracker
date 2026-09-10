@@ -143,6 +143,98 @@ export function resolveTeamAbbr(sport, rawText) {
   return (words[0] || '').toUpperCase()
 }
 
+// Moved from SharpMoney.jsx (unchanged) so it can be shared with
+// mergePicksIntoStorage below -- already a pure function (only reads its
+// own parameter and module-level constants), so moving it carries no
+// behavior risk.
+export function reflipIfNegative(p) {
+  if (p.gap === undefined || p.gap === null || p.gap >= 0) return p
+  const market = p.market || 'ml'
+  const field = (p.sharpPick || p.bet || p.side || '').trim()
+  const parts = field.split(' ')
+  const firstWord = (parts[0] || '').toUpperCase()
+  const flippedNote = 'Auto re-flipped — gap on the named side went negative, real money was on the other side.'
+
+  if (market === 'total') {
+    if (firstWord !== 'OVER' && firstWord !== 'UNDER') return p
+    const newSide = firstWord === 'OVER' ? 'Under' : 'Over'
+    const rest = parts.slice(1).join(' ')
+    return { ...p, sharpPick: `${newSide} ${rest}`.trim(), gap: Math.abs(p.gap),
+            rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
+            signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
+  }
+
+  if (!p.game || !p.game.includes('@')) return p
+  const teams = p.game.split('@').map(s => s.trim())
+  const other = teams.find(t => t.toUpperCase() !== firstWord)
+  if (!other) return p
+
+  if (market === 'spread') {
+    const lineNum = parseFloat(parts[1])
+    if (!isNaN(lineNum)) {
+      const flippedLine = -lineNum
+      const sign = flippedLine >= 0 ? '+' : ''
+      return { ...p, sharpPick: `${other} ${sign}${flippedLine}`, gap: Math.abs(p.gap),
+              rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
+              signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
+    }
+  }
+  const rest = parts.slice(1).join(' ')
+  return { ...p, sharpPick: `${other} ${rest}`.trim(), gap: Math.abs(p.gap),
+          rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
+          signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
+}
+
+// Real feature request: one paste box that routes picks to the right
+// sport instead of needing separate JSON per sport. SharpMoney's storage
+// is fully isolated per sport (separate localStorage keys, separate
+// stats engines) -- rather than a bigger, riskier refactor of that model
+// to a single flat POTD-style list, this is additive: a pure function
+// that reads/writes ONE sport's existing storage directly, using the
+// exact same keys, merge, dedup, and reflip logic loadJSON already used
+// (extracted here rather than duplicated, so there is exactly one real
+// implementation instead of two that can independently drift and break
+// the way resolveTeamAbbr's extraction logic did earlier tonight).
+// Always writes to localStorage directly -- safe whether or not a
+// SharpMoney instance for that sport happens to be mounted; callers
+// that DO have one mounted (loadJSON itself) sync their own React state
+// afterward from the returned updatedData.
+export function mergePicksIntoStorage(sport, parsed) {
+  if (!parsed?.date || !parsed?.picks) {
+    return { success: false, error: 'JSON must have "date" and "picks" fields' }
+  }
+  const STORAGE_KEY = `betlab-sharp-v2-${sport}`
+  const HISTORY_KEY = `betlab-sharp-history-v1-${sport}`
+
+  let existingHist
+  try { existingHist = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{"days":[]}') }
+  catch { existingHist = { days: [] } }
+  if (existingHist.days.some(d => d.date === parsed.date)) {
+    return { success: false, error: `${parsed.date} is already archived in ${sport.toUpperCase()} History — pasting again would double-count it. Delete it from History first if you need to redo that day.` }
+  }
+
+  let data
+  try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"days":[]}') }
+  catch { data = { days: [] } }
+
+  const updated = JSON.parse(JSON.stringify(data))
+  const existing = updated.days.find(d => d.date === parsed.date)
+  const withIds = parsed.picks.map((p, i) => reflipIfNegative({ ...p, id: p.id || Date.now().toString() + i }))
+  let addedCount = withIds.length
+  if (existing) {
+    const sig = (p) => `${p.game || ''}|${p.sharpPick || p.bet || p.side || ''}|${p.checkTime || ''}`
+    const seen = new Set(existing.picks.map(sig))
+    const adds = withIds.filter(p => !seen.has(sig(p)))
+    addedCount = adds.length
+    existing.picks = [...existing.picks, ...adds]
+  } else {
+    updated.days.push({ date: parsed.date, picks: withIds })
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+  return { success: true, addedCount, updatedData: updated }
+}
+
 // Returns { found, final, homeAbbr, awayAbbr, homeScore, awayScore, pickedHome, pickedAbbr }
 // or null if the team couldn't be matched to a game.
 export function matchGame(sport, games, teamAbbr) {

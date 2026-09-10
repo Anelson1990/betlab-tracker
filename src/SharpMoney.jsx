@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SEED_SHARP } from './sharp.js'
-import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin, decideTotal, resolveTeamAbbr } from './sportApi.js'
+import { SPORTS, parseCardDate, fetchGames, matchGame, decideWin, decideTotal, resolveTeamAbbr, mergePicksIntoStorage } from './sportApi.js'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import * as driveSync from './driveSync.js'
 
@@ -543,70 +543,14 @@ export default function SharpMoney({ sport }) {
   // negative gap on a stale name, which is confusing and easy to misread
   // (confirmed real case: DET @ MIN, Aug 30 -- flipped MIN->DET at 1 PM,
   // then drifted back toward MIN by 3 PM without the label updating).
-  function reflipIfNegative(p) {
-    if (p.gap === undefined || p.gap === null || p.gap >= 0) return p
-    const market = p.market || 'ml'
-    const field = (p.sharpPick || p.bet || p.side || '').trim()
-    const parts = field.split(' ')
-    const firstWord = (parts[0] || '').toUpperCase()
-    const flippedNote = 'Auto re-flipped — gap on the named side went negative, real money was on the other side.'
-
-    if (market === 'total') {
-      if (firstWord !== 'OVER' && firstWord !== 'UNDER') return p
-      const newSide = firstWord === 'OVER' ? 'Under' : 'Over'
-      const rest = parts.slice(1).join(' ')
-      return { ...p, sharpPick: `${newSide} ${rest}`.trim(), gap: Math.abs(p.gap),
-              rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
-              signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
-    }
-
-    if (!p.game || !p.game.includes('@')) return p
-    const teams = p.game.split('@').map(s => s.trim())
-    const other = teams.find(t => t.toUpperCase() !== firstWord)
-    if (!other) return p // can't safely determine the flip target, leave as-is rather than guess
-
-    if (market === 'spread') {
-      const lineNum = parseFloat(parts[1])
-      if (!isNaN(lineNum)) {
-        const flippedLine = -lineNum
-        const sign = flippedLine >= 0 ? '+' : ''
-        return { ...p, sharpPick: `${other} ${sign}${flippedLine}`, gap: Math.abs(p.gap),
-                rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
-                signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
-      }
-    }
-    const rest = parts.slice(1).join(' ')
-    return { ...p, sharpPick: `${other} ${rest}`.trim(), gap: Math.abs(p.gap),
-            rawMoney: p.rawMoney != null ? 100 - p.rawMoney : p.rawMoney,
-            signal: p.signal ? `${flippedNote} ${p.signal}` : flippedNote }
-  }
 
   const loadJSON = async () => {
     try {
       const parsed = JSON.parse(pasteInput.trim())
-      if (!parsed.date || !parsed.picks) { setPasteError('JSON must have "date" and "picks" fields'); return }
-      // Guard against double-counting: if this date is already archived, its
-      // picks are already in history and already counted in stats. Re-adding
-      // them to active data would count the same games twice.
-      let existingHist
-      try { existingHist = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{"days":[]}') }
-      catch { existingHist = { days: [] } }
-      if (existingHist.days.some(d => d.date === parsed.date)) {
-        setPasteError(`${parsed.date} is already archived in History — pasting again would double-count it. Delete it from History first if you need to redo that day.`)
-        return
-      }
-      const updated = JSON.parse(JSON.stringify(data))
-      const existing = updated.days.find(d => d.date === parsed.date)
-      const withIds = parsed.picks.map((p,i) => reflipIfNegative({ ...p, id: p.id || Date.now().toString()+i }))
-      if (existing) {
-        const sig = (p) => `${p.game||''}|${p.sharpPick||p.bet||p.side||''}|${p.checkTime||''}`
-        const seen = new Set(existing.picks.map(sig))
-        const adds = withIds.filter(p => !seen.has(sig(p)))
-        existing.picks = [...existing.picks, ...adds]
-      } else {
-        updated.days.push({ date: parsed.date, picks: withIds })
-      }
-      save(updated)
+      const result = mergePicksIntoStorage(sport, parsed)
+      if (!result.success) { setPasteError(result.error); return }
+      const updated = result.updatedData
+      setData(updated)
       setPasteInput(''); setPasteError(''); setShowPaste(false)
 
       const staleDates = updated.days
