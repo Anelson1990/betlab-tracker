@@ -788,6 +788,25 @@ export default function SharpMoney({ sport }) {
   const rlmStats = { wins: rlmW, losses: rlmPicks.length - rlmW, total: rlmPicks.length,
     wr: rlmPicks.length ? Math.round(rlmW/rlmPicks.length*100) : 0 }
 
+  // RUN LINE SWEET SPOT -- Run Line has been the single strongest,
+  // most consistently validated market in the whole system (56% WR
+  // overall on 184 picks, confirmed repeatedly across Movement Shape,
+  // Line Reaction, and CLV all pointing the same direction). But the
+  // real edge isn't spread evenly across every gap size -- specifically
+  // the 20-29% tier (66% WR, n=44) and 40-49% tier (70% WR, n=10) are
+  // the two real, validated bands; 1-9% (51%), 10-19% (48%), and 30-39%
+  // (50%) show no real edge, and 50%+ (100%, n=2) is far too thin to
+  // trust despite the eye-catching number. Flags only the two bands
+  // that have actually earned it, not the whole market.
+  function isRunLineSweetSpot(p) {
+    if (p.market !== 'spread') return false
+    return (p.gap >= 20 && p.gap <= 29) || (p.gap >= 40 && p.gap <= 49)
+  }
+  const runLineSweetSpotPicks = allClosingPicksEverAllMarkets.filter(isRunLineSweetSpot).filter(p => p.result === 'win' || p.result === 'loss')
+  const runLineSweetSpotW = runLineSweetSpotPicks.filter(p => p.result === 'win').length
+  const runLineSweetSpotStats = { wins: runLineSweetSpotW, losses: runLineSweetSpotPicks.length - runLineSweetSpotW, total: runLineSweetSpotPicks.length,
+    wr: runLineSweetSpotPicks.length ? Math.round(runLineSweetSpotW/runLineSweetSpotPicks.length*100) : 0 }
+
   // OLD FORMULA + CONFIRMS: the real signal, replacing the earlier
   // new-formula version of this tier. Backed out directly from the Sep 7
   // stats screen: all-time confirms was 55-33 (63%, n=88), new-formula-
@@ -1161,9 +1180,18 @@ export default function SharpMoney({ sport }) {
             const isAvoid = isAvoidTierPick(closing, shape)
             const isWatch = isWatchTierPick(closing) && !isHotCombo // don't double-flag when the stronger combo already fired
             const isRlm = isRlmPick(closing)
+            const isRunLineSweet = isRunLineSweetSpot(closing)
             return (
               <div key={game} style={{ background:'#09090f', border:`1px solid ${isAvoid ? '#ef4444' : isHotCombo ? '#facc15' : tierBorder}`, borderRadius:8, padding:'10px 10px', marginBottom:2 }}>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap || isAvoid || isWatch || isRlm) ? 6 : 0 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: (shape || pickMarket!=='ml' || isHotCombo || isNegGap || isAvoid || isWatch || isRlm || isRunLineSweet) ? 6 : 0 }}>
+                  {isRunLineSweet && (
+                    <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#22d3ee22', border:'1px solid #22d3ee', borderRadius:5, padding:'2px 7px' }}>
+                      <span style={{ fontSize:'.56rem', fontWeight:800, color:'#22d3ee', textTransform:'uppercase' }}>🎯 RL Sweet Spot</span>
+                      <span style={{ fontSize:'.46rem', color:'#8080a0' }}>
+                        · 20-29% or 40-49% gap, the two validated Run Line bands · {runLineSweetSpotStats.total ? `${runLineSweetSpotStats.wins}-${runLineSweetSpotStats.losses} (${runLineSweetSpotStats.wr}%) all-time` : 'building history'}
+                      </span>
+                    </div>
+                  )}
                   {isRlm && (
                     <div style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#34d39922', border:'1px solid #34d399', borderRadius:5, padding:'2px 7px' }}>
                       <span style={{ fontSize:'.56rem', fontWeight:800, color:'#34d399', textTransform:'uppercase' }}>↩ RLM</span>
@@ -1725,6 +1753,20 @@ export default function SharpMoney({ sport }) {
             ) : (
               <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
                 {watchTierStats.wins}-{watchTierStats.losses} · <span style={{ color: watchTierStats.wr>=55?'#4ade80':watchTierStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{watchTierStats.wr}% WR</span> ({watchTierStats.total} picks)
+              </div>
+            )}
+          </div>
+
+          <div style={{ background:'#09090f', border:'1px solid #22d3ee55', borderRadius:10, padding:12 }}>
+            <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontSize:'.72rem', fontWeight:800, textTransform:'uppercase', color:'#22d3ee', marginBottom:3 }}>🎯 Run Line Sweet Spot</div>
+            <div style={{ fontSize:'.42rem', color:'#404060', marginBottom:8, lineHeight:1.4 }}>
+              Run Line has been the single strongest, most consistently validated market in the whole system — but the real edge isn't spread evenly across every gap size. Specifically the 20-29% tier (66% WR, n=44) and 40-49% tier (70% WR, n=10) are the two real, validated bands from the full Run Line Performance breakdown; 1-9%, 10-19%, and 30-39% show no real edge, and 50%+ (100%, n=2) is far too thin to trust despite the number. Flags only the two bands that have actually earned it.
+            </div>
+            {runLineSweetSpotStats.total === 0 ? (
+              <div style={{ fontSize:'.56rem', color:'#303050', textAlign:'center', padding:'8px 0' }}>No graded picks yet</div>
+            ) : (
+              <div style={{ fontSize:'.6rem', color:'#e0e0f0' }}>
+                {runLineSweetSpotStats.wins}-{runLineSweetSpotStats.losses} · <span style={{ color: runLineSweetSpotStats.wr>=55?'#4ade80':runLineSweetSpotStats.wr<=45?'#f87171':'#a0a0c0', fontWeight:700 }}>{runLineSweetSpotStats.wr}% WR</span> ({runLineSweetSpotStats.total} picks)
               </div>
             )}
           </div>
