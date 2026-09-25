@@ -1,5 +1,5 @@
 # ════════════════════════════════════════════════════════════════
-# BETLAB NFL WEEKLY RUNNER v1.1  (Google Colab cell)
+# BETLAB NFL WEEKLY RUNNER v1.2  (Google Colab cell)
 # - Mirrors the MLB daily runner: Drive mount, self-grading on each
 #   run, ROI tracking per model, Consensus card, ROI summary table
 # - Three models vote (same architecture as MLB LGB/LGR/MC):
@@ -25,6 +25,14 @@
 #      nflreadpy (nflverse's successor library) and groupby().transform(),
 #      which works on pandas 1.x, 2.x and 3.x.
 #   4. Guard for a season with no play-by-play yet (pd.concat([]) crash).
+#
+# v1.2 speed:
+#   - Completed seasons are processed once and cached on Drive as small
+#     parquet files. Weekly runs only download the current season.
+#   - Models retrain only when the training seasons change (i.e. once per
+#     new season), not every 30 days: past seasons don't change, so a
+#     30-day retrain produced the same model at the cost of a rebuild.
+#     Set FORCE_RETRAIN = True to rebuild on demand.
 #
 # ⚠️  HONEST LIMITATION — READ BEFORE BETTING:
 #   This predicts WINNERS well but that is NOT the same as beating the
@@ -63,18 +71,20 @@ PAYOUT          = STAKE * (100/110)                   # standard -110 juice
 
 CONF_FLOOR      = 0.68   # strict consensus floor. 0.62=42% of games/70.3%
                          #                        0.70=18% of games/75.6%
-RETRAIN_DAYS    = 30     # retrain models if saved bundle older than this
+FORCE_RETRAIN   = False  # True = retrain models on this run
 
 ROI_FILE        = f'{NFL_DRIVE}/nfl_roi.json'
 MODEL_BUNDLE    = f'{NFL_DRIVE}/nfl_models.pkl'
 MODEL_META      = f'{NFL_DRIVE}/nfl_model_meta.json'
+CACHE_DIR       = f'{NFL_DRIVE}/cache'
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 BASE_STATS = ['off_epa_per_play','def_epa_per_play','off_success_rate',
               'pass_epa','rush_epa','turnover_margin']
 PBP_COLS   = ['game_id','posteam','defteam','season','week','epa','success',
               'play_type','interception','fumble_lost']
 
-print(f'BetLab NFL Weekly v1.1 | {today_str}')
+print(f'BetLab NFL Weekly v1.2 | {today_str}')
 print('='*65)
 
 
@@ -128,9 +138,16 @@ print('ROI file loaded ✅')
 
 def build_team_game_stats(seasons):
     """Per-team per-game stats from real play-by-play.
-    Memory-safe: one season at a time, raw PBP discarded immediately."""
+    Memory-safe: one season at a time, raw PBP discarded immediately.
+    Completed seasons are cached on Drive; only the current season is
+    re-downloaded each run."""
     out = []
     for season in seasons:
+        cache = f'{CACHE_DIR}/team_games_{season}.parquet'
+        if season < CURRENT_SEASON and os.path.exists(cache):
+            out.append(pd.read_parquet(cache))
+            print(f'  {season} ✅ (cached)')
+            continue
         try:
             pbp = load_pbp(season)
         except Exception as e:
@@ -173,6 +190,8 @@ def build_team_game_stats(seasons):
         gt[['giveaways','takeaways']] = gt[['giveaways','takeaways']].fillna(0)
         gt['turnover_margin'] = gt['takeaways'] - gt['giveaways']
         out.append(gt)
+        if season < CURRENT_SEASON:
+            gt.to_parquet(cache, index=False)
         del plays; gc.collect()
         print(f'  {season} ✅')
 
@@ -292,7 +311,8 @@ def train_models(train, feats):
 
     return {'lgb': lgb_m, 'lgr': lgr_m, 'scaler': scaler, 'mc_margin': mc_margin,
             'resid_std': resid_std, 'feats': feats, 'best_C': best_C,
-            'trained_date': today_str, 'n_train': len(train)}
+            'trained_date': today_str, 'n_train': len(train),
+            'train_seasons': TRAIN_SEASONS}
 
 
 def predict_probs(bundle, X, n_sims=10000, seed=42):
@@ -407,14 +427,13 @@ for fn in sorted(os.listdir(NFL_DRIVE)):
 
 print(f'\n=== MODELS ===')
 
-need_train = not os.path.exists(MODEL_BUNDLE)
+need_train = FORCE_RETRAIN or not os.path.exists(MODEL_BUNDLE)
 bundle = None
 if not need_train:
     try:
         with open(MODEL_BUNDLE,'rb') as f: bundle = pickle.load(f)
-        age = (datetime.now() - datetime.strptime(bundle['trained_date'],'%Y-%m-%d')).days
-        if age > RETRAIN_DAYS:
-            print(f'  Model is {age}d old — retraining'); need_train = True
+        if bundle.get('train_seasons') != TRAIN_SEASONS:
+            print(f'  Training seasons changed — retraining'); need_train = True
         else:
             print(f"  Loaded ✅ (trained {bundle['trained_date']}, "
                   f"{bundle['n_train']} games, C={bundle['best_C']})")
