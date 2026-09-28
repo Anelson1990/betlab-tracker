@@ -102,7 +102,7 @@ class GP:
     name:str='Unknown';sv:float=.905;gp:int=0;gaa:float=2.80;gsax:float=0;conf:bool=False;news:str=''
 @dataclass
 class INJ:
-    player:str;pos:str;team:str='';rating:float=50;xgi:float=0
+    player:str;pos:str;team:str='';rating:float=50;xgi:float=0;status:str='';out:bool=True
 @dataclass
 class SC:
     rest:int=2;travel:int=0;g7d:int=3;home:bool=True
@@ -294,15 +294,32 @@ class DF:
     @staticmethod
     def injuries():
         data=DF._nd('https://www.dailyfaceoff.com/hockey-player-news/injuries')
-        if not data: print('  DF injuries: unavailable');return[]
-        try:
-            raw=[INJ(player=r.get('playerName',''),pos=r.get('playerPosition',''),team=r.get('teamAbbreviation',''),rating=r.get('playerRating',50)or 50) for r in data['props']['pageProps']['data']['data']]
-            seen=set();out=[]
-            for i in raw:
-                k=f'{i.player}|{i.team}'
-                if k not in seen: seen.add(k);out.append(i)
-            return out
-        except Exception: return[]
+        if not data: warn('INJURIES UNAVAILABLE (Daily Faceoff) - no injury adjustments this run, check injuries yourself');return[]
+        try: rows=data['props']['pageProps']['data']['data']
+        except Exception as e: warn(f'INJURIES UNAVAILABLE (Daily Faceoff page format changed: {e}) - check injuries yourself');return[]
+        # Status field name is not verified - try likely keys, then any key containing 'status'
+        def status_of(r):
+            for k in('injuryStatus','status','playerInjuryStatus','injuryStatusName','injuryType','newsStrengthName'):
+                v=r.get(k)
+                if isinstance(v,str) and v.strip(): return v.strip()
+            for k,v in r.items():
+                if 'status' in k.lower() and isinstance(v,str) and v.strip(): return v.strip()
+            return ''
+        DTD_WORDS=('day-to-day','day to day','dtd','questionable','probable','game-time','game time','gtd','doubtful')
+        seen=set();out=[];no_status=0
+        for r in rows:
+            i=INJ(player=r.get('playerName',''),pos=r.get('playerPosition',''),team=r.get('teamAbbreviation',''),rating=r.get('playerRating',50)or 50)
+            k=f'{i.player}|{i.team}'
+            if not i.player or k in seen: continue
+            seen.add(k);i.status=status_of(r);st=i.status.lower()
+            if not st: no_status+=1;i.out=True
+            elif any(w in st for w in DTD_WORDS): i.out=False
+            else: i.out=True   # Out / IR / LTIR / suspended / anything unrecognised -> treated as out
+            out.append(i)
+        if not out: warn('INJURIES: Daily Faceoff returned 0 players - probably a format change, check injuries yourself')
+        elif no_status==len(out): warn('INJURIES: no status field found - every listed player treated as OUT (day-to-day included)')
+        nout=sum(i.out for i in out);print(f'  Injuries: {len(out)} listed | {nout} treated as OUT | {len(out)-nout} day-to-day/questionable (not adjusted)')
+        return out
 
 # ── Odds API (optional) ───────────────────────────────────
 class OA:
@@ -665,7 +682,7 @@ standings=nhl.stand(game_date);print(f'  Standings: {len(standings)} teams')
 LG_XG=MP.lg_xg()
 MP_OK=not MP.teams().empty or not MP.teams(PSYR).empty
 if MP.teams().empty: warn(f'MoneyPuck {SYR} team data missing - using last season as prior only')
-df_data=DF.goalies();df_inj=DF.injuries();print(f'  Injuries: {len(df_inj)}')
+df_data=DF.goalies();df_inj_all=DF.injuries();df_inj=[i for i in df_inj_all if i.out]
 odds_bk=OA.fetch(ODDS_KEY)
 espn_data=ESPN.scoreboard(game_date)
 # Team shot rates (current + last season) and league save %
@@ -868,8 +885,11 @@ for game in games:
         print(f'  Odds: H:{int(vl.hml):+d}({hi:.0f}%) A:{int(vl.aml):+d}({ai:.0f}%) T:{vl.total} [{vl.src}]')
         print(f'  Edge: H:{hwf*100-hi:+.1f}% A:{awf*100-ai:+.1f}%')
     else: print('  Odds: none found')
-    if hinj: print(f'  H-Inj: {", ".join(i.player for i in hinj[:4])}')
-    if ainj: print(f'  A-Inj: {", ".join(i.player for i in ainj[:4])}')
+    if hinj: print(f'  H-Out: {", ".join(f"{i.player}({i.xgi:+.2f})" for i in hinj[:6])}')
+    if ainj: print(f'  A-Out: {", ".join(f"{i.player}({i.xgi:+.2f})" for i in ainj[:6])}')
+    for lbl,tri in(('H',ht),('A',at)):
+        dtd=[i.player+(f' [{i.status}]' if i.status else '') for i in df_inj_all if i.team==tri and not i.out]
+        if dtd: print(f'  {lbl}-DTD (NOT adjusted, check status): {", ".join(dtd[:5])}')
     if hsc.rest<=1: print(f'  ** HOME B2B ({hsc.rest}d rest) **')
     if asc.rest<=1: print(f'  ** AWAY B2B ({asc.rest}d rest) **')
     # ML ledger row: the model's side (bigger edge, or bigger win% when no odds)
@@ -1029,3 +1049,4 @@ except Exception as e: print(f'\nDrive save skipped: {e}')
 # - Travel = last game's arena -> tonight's arena, for both teams (was: to the away team's own city)
 # - Odds API SOG: when a player has several lines, the main (most evenly priced) one is used
 # - kelly() edge now in percentage points (same unit as the betslip); ML accuracy/Brier exclude pushes
+# - Injuries: loud warning when the injury feed is missing/empty; only Out/IR/LTIR/suspended adjusted, day-to-day/questionable listed but not adjusted
