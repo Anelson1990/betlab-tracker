@@ -111,17 +111,30 @@ class VL:
     hml:float=0;aml:float=0;spread:float=0;total:float=0;src:str=''
 WARN=[]
 def warn(msg): WARN.append(msg);print(f'  !! {msg}')
+import time
+def http_get(url,tries=3,sess=None,**kw):
+    """GET with retry + backoff (1s, 2s) on timeouts/5xx/429. Returns the Response, or None if it never connected."""
+    kw.setdefault('timeout',15);r=None
+    for i in range(tries):
+        try:
+            r=(sess or requests).get(url,**kw)
+            if r.ok or (r.status_code<500 and r.status_code!=429): return r
+        except Exception as e:
+            if i==tries-1: print(f'  HTTP fail {url.split("?")[0][-60:]}: {e}')
+        if i<tries-1: time.sleep(2**i)
+    return r
 
 # ── NHL API ───────────────────────────────────────────────
 class NHL:
     B='https://api-web.nhle.com/v1'
-    def __init__(self): self._c={};self._s=requests.Session();self._s.headers['User-Agent']=UA
+    def __init__(self): self._c={};self.fails=0;self._s=requests.Session();self._s.headers['User-Agent']=UA
     def _g(self,u):
         if u in self._c: return self._c[u]
         try:
-            r=self._s.get(u,timeout=15)
-            if r.ok: self._c[u]=r.json();return self._c[u]
-        except Exception as e: print(f'  NHL err {u.split("/v1/")[-1]}: {e}')
+            r=http_get(u,sess=self._s)
+            if r is not None and r.ok: self._c[u]=r.json();return self._c[u]
+            self.fails+=1
+        except Exception as e: self.fails+=1;print(f'  NHL err {u.split("/v1/")[-1]}: {e}')
         return None
     def sched(self,d):
         data=self._g(f'{self.B}/schedule/{d}')
@@ -142,7 +155,7 @@ class NHL:
         return {int(p['id']) for grp in('forwards','defensemen') for p in d.get(grp,[]) if p.get('id')}
     def gamelog(self,pid,season,gtype):
         d=self._g(f'{self.B}/player/{int(pid)}/game-log/{season}/{gtype}');return d.get('gameLog',[]) if d else[]
-FINAL_STATES=('OFF','FINAL','7')
+FINAL_STATES=('OFF','FINAL')
 def done(g,types): return g.get('gameState','') in FINAL_STATES and g.get('gameType') in types
 
 # ── NHL Stats REST API (team + skater season totals) ──────
@@ -154,9 +167,9 @@ class ST:
         if k in ST._c: return ST._c[k]
         rows=[]
         try:
-            r=requests.get(f'{ST.B}/{path}',params={'isAggregate':'false','isGame':'false','start':0,'limit':-1,
+            r=http_get(f'{ST.B}/{path}',params={'isAggregate':'false','isGame':'false','start':0,'limit':-1,
                 'cayenneExp':f'seasonId={season} and gameTypeId={gtype}'},headers={'User-Agent':UA},timeout=20)
-            if r.ok: rows=r.json().get('data',[])
+            if r is not None and r.ok: rows=r.json().get('data',[])
         except Exception as e: print(f'  Stats {path} {season}: {e}')
         ST._c[k]=rows;return rows
     @staticmethod
@@ -173,7 +186,8 @@ class MP:
         if (k,yr) in MP._c: return MP._c[(k,yr)]
         df=pd.DataFrame()
         try:
-            r=requests.get(f'{MP.B.format(yr=yr)}/{k}.csv',headers={'User-Agent':UA},timeout=25)
+            r=http_get(f'{MP.B.format(yr=yr)}/{k}.csv',headers={'User-Agent':UA},timeout=25)
+            if r is None: raise IOError('no response')
             if r.ok and ',' in r.text[:100]:
                 df=pd.read_csv(StringIO(r.text));print(f'  MP {k} {yr}: {len(df)}r')
             else: print(f'  MP {k} {yr}: HTTP {r.status_code}')
@@ -344,9 +358,12 @@ class OA:
                         for o in mk.get('outcomes',[]):
                             nm=norm_name(o.get('description',''));side=o.get('name','').lower()
                             tmp.setdefault((nm,o.get('point')),{})[side]=num(o.get('price'))
+                        best={}
                         for(nm,pt),sd in tmp.items():
-                            if pt is None or nm in out: continue
-                            if 'over' in sd and 'under' in sd: out[nm]=(float(pt),sd['over'],sd['under'],f'OA/{bk.get("key")}');got+=1
+                            if pt is None or nm in out or 'over' not in sd or 'under' not in sd: continue
+                            io,iu=o2p(sd['over']),o2p(sd['under']);dist=abs(io/(io+iu)-.5)   # main line = most balanced price
+                            if nm not in best or dist<best[nm][0]: best[nm]=(dist,(float(pt),sd['over'],sd['under'],f'OA/{bk.get("key")}'))
+                        for nm,(_,v) in best.items(): out[nm]=v;got+=1
                     if got: break
             print(f'  OA SOG lines: {len(out)} players')
         except Exception as e: print(f'  OA SOG err: {e}')
@@ -459,12 +476,9 @@ def ot_split(h,a,po):
 def kelly(prob,odds,frac=.25):
     if odds==0 or abs(odds)<100: return 0,0,'NO EDGE'
     b=payout(odds);imp=o2p(odds)/100
-    edge=prob-imp;kf=max(0,(b*prob-(1-prob))/b*frac)
-    if edge>.08: return edge,kf*100,'STRONG BET'
-    if edge>.04: return edge,kf*100,'VALUE BET'
-    if edge>.02: return edge,kf*100,'LEAN'
-    if edge>0: return edge,kf*100,'SLIGHT'
-    return edge,0,'NO EDGE'
+    edge=(prob-imp)*100;kf=max(0,(b*prob-(1-prob))/b*frac)   # edge in percentage points
+    tier=ml_tier(edge)
+    return edge,(kf*100 if edge>0 else 0),tier
 def ml_tier(edge_pct):
     for t,lbl in[(8,'STRONG BET'),(4,'VALUE BET'),(2,'LEAN'),(0,'SLIGHT')]:
         if edge_pct>t: return lbl
@@ -573,6 +587,9 @@ def grade_ledger(d,nhl,upto):
         ha=box.get('homeTeam',{}).get('abbrev','');aa=box.get('awayTeam',{}).get('abbrev','')
         if hs is None or as_ is None: continue
         winner=ha if hs>as_ else aa;players=box_players(box)
+        exp_key=str(pend.loc[pend['game_id']==gid,'game'].iloc[0])
+        if exp_key!=f'{aa}@{ha}':
+            warn(f'boxscore {gid} is {aa}@{ha}, ledger says {exp_key} - left pending');continue
         for i in pend.index[pend['game_id']==gid]:
             row=d.loc[i];odds=num(row['odds'])
             if row['market']=='ML':
@@ -603,7 +620,8 @@ def report(d):
         x=bets[bets['tier']==t]
         if len(x): print(f'    {t:11s} {_wl(x)}')
     if len(ml):
-        acc=(ml['result']=='W').mean()*100;br=((ml['model_p']-(ml['result']=='W').astype(float))**2).mean()
+        wl=ml[ml['result'].isin(['W','L'])];acc=(wl['result']=='W').mean()*100 if len(wl) else 0
+        br=((wl['model_p']-(wl['result']=='W').astype(float))**2).mean() if len(wl) else float('nan')
         print(f'  ML model side, every game: {(ml["result"]=="W").sum()}-{(ml["result"]=="L").sum()} ({acc:.1f}%)  Brier {br:.3f} (0.250 = coin flip)')
     sog=g[g['market']=='SOG'];sp=sog[sog['tier']=='PICK']
     print(f'  SOG PICKS: {_wl(sp) if len(sp) else "none yet"}')
@@ -683,6 +701,7 @@ for season in(PREV_SEASON,SEASON):
                 else: ag-=1
             if ha and aa: hist.append({'ht':ha,'at':aa,'hg':hg,'ag':ag,'date':gd})
 print(f'  {len(hist)} unique games')
+if nhl.fails: warn(f'{nhl.fails} NHL API requests failed while loading schedules - Dixon-Coles may be missing games')
 dc=DC(rho=RHO);dc.fit(hist,GD)
 DEGRADED=not dc.ok and MP.teams().empty
 if DEGRADED: warn('No DC fit and no current MoneyPuck data - ML output is mostly default numbers, NO BETS will be flagged')
@@ -769,18 +788,18 @@ for game in games:
     for i in hinj: i.xgi=MP.pxi(i.player,ht)
     for i in ainj: i.xgi=MP.pxi(i.player,at)
     # Schedule context
-    def sctx(tri,past,ih):
+    def sctx(tri,past,ih,venue):
         tgt=GD;rest=3
         if past:
             try: rest=(tgt-datetime.strptime(past[0].get('gameDate',game_date),'%Y-%m-%d')).days
             except Exception: pass
         g7=sum(1 for g in past if g.get('gameDate','')>=(tgt-timedelta(days=7)).strftime('%Y-%m-%d'))
         travel=0
-        if past and not ih:
-            lv=past[0].get('homeTeam',{}).get('abbrev','');l1,l2=CO.get(lv),CO.get(tri)
+        if past:   # last game's arena -> tonight's arena (home teams travel too when returning from a road trip)
+            lv=past[0].get('homeTeam',{}).get('abbrev','');l1,l2=CO.get(lv),CO.get(venue)
             if l1 and l2: travel=int(hav(l1[0],l1[1],l2[0],l2[1]))
         return SC(rest=rest,travel=travel,g7d=g7,home=ih)
-    hsc=sctx(ht,hlogs,True);asc=sctx(at,alogs,False)
+    hsc=sctx(ht,hlogs,True,ht);asc=sctx(at,alogs,False,ht)
     # Odds: DF -> OA -> ESPN
     vl=df_data.get(key,{}).get('vl')
     if not vl or vl.hml==0: vl=odds_bk.get(key)
@@ -951,8 +970,17 @@ for pr in allp: print(f'  {pr["name"]:22s} ({pr["team"]}) G:{pr["g"]:.2f} A:{pr[
 # ═══════════════════════════════════════════════════════════
 if new_rows:
     nr=pd.DataFrame(new_rows,columns=LCOLS)
-    keep=~((ledger['date']==game_date)&(ledger['game_id'].isin(nr['game_id'].unique()))&(ledger['result'].isin(['pending'])|ledger['result'].isna()))
+    def rk(df): return df['game_id'].astype(str)+'|'+df['market']+'|'+df['player_id'].fillna(-1).astype(float).astype(int).astype(str)
+    def has_price(df): return (df['odds'].fillna(0).astype(float)!=0)&~df['line_src'].fillna('').astype(str).str.startswith('EST')
+    if len(ledger):
+        old=ledger[(ledger['date']==game_date)&(ledger['result'].isin(['pending'])|ledger['result'].isna())]
+        priced_old=set(rk(old[has_price(old)]))
+        downgrade=rk(nr).isin(priced_old)&~has_price(nr)
+        if downgrade.any(): print(f'  Ledger: kept {int(downgrade.sum())} earlier rows that had real odds (this run had none for them)')
+        nr=nr[~downgrade]
+    keep=~((ledger['date']==game_date)&rk(ledger).isin(set(rk(nr)))&(ledger['result'].isin(['pending'])|ledger['result'].isna())) if len(ledger) else None
     ledger=pd.concat([ledger[keep],nr],ignore_index=True) if len(ledger) else nr
+    print(f'  NHL API failed requests this run: {nhl.fails}') if nhl.fails else None
 save_ledger(ledger)
 report(ledger)
 
@@ -994,3 +1022,10 @@ except Exception as e: print(f'\nDrive save skipped: {e}')
 # - Name matching for goalies/injuries uses full names + team (no last-name-only collisions)
 # - Game times shown in real Central time (CDT/CST)
 # - NEW: player SOG model + self-grading ledger (ML + SOG W/L, units, ROI, Brier, projection bias/MAE)
+# v12.0 review pass
+# - Retry with backoff on all NHL / stats / MoneyPuck requests; failed-request count is printed and warned
+# - Grading refuses a boxscore whose teams don't match the ledger row (left pending)
+# - Pregame rerun with a dead odds source no longer replaces rows that had real odds/lines
+# - Travel = last game's arena -> tonight's arena, for both teams (was: to the away team's own city)
+# - Odds API SOG: when a player has several lines, the main (most evenly priced) one is used
+# - kelly() edge now in percentage points (same unit as the betslip); ML accuracy/Brier exclude pushes
