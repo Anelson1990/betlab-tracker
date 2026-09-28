@@ -1,5 +1,5 @@
 # ════════════════════════════════════════════════════════════════
-# BETLAB NFL WEEKLY RUNNER v1.2  (Google Colab cell)
+# BETLAB NFL WEEKLY RUNNER v1.3  (Google Colab cell)
 # - Mirrors the MLB daily runner: Drive mount, self-grading on each
 #   run, ROI tracking per model, Consensus card, ROI summary table
 # - Three models vote (same architecture as MLB LGB/LGR/MC):
@@ -33,6 +33,14 @@
 #     new season), not every 30 days: past seasons don't change, so a
 #     30-day retrain produced the same model at the cost of a rebuild.
 #     Set FORCE_RETRAIN = True to rebuild on demand.
+#
+# v1.3 key-player injury flags (display only — picks are NOT changed):
+#   - Starters = season-to-date usage leaders: QB1 by pass attempts,
+#     RB1 by carries, WR1-2 by targets (must still be on the team).
+#   - Flagged if on this week's injury report as Out / Doubtful /
+#     Questionable, or on a reserve list (IR etc.) in the weekly roster.
+#   - Backtest note: a QB-out model feature did NOT clearly improve
+#     accuracy (2021-25), so injuries are shown for your judgment only.
 #
 # ⚠️  HONEST LIMITATION — READ BEFORE BETTING:
 #   This predicts WINNERS well but that is NOT the same as beating the
@@ -84,7 +92,7 @@ BASE_STATS = ['off_epa_per_play','def_epa_per_play','off_success_rate',
 PBP_COLS   = ['game_id','posteam','defteam','season','week','epa','success',
               'play_type','interception','fumble_lost']
 
-print(f'BetLab NFL Weekly v1.2 | {today_str}')
+print(f'BetLab NFL Weekly v1.3 | {today_str}')
 print('='*65)
 
 
@@ -95,6 +103,73 @@ def load_pbp(season):
 
 def load_sched(seasons):
     return nflr.load_schedules(list(seasons)).to_pandas()
+
+
+# ══ KEY-PLAYER INJURY FLAGS ═════════════════════════════════════
+
+KEY_SLOTS   = [('QB', 1), ('RB', 1), ('WR', 2)]   # position, how many starters
+FLAG_STATUS = {'Out': '🚫', 'Doubtful': '⚠️', 'Questionable': '❓'}
+
+def key_player_flags(season, week):
+    """Returns ({team: [flag dicts]}, note). Never raises — flags are optional."""
+    try:
+        pbp = nflr.load_pbp([season]).select(
+            ['week','posteam','passer_player_id','rusher_player_id','receiver_player_id',
+             'pass_attempt','rush_attempt']).to_pandas()
+        pbp = pbp[pbp['week'] < week]
+        rost = nflr.load_rosters_weekly([season]).to_pandas()
+        rost = rost.sort_values('week').groupby('gsis_id').tail(1)   # latest row per player
+        rost = rost.set_index('gsis_id')
+        inj = nflr.load_injuries([season]).to_pandas()
+        inj = inj[inj['week'] == week]
+    except Exception as e:
+        return {}, f'injury flags unavailable ({e})'
+
+    usage = pd.concat([
+        pbp[pbp['pass_attempt']==1].groupby(['posteam','passer_player_id']).size()
+           .rename('n').reset_index().rename(columns={'passer_player_id':'id'}).assign(pos='QB'),
+        pbp[pbp['rush_attempt']==1].groupby(['posteam','rusher_player_id']).size()
+           .rename('n').reset_index().rename(columns={'rusher_player_id':'id'}).assign(pos='RB'),
+        pbp[pbp['pass_attempt']==1].groupby(['posteam','receiver_player_id']).size()
+           .rename('n').reset_index().rename(columns={'receiver_player_id':'id'}).assign(pos='WR'),
+    ]).rename(columns={'posteam':'team'})
+    usage = usage[usage['id'].isin(rost.index)]
+    usage['roster_pos']    = usage['id'].map(rost['position'])
+    usage['roster_team']   = usage['id'].map(rost['team'])
+    usage['roster_status'] = usage['id'].map(rost['status'])
+    usage['name']          = usage['id'].map(rost['full_name'])
+    # right position, still on this team, not released/retired
+    usage = usage[(usage['pos']==usage['roster_pos']) & (usage['team']==usage['roster_team'])
+                  & ~usage['roster_status'].isin(['CUT','RET'])]
+
+    report = inj.set_index(['team','gsis_id'])
+    flags = {}
+    for (team, pos), g in usage.groupby(['team','pos']):
+        n_start = dict(KEY_SLOTS)[pos]
+        for _, pl in g.sort_values('n', ascending=False).head(n_start).iterrows():
+            status, detail = None, ''
+            if (team, pl['id']) in report.index:
+                r = report.loc[(team, pl['id'])]
+                r = r.iloc[0] if isinstance(r, pd.DataFrame) else r
+                if r['report_status'] in FLAG_STATUS:
+                    status = r['report_status']
+                    detail = r['report_primary_injury'] if pd.notna(r['report_primary_injury']) else ''
+            if status is None and pl['roster_status'] == 'RES':
+                status, detail = 'Reserve/IR', 'on reserve list'
+            if status:
+                flags.setdefault(team, []).append({'pos': pos, 'name': pl['name'],
+                                                   'status': status, 'detail': detail})
+    note = None if len(inj) else (f'week {week} injury report not published yet — only IR/reserve '
+                                  f'shown; re-run Thu-Sat for Out/Doubtful/Questionable')
+    return flags, note
+
+def flag_lines(p):
+    out = []
+    for f in p.get('injury_flags', []):
+        icon = FLAG_STATUS.get(f['status'], '🚑')
+        extra = f" ({f['detail']})" if f['detail'] else ''
+        out.append(f"       {icon} {f['team']} {f['pos']} {f['name']} — {f['status']}{extra}")
+    return out
 
 
 # ══ GUARDS + UTILS ══════════════════════════════════════════════
@@ -488,6 +563,7 @@ if target_week is not None:
         week_games['pred_margin'] = pred_margin
         week_games = apply_consensus(week_games)
 
+        inj_flags, inj_note = key_player_flags(CURRENT_SEASON, target_week)
         picks = []
         for _, g in week_games.iterrows():
             picks.append(make_serializable({
@@ -506,6 +582,8 @@ if target_week is not None:
                 'pred_margin': round(float(g['pred_margin']),1),
                 'generated': today_str,
             }))
+            picks[-1]['injury_flags'] = [dict(f, team=t) for t in (g['away_team'], g['home_team'])
+                                         for f in inj_flags.get(t, [])]
 
         # Don't overwrite a week's picks once any of its games has kicked off
         # (re-running mid-week would otherwise replace them with a smaller set).
@@ -513,6 +591,9 @@ if target_week is not None:
         if os.path.exists(picks_file):
             with open(picks_file) as f: prev = json.load(f)
             prev_ids = {p['game_id'] for p in prev.get('picks', [])}
+            fresh = {p['game_id']: p.get('injury_flags', []) for p in picks}
+            for p in prev['picks']:
+                if p['game_id'] in fresh: p['injury_flags'] = fresh[p['game_id']]
             picks = prev['picks'] + [p for p in picks if p['game_id'] not in prev_ids]
         with open(picks_file,'w') as f:
             json.dump({'season':CURRENT_SEASON,'week':target_week,
@@ -525,6 +606,9 @@ if target_week is not None:
         print(f'\n{"="*65}')
         print(f'  🏈 BETLAB NFL CARD | {CURRENT_SEASON} Week {target_week}')
         print(f'  {len(cons)} Consensus | {len(maj)} 2-of-3 | {len(picks)} games')
+        n_flag = sum(1 for p in picks if p.get('injury_flags'))
+        print(f'  🚑 {n_flag} game(s) with a starting QB/RB/WR injury flag — model does NOT adjust for these')
+        if inj_note: print(f'  ℹ️  {inj_note}')
         print(f'{"="*65}')
 
         if cons:
@@ -535,6 +619,7 @@ if target_week is not None:
                       f"LGR:{p['lgr_pick']} {p['lgr_conf']:.1f}% · "
                       f"MC:{p['mc_pick']} {p['mc_conf']:.1f}%")
                 print(f"       Predicted margin: {p['home_team']} {p['pred_margin']:+.1f}")
+                for line in flag_lines(p): print(line)
         else:
             print(f'\n  ★ CONSENSUS: none this week')
 
@@ -542,11 +627,13 @@ if target_week is not None:
             print(f'\n  ⚠️  2-OF-3 MAJORITY — 53.6% historically, near coin-flip, treat as WATCH:')
             for p in sorted(maj, key=lambda x:-x['avg_conf']):
                 print(f"    ? {p['pick']:<5} {p['avg_conf']:.1f}%  |  {p['matchup']}")
+                for line in flag_lines(p): print(line)
 
         if others:
             print(f'\n  📊 NO SIGNAL ({len(others)} games below floor or split):')
             for p in others:
                 print(f"    – {p['matchup']:<28} lean {p['pick']} {p['avg_conf']:.1f}%")
+                for line in flag_lines(p): print(line)
 
         print(f'\n  Saved ✅ {picks_file}')
 
