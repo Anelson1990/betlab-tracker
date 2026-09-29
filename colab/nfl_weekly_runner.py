@@ -1,5 +1,5 @@
 # ════════════════════════════════════════════════════════════════
-# BETLAB NFL WEEKLY RUNNER v1.3  (Google Colab cell)
+# BETLAB NFL WEEKLY RUNNER v1.4  (Google Colab cell)
 # - Mirrors the MLB daily runner: Drive mount, self-grading on each
 #   run, ROI tracking per model, Consensus card, ROI summary table
 # - Three models vote (same architecture as MLB LGB/LGR/MC):
@@ -42,6 +42,17 @@
 #   - Backtest note: a QB-out model feature did NOT clearly improve
 #     accuracy (2021-25), so injuries are shown for your judgment only.
 #
+# v1.4 lean tracking + in-season retrain:
+#   - Every game's lean is graded at its real moneyline (nflverse
+#     schedule odds; falls back to -110 if missing). Underdog leans are
+#     tracked separately. Backtest 2021-25: all leans 62.4% / -4.4% ROI,
+#     underdog leans 38.0% / -11.1% ROI at the moneyline.
+#   - Models retrain every RETRAIN_EVERY_WEEKS completed weeks, adding
+#     this season's finished games. Backtest 2021-25 vs a frozen
+#     preseason model: log-loss 0.6493 -> 0.6479, leans 62.4% -> 63.0%,
+#     consensus 74.1% (274) -> 76.0% (267). Small gains, not proven
+#     beyond noise, but nothing got worse.
+#
 # ⚠️  HONEST LIMITATION — READ BEFORE BETTING:
 #   This predicts WINNERS well but that is NOT the same as beating the
 #   market. Separate testing showed betting this model's disagreements
@@ -80,6 +91,7 @@ PAYOUT          = STAKE * (100/110)                   # standard -110 juice
 CONF_FLOOR      = 0.68   # strict consensus floor. 0.62=42% of games/70.3%
                          #                        0.70=18% of games/75.6%
 FORCE_RETRAIN   = False  # True = retrain models on this run
+RETRAIN_EVERY_WEEKS = 2  # retrain after this many newly completed weeks this season
 
 ROI_FILE        = f'{NFL_DRIVE}/nfl_roi.json'
 MODEL_BUNDLE    = f'{NFL_DRIVE}/nfl_models.pkl'
@@ -92,7 +104,7 @@ BASE_STATS = ['off_epa_per_play','def_epa_per_play','off_success_rate',
 PBP_COLS   = ['game_id','posteam','defteam','season','week','epa','success',
               'play_type','interception','fumble_lost']
 
-print(f'BetLab NFL Weekly v1.3 | {today_str}')
+print(f'BetLab NFL Weekly v1.4 | {today_str}')
 print('='*65)
 
 
@@ -205,7 +217,7 @@ def make_serializable(obj):
     if isinstance(obj, str):                       return str(obj)
     return obj
 
-roi = load_roi(ROI_FILE, ['consensus_3of3', 'lgb', 'lgr', 'mc'])
+roi = load_roi(ROI_FILE, ['consensus_3of3', 'lgb', 'lgr', 'mc', 'lean_all', 'lean_dog'])
 print('ROI file loaded ✅')
 
 
@@ -448,6 +460,7 @@ def grade_week(season, week):
             'home_score': int(g['home_score']), 'away_score': int(g['away_score']),
             'home_win': int(g['home_score']) > int(g['away_score']),
             'tie': int(g['home_score']) == int(g['away_score']),
+            'home_ml': g.get('home_moneyline'), 'away_ml': g.get('away_moneyline'),
         }
 
     graded = 0
@@ -476,6 +489,24 @@ def grade_week(season, week):
                 'score': f"{r['away_team']} {r['away_score']} - {r['home_team']} {r['home_score']}",
             })
 
+        # Leans: every game's pick, graded at the real moneyline
+        ml = r['home_ml'] if p.get('pick') == r['home_team'] else r['away_ml']
+        ml = -110 if ml is None or pd.isna(ml) else float(ml)
+        won = (p.get('pick') == actual)
+        profit = round((STAKE*ml/100 if ml > 0 else STAKE*100/abs(ml)) if won else -STAKE, 2)
+        for model_key in (['lean_all', 'lean_dog'] if ml > 0 else ['lean_all']):
+            roi[model_key]['total'] += 1
+            roi[model_key]['wins']  += int(won)
+            roi[model_key]['profit'] = round(roi[model_key]['profit'] + profit, 2)
+            roi[model_key]['bets'].append({
+                'season': season, 'week': week, 'matchup': p.get('matchup',''),
+                'pick': p.get('pick'), 'conf': p.get('avg_conf'), 'moneyline': ml,
+                'won': won, 'profit': profit,
+                'score': f"{r['away_team']} {r['away_score']} - {r['home_team']} {r['home_score']}",
+            })
+        print(f"  {'✅' if won else '❌'} lean {p.get('pick')} ({ml:+.0f}) {p.get('matchup','')} "
+              f"→ {r['away_team']} {r['away_score']}-{r['home_score']} {r['home_team']} | ${profit:+.2f}")
+
         if p.get('consensus'):
             won = (p['pick'] == actual)
             print(f"  {'✅' if won else '❌'} CONSENSUS: {p['matchup']} | {p['pick']} "
@@ -502,6 +533,12 @@ for fn in sorted(os.listdir(NFL_DRIVE)):
 
 print(f'\n=== MODELS ===')
 
+sched_cur = load_sched([CURRENT_SEASON])
+_wk = sched_cur.groupby('week')['home_score'].apply(lambda s: s.notna().all())
+cur_through = int(_wk[_wk].index.max()) if _wk.any() else 0   # last fully completed week
+gt_cur = build_team_game_stats([CURRENT_SEASON])
+gt_cur = gt_cur[gt_cur['season'] == CURRENT_SEASON] if len(gt_cur) else gt_cur
+
 need_train = FORCE_RETRAIN or not os.path.exists(MODEL_BUNDLE)
 bundle = None
 if not need_train:
@@ -509,9 +546,13 @@ if not need_train:
         with open(MODEL_BUNDLE,'rb') as f: bundle = pickle.load(f)
         if bundle.get('train_seasons') != TRAIN_SEASONS:
             print(f'  Training seasons changed — retraining'); need_train = True
+        elif cur_through - bundle.get('cur_through', 0) >= RETRAIN_EVERY_WEEKS:
+            print(f"  {cur_through - bundle.get('cur_through', 0)} new completed week(s) "
+                  f"— retraining with {CURRENT_SEASON} games through week {cur_through}")
+            need_train = True
         else:
-            print(f"  Loaded ✅ (trained {bundle['trained_date']}, "
-                  f"{bundle['n_train']} games, C={bundle['best_C']})")
+            print(f"  Loaded ✅ (trained {bundle['trained_date']}, {bundle['n_train']} games, "
+                  f"{CURRENT_SEASON} through week {bundle.get('cur_through', 0)}, C={bundle['best_C']})")
     except Exception as e:
         print(f'  Load failed ({e}) — retraining'); need_train = True
 
@@ -519,10 +560,16 @@ if need_train:
     print('  Building historical features (several minutes)...')
     gt_hist = build_team_game_stats(TRAIN_SEASONS)
     hist, FEATS = build_dataset(gt_hist, TRAIN_SEASONS)
+    if len(gt_cur):
+        cur_hist, _ = build_dataset(gt_cur, [CURRENT_SEASON])
+        cur_hist = cur_hist[cur_hist['week'] <= cur_through]
+        hist = pd.concat([hist, cur_hist], ignore_index=True)
     hist = hist.dropna(subset=['result'])
     hist['home_win'] = (hist['result'] > 0).astype(int)
-    print(f'  Training set: {len(hist)} games, {len(FEATS)} features')
+    print(f'  Training set: {len(hist)} games ({(hist["season"]==CURRENT_SEASON).sum()} from '
+          f'{CURRENT_SEASON}), {len(FEATS)} features')
     bundle = train_models(hist, FEATS)
+    bundle['cur_through'] = cur_through
     with open(MODEL_BUNDLE,'wb') as f: pickle.dump(bundle, f)
     with open(MODEL_META,'w') as f:
         json.dump({k:v for k,v in bundle.items()
@@ -537,7 +584,6 @@ FEATS = bundle['feats']
 
 print(f'\n=== THIS WEEK ===')
 
-sched_cur = load_sched([CURRENT_SEASON])
 unplayed = sched_cur[sched_cur['home_score'].isna()]
 if len(unplayed) == 0:
     print('  No unplayed games left this season.')
@@ -548,8 +594,6 @@ else:
           f'({len(unplayed[unplayed["week"]==target_week])} unplayed games)')
 
 if target_week is not None:
-    gt_cur = build_team_game_stats([CURRENT_SEASON])
-    gt_cur = gt_cur[gt_cur['season'] == CURRENT_SEASON] if len(gt_cur) else gt_cur
     week_games = build_upcoming(gt_cur, sched_cur, target_week)[0] if len(gt_cur) else pd.DataFrame()
 
     if len(week_games) == 0:
@@ -645,7 +689,8 @@ def print_roi_table():
     print(f'  BETLAB NFL ROI | {today_str}')
     print(f'{"="*65}')
     for key, name in [('consensus_3of3','Consensus 3/3'), ('lgb','LGB alone'),
-                      ('lgr','LGR alone'), ('mc','MC alone')]:
+                      ('lgr','LGR alone'), ('mc','MC alone'),
+                      ('lean_all','All leans @ML'), ('lean_dog','Underdog leans @ML')]:
         d = roi[key]
         if d['total'] == 0:
             print(f'    – {name:<18} No graded picks yet'); continue
@@ -653,7 +698,9 @@ def print_roi_table():
         r  = d['profit']/(d['total']*STAKE)*100
         print(f'    {"✅" if d["profit"]>0 else "❌"} {name:<18} '
               f'{d["total"]:3d}b | {wr:.1f}%WR | ${d["profit"]:+.2f} | ROI:{r:.1f}%')
-    print(f'\n  Backtest reference (4 held-out seasons, 235 fires): 73.6% WR')
+    print(f'\n  Model/consensus rows graded at -110; lean rows at the real moneyline.')
+    print(f'  Backtest reference (4 held-out seasons, 235 fires): 73.6% WR')
+    print(f'  Backtest leans 2021-25 @ML: all 62.4% / -4.4% ROI, underdog 38.0% / -11.1% ROI')
     print(f'  Reminder: high accuracy ≠ profitable. Shop for price.')
 
 print_roi_table()
