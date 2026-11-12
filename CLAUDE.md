@@ -33,8 +33,8 @@ currently Austin's crew workbench. When the Agent Room repo exists, this memory 
 
 ## Current projects & state (as of 2026-11-12)
 1. **Bridge Console** — phone-first release gate for the crew's Handoff Board (Supabase `bridge_jobs`).
-   - Sandbox preview is LIVE + green (switchboard-sandbox). Hardening SQL + jessica-core cutover runbook drafted in Notion.
-   - **Nothing touches jessica-core (PRODUCTION) until Austin uses the preview and says go.**
+   - **LIVE on jessica-core (production) as of 2026-11-12** (bridge-console-prod.vercel.app): hardened gate, transport-B app role (`console_app`, direct `pg` via `CONSOLE_DATABASE_URL`), old token path closed (`bridge_release_job` is postgres-only), ntfy phone alerts wired (prod topic, `[LIVE]` title). Sandbox (switchboard-sandbox) kept for testing.
+   - Residual: revoking `PUBLIC` on `net.*` (console_app's one remaining inherited grant — a DB-SSRF defense-in-depth gap) needs a Supabase **support ticket**; `supabase_admin` owns it.
 2. **Agent Room v2** — phone-first "board meeting": one conductor + a talking stick so the AIs take turns;
    Austin picks the bench + sets the brief; cloud conductor + Supabase board; the phone watches and taps.
    - Design + crew review in Notion ("Agent Room v2"). Build phases P1→P4.
