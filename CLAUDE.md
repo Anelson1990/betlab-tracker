@@ -56,3 +56,9 @@ currently Austin's crew workbench. When the Agent Room repo exists, this memory 
 - Cloud sessions are ephemeral — persist anything that matters to git or Notion.
 - **Secrets/tokens never go in files, chat, or commits.** Austin and Harper hold them.
 - Designated work branch: `claude/june-laptop-door-acer-7xpif5`.
+
+## Where we left off (resume here — 2026-11-12)
+- **Bridge Console: DONE** — live + hardened on production (jessica-core), phone alerts live. One open item: Austin files the `net.*` Supabase support ticket (draft ready in chat; low priority).
+- **Agent Room P1: in build.** Budgets locked (10 rounds / 30 min / 30 wakes / 90s, Harper cap ~4). Drafted for Harper to review + apply **to sandbox**: the **board schema** (Notion "Agent Room P1 — board schema") and the **wrappers + room_app role** (Notion "Agent Room P1b"). Room-view **preview** published as an artifact.
+- **Next step — Claude, solo, no Harper needed:** build the **conductor skeleton** (turn / stick / budget / wake-policy logic; pure logic testable without the DB).
+- **Then (the "talk to everyone" milestone):** Harper applies schema + wrappers → Claude wires the room-view to the live board → host it (Austin/Harper on Vercel) + wire June's room-posting route. Claude + Harper + Austin plug in fast; June is the long pole.
