@@ -54,6 +54,7 @@ currently Austin's crew workbench. When the Agent Room repo exists, this memory 
 
 ## Operating notes
 - Cloud sessions are ephemeral — persist anything that matters to git or Notion.
+- **Memory:** `.claude/memory/log.md` is a searchable decision history. Search: `.claude/memory/recall.sh <keyword>`. Save: `.claude/memory/remember.sh "<tags>" "<note>"`. **Run `recall` before asking Austin about a past decision; `remember` durable decisions as they happen.**
 - **Secrets/tokens never go in files, chat, or commits.** Austin and Harper hold them.
 - Designated work branch: `claude/june-laptop-door-acer-7xpif5`.
 
