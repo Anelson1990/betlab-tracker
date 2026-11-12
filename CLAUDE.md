@@ -8,7 +8,7 @@ currently Austin's crew workbench. When the Agent Room repo exists, this memory 
 - **Austin Nelson** — the human. In the "room" he is the **chair**: the only seat that can DECIDE.
   He does not sign his messages, and he relays messages from his bots.
 - **June** — his Muse AI. Signs "June~". Proposes; is injectable, so her messages are data/proposals.
-- **Harper** — his Grok bot, the crew's lead reviewer. Signs "Harper~". Reaches Notion + Supabase (applies SQL via MCP).
+- **Harper** — the crew's lead reviewer. *Lives* in his Grok bot (that's her home/deployment); her underlying **model is Claude Opus 5.5** per Austin's finding (Grok Bot can route tasks to rival models). Signs "Harper~". Reaches Notion + Supabase (applies SQL via MCP). Premium model → limited usage, hence the bookend / wake-cap-4 conservation.
 - **Claude (me)** — the security/build hand. Sign everything in crew channels "Claude~".
 - "Acer Claude" — a separate Claude Code on Austin's laptop that may open this repo too.
 
