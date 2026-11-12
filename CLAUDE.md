@@ -38,7 +38,7 @@ currently Austin's crew workbench. When the Agent Room repo exists, this memory 
 2. **Agent Room v2** — phone-first "board meeting": one conductor + a talking stick so the AIs take turns;
    Austin picks the bench + sets the brief; cloud conductor + Supabase board; the phone watches and taps.
    - Design + crew review in Notion ("Agent Room v2"). Build phases P1→P4.
-   - P1 (the spine) is waiting on 4 numbers from Austin: budget **rounds / minutes / paid-wakes**, plus the **stick-timeout**.
+   - P1 (the spine) is **building**. Budgets locked: **10 rounds / 30 min / 30 wakes / 90s stick-timeout**, Harper wake cap ~4. Board schema drafted (Notion "Agent Room P1 — board schema") → Harper reviews/applies to sandbox. Claude building room-view (preview published) + wrappers + conductor; nothing finalized until Harper reviews.
    - PinchTab (browser control) parked for P4 — outbound-only, version-pinned, vet-before-run.
 3. **Vendored skills** — `agent-teams` coordination skills live in `.claude/skills/` (MIT, wshobson/agents).
 
