@@ -25,7 +25,18 @@ returns a **TURN** `{ body, kind, tag, atMention }` or `null` (= not ready).
 - This is defence in depth on top of `room_post_bot`, which already blocks `decide` and the
   `austin` seat at the database.
 
-Tested — `june-route.test.mjs` (**19/19**).
+### Hardening (Harper's review)
+- Kinds / tags / body-length mirror the DB CHECK constraints via `../contract.mjs` (kept in sync
+  with the schema): an off-list or unicode-trick kind becomes `propose`, a bad tag is dropped,
+  and the body is clamped to 8000 chars — so a turn can't reach the DB only to be thrown out.
+- `june-server.mjs` requires a shared `x-room-token` (timing-safe compare), binds to `127.0.0.1`
+  by default, **fails closed** with no token set, and returns generic errors (no env/key leak).
+- The model call is time-capped (~18s) in both the handler and the conductor's `webhookAdapter`,
+  so a hung route never blows the 90s stick.
+- `receipt` / `review_ready` are not trusted from the generic turn path — the builder seat sets
+  them through its own authorized guard, so a bot can't forge "ready for review".
+
+Tested — `june-route.test.mjs` (**24**) + `june-server.test.mjs` (auth, **6**).
 
 ## Next
 **Harper's reviewer route** is the same shape (a `review`-oriented protocol), once June's is

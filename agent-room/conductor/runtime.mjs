@@ -85,7 +85,12 @@ export function makeConductor({ connectionString = process.env.CONDUCTOR_DATABAS
     );
     if (!v.ok) return { done: false, rejected: v.error, seat: m.current_seat, budget };
 
-    await postBot(meetingId, m.current_seat, turn.body, turn.kind || "propose", turn.tag || null, turn.receipt || null, !!turn.reviewReady);
+    try {
+      await postBot(meetingId, m.current_seat, turn.body, turn.kind || "propose", turn.tag || null, turn.receipt || null, !!turn.reviewReady);
+    } catch (e) {
+      // the board rejected the post (CHECK, trigger, etc.) — don't advance; surface it.
+      return { done: false, postFailed: String(e.message || e), seat: m.current_seat, budget };
+    }
 
     const eff = tagEffect(turn.tag);
     if (eff.action === "stop") {

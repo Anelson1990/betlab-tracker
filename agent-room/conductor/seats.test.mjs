@@ -18,11 +18,17 @@ console.log("normalizeTurn");
 eq("string -> propose turn", normalizeTurn("hello", { seatNames: names }).kind, "propose");
 eq("null -> null (still working)", normalizeTurn(null), null);
 eq("blank body -> null", normalizeTurn({ body: "   " }), null);
-eq("bot decide downgraded to propose", normalizeTurn({ body: "x", kind: "decide" }).kind, "propose");
+eq("decide downgraded to propose", normalizeTurn({ body: "x", kind: "decide" }).kind, "propose");
+eq("system downgraded to propose", normalizeTurn({ body: "x", kind: "system" }).kind, "propose");
+eq("unknown kind -> propose", normalizeTurn({ body: "x", kind: "admin" }).kind, "propose");
+eq("uppercase bot kind normalized", normalizeTurn({ body: "x", kind: "Delegate" }).kind, "delegate");
+eq("unicode-trick kind -> propose", normalizeTurn({ body: "x", kind: "revıew" }).kind, "propose");
+eq("receipt/review-ready are dropped (untrusted here)", "receipt" in normalizeTurn({ body: "done", reviewReady: true, receipt: "job#9" }), false);
 eq("parses @mention from body", normalizeTurn({ body: "ok @Harper review" }, { seatNames: names }).atMention, "harper");
-eq("explicit atMention wins", normalizeTurn({ body: "text", atMention: "claude" }, { seatNames: names }).atMention, "claude");
-eq("receipt + review-ready preserved", normalizeTurn({ body: "done", reviewReady: true, receipt: "job#9" }).receipt, "job#9");
-eq("tag lowercased", normalizeTurn({ body: "y", tag: "NEEDS_AUSTIN" }).tag, "needs_austin");
+eq("explicit atMention wins (@ stripped)", normalizeTurn({ body: "text", atMention: "@Claude" }, { seatNames: names }).atMention, "claude");
+eq("tag normalized", normalizeTurn({ body: "y", tag: "NEEDS_AUSTIN" }).tag, "needs_austin");
+eq("junk tag dropped", normalizeTurn({ body: "y", tag: "explode" }).tag, null);
+eq("overlong body clamped to 8000", normalizeTurn({ body: "a".repeat(9000) }).body.length, 8000);
 
 (async () => {
   console.log("dispatcher (fixture)");

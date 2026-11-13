@@ -26,8 +26,8 @@ async function claudeComplete(/* ctx */) {
 const conductor = makeConductor({ connectionString: process.env.CONDUCTOR_DATABASE_URL });
 const getTurn = makeDispatcher({
   claude: claudeAdapter(claudeComplete),
-  june: webhookAdapter(process.env.ROOM_JUNE_URL),
-  harper: webhookAdapter(process.env.ROOM_HARPER_URL),
+  june: webhookAdapter(process.env.ROOM_JUNE_URL, { token: process.env.ROOM_SEAT_TOKEN }),
+  harper: webhookAdapter(process.env.ROOM_HARPER_URL, { token: process.env.ROOM_SEAT_TOKEN }),
 });
 
 async function loop() {

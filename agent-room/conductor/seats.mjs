@@ -14,6 +14,8 @@
 //                        `complete()` so the deploy wires the real Anthropic call
 //                        (keeps security-critical reasoning on the strong model).
 
+import { botKind, validTag, clampBody } from "../contract.mjs";
+
 export function extractMention(body, seatNames) {
   const m = String(body || "").match(/@([A-Za-z][\w-]*)/);
   if (!m) return null;
@@ -24,18 +26,15 @@ export function extractMention(body, seatNames) {
 export function normalizeTurn(raw, { seatNames = [] } = {}) {
   if (raw == null) return null; // seat still working / not ready
   const t = typeof raw === "string" ? { body: raw } : raw;
-  if (!t.body || !String(t.body).trim()) return null;
-  let kind = (t.kind || "propose").toLowerCase();
-  if (kind === "decide") kind = "propose"; // bots can never DECIDE — downgrade, don't throw
-  const atMention = t.atMention || extractMention(t.body, seatNames);
-  return {
-    body: String(t.body),
-    kind,
-    tag: t.tag ? String(t.tag).toLowerCase() : null,
-    receipt: t.receipt || null,
-    reviewReady: !!t.reviewReady,
-    atMention: atMention || null,
-  };
+  const body = clampBody(t && t.body); // trim + clamp to the DB's 8000-char max
+  if (!body) return null;
+  const explicit = t.atMention ? String(t.atMention).toLowerCase().replace(/^@/, "") : null;
+  const atMention = explicit || extractMention(body, seatNames);
+  // kind -> a valid bot kind (decide / system / unknown / unicode trick -> propose).
+  // receipt and review_ready are NOT trusted from this generic path — a bot must
+  // not be able to self-assert "ready for review" and burn a reviewer's wake. The
+  // builder seat sets those through its own authorized guard when it's built.
+  return { body, kind: botKind(t.kind), tag: validTag(t.tag), atMention: atMention || null };
 }
 
 // Dispatcher: getTurn(seat, ctx) -> normalized TURN (or null). `registry` maps a
@@ -63,26 +62,36 @@ export function fixtureAdapter(script) {
   };
 }
 
-// Webhook adapter for an external bot route (June / Harper). Deploy-time: pass
-// the route URL (keep it in env) + optionally a fetch impl. POSTs
-// { seat, meeting, thread } and expects a TURN (or null) back. A route that is
-// down / errors yields null -> the seat is "not ready" and the conductor waits
-// or times the stick out; it never fabricates a turn.
-export function webhookAdapter(url, fetchImpl) {
+// Webhook adapter for an external bot route (June / Harper). Deploy-time options:
+//   { token, timeoutMs = 18000, fetchImpl }
+// POSTs { seat, meeting, thread } with a shared-secret `x-room-token` header and
+// aborts after timeoutMs so a slow/hung route never blows the 90s stick. A route
+// that is down / slow / errors yields null -> the seat is "not ready" and the
+// conductor waits or times the stick out; it never fabricates a turn. Keep both
+// the route URL and the token in env, off the repo.
+export function webhookAdapter(url, opts = {}) {
+  const { token, timeoutMs = 18000, fetchImpl } = opts;
   const f = fetchImpl || (typeof fetch !== "undefined" ? fetch : null);
   return async function (seat, ctx) {
     if (!url || !f) return null;
     const thread = ctx && ctx.readThread ? await ctx.readThread() : null;
+    const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
     try {
+      const headers = { "content-type": "application/json" };
+      if (token) headers["x-room-token"] = token;
       const res = await f(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers,
         body: JSON.stringify({ seat, meeting: ctx && ctx.meeting, thread }),
+        signal: ctl ? ctl.signal : undefined,
       });
       if (!res || !res.ok) return null;
       return await res.json();
     } catch (e) {
-      return null;
+      return null; // timeout / abort / network / bad json -> not ready
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   };
 }

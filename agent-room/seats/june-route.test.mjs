@@ -31,6 +31,11 @@ eq("blank body -> null", guardJuneTurn({ body: "   " }), null);
 eq("plain string -> body", guardJuneTurn("just thinking out loud").body, "just thinking out loud");
 eq("JSON string parsed", guardJuneTurn('{"body":"ok","tag":"pass"}').tag, "pass");
 eq("@ stripped from atMention", guardJuneTurn({ body: "x", atMention: "@Claude" }).atMention, "claude");
+eq("admin kind -> propose", guardJuneTurn({ body: "x", kind: "admin" }).kind, "propose");
+eq("uppercase kind normalized", guardJuneTurn({ body: "x", kind: "Delegate" }).kind, "delegate");
+eq("unicode-trick kind -> propose", guardJuneTurn({ body: "x", kind: "decıde" }).kind, "propose");
+eq("overlong body clamped to 8000", guardJuneTurn({ body: "a".repeat(9000) }).body.length, 8000);
+eq("whitespace-only JSON body -> null", guardJuneTurn('{"body":"   "}'), null);
 
 (async () => {
   console.log("makeJuneHandler");

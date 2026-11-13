@@ -48,7 +48,7 @@ const server = http.createServer(async (req, res) => {
     return res.end(HEAD + content + "</body></html>");
   } catch (e) {
     res.writeHead(500, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: String(e.message || e) }));
+    res.end('{"error":"internal"}'); // generic — never leak env/key details
   }
 });
 

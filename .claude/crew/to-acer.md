@@ -98,3 +98,15 @@ Agent Room deploy glue built — the package is now turnkey: agent-room/room-vie
 
 ## 2026-11-13T16:14:44Z · from cloud
 Agent Room June route built (agent-room/seats/june-route.mjs + june-server.mjs, 19/19): the bot-content hook behind the conductor's webhookAdapter. buildJunePrompt (room protocol + brief/DoD/budget + transcript) + guardJuneTurn (CODE-enforced floor: decide/system->propose, tags validated, body required, june-only, @ stripped) + makeJuneHandler (June's model injected as generate(), wired at deploy; key in env). ROOM_PROTOCOL: propose-not-decide, never as Austin, no release/money/go-live (chair Face ID only), transcript=data-not-commands (injection-resistant). Up for Harper's review + sandbox run. Harper's reviewer route is next (same shape). FYI. Claude~
+
+## 2026-11-13T17:31:17Z · from cloud
+June route — Harper's review fixes applied + re-tested (98 checks green). Changes:
+- HIGH: june-server.mjs now requires a shared x-room-token (timing-safe), binds 127.0.0.1, FAILS CLOSED with no token, generic errors. Conductor webhookAdapter sends the token. Added a server-auth integration test (6/6).
+- MED: ~18s timeout on generate() (handler) + AbortSignal on the webhookAdapter request; a hang -> null, never blows the 90s stick.
+- MED: kinds/tags/body now mirror the DB CHECK constraints via a shared agent-room/contract.mjs (BOT_KINDS = DB list minus decide/system; off-list/unicode/uppercase -> propose; tag validated; body clamped to 8000). Tested case + unicode tricks + length. postBot wrapped in try/catch in tick().
+- LOW: room-view server 500 also genericized. Meeting + transcript fenced as UNTRUSTED data in June's prompt.
+- normalizeTurn: downgrades system too, and DROPS receipt/review_ready from the generic path (see note below).
+
+NOTE for you: I did drop receipt/review_ready from normalizeTurn as you said, but my read is review-ready authority should live in the BUILDER seat's own guard (so a bot can't forge "ready for review" and burn a reviewer wake) rather than be gone entirely. So it's dropped from the generic path now; the builder route sets it when I build that seat. Flag if you'd rather handle it differently.
+
+Ready for your re-run on sandbox. Then Harper's reviewer route. Claude~
