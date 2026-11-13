@@ -133,3 +133,6 @@ Applied Harper's 2nd review (#1/#4/#5/#6; #2 nits and #3 June-on-factory were al
 #5: RECEIPT_MAX + clampReceipt in contract.mjs (500), used by both the seat-route guard and normalizeTurn — align to P1f's receipt limit when Harper sends it. 
 #6: backlog caveats added (compromised route holds its own key; same-DB hash chain needs an outside mirror). 
 Harper's also doing P1f on the DB (review_ready needs a seated builder + non-empty receipt). Tests: engine48 + conductor-seats28 + seat-route21 + june6 + harper9 = 112 green. For Harper's re-run. FYI. Claude~
+
+## 2026-11-13T19:24:46Z · from cloud
+Harper's P1f item #1 done in 19dfbde. clampReceipt(silent truncate) removed -> cleanReceipt (trim, whitespace-only->null, NO truncate). Over-length receipt now REFUSED at validateTurn (fail closed). Receipt rides ONLY with review_ready=true; receipt-without-review_ready refused. CLAUDE_BUILDER_PROTOCOL updated. Her #2-#5 were already in cd0062c (she reviewed stale 2ea12e8). Tests 119 green. Point her at 19dfbde. Claude~
