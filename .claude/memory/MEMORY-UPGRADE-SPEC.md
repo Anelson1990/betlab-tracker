@@ -68,3 +68,60 @@ this size; restructuring for its own sake is complexity that isn't earning its k
    secrets.)
 
 _— Claude~_
+
+---
+
+## Stage 1 — build status (Acer seat, 2026-11-12) · UP FOR HARPER'S REVIEW
+Chair call: Austin, "Yes, Acer builds it" (Stage 1 only; archives gitignored/local).
+
+**Built (not registered — `settings.json` untouched):**
+- `.claude/hooks/session-end.sh` — copies the transcript to
+  `.claude/memory/sessions/<UTC>_<session_id>.jsonl` + one marker line in `sessions/index.log`.
+  Pure bash (no jq/python, no forks in parsing). Rejects unsafe `session_id` (path traversal),
+  non-`.jsonl` paths, missing files. Always exits 0 — can never break session exit.
+- `.claude/hooks/pre-compact.sh` — stdout = compaction-summary instructions: keep a
+  "Durable decisions & facts" section (who decided — chair decides, bots propose), open items,
+  exact IDs, no secrets, and mark anything not in `log.md` as `UNLOGGED`; appends the last 15
+  `log.md` entries so the summarizer can compare. Always exits 0 — never blocks compaction.
+- `.gitignore` += `.claude/memory/sessions/`.
+- `.claude/hooks/memory-hooks.test.sh` — 13 checks with realistic stdin payloads.
+- `remember.sh` / `log.md` unchanged — still the curated source of truth.
+
+**Docs re-check (code.claude.com/docs/en/hooks, read 2026-11-12) — corrections to the table above:**
+- SessionEnd: input = common fields + `reason` (`clear|resume|logout|prompt_input_exit|other`).
+  No decision control; JSON output discarded. **Default budget 1.5 s** total (raise via per-hook
+  `timeout`, up to 60 s, or `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS`). The docs don't literally
+  say "shell-only" — the accurate claim is *no model turn / no decision control*, so it can't
+  make Claude write anything. Same conclusion.
+- PreCompact: input = common fields + `trigger` (`manual|auto`) + `custom_instructions`.
+  Exit 0 → stdout used as summary instructions (cap 10,000 chars). **Exit 2 or
+  `"decision":"block"` blocks compaction** (for auto-compact at the context limit that fails
+  the request) — our script never does this.
+
+**Receipts:**
+- `bash .claude/hooks/memory-hooks.test.sh` → `13 passed, 0 failed` on Git Bash (native Windows)
+  **and** on Linux (WSL Ubuntu, no `cygpath` branch).
+- Real run on this seat's live transcript (1.4 MB): archived in 0.37 s; `git check-ignore -v`
+  matched `.gitignore:7:.claude/memory/sessions/` for both files; `git status` didn't list them.
+  (First draft took ~1.0 s on Git Bash — too close to the 1.5 s budget — rewritten fork-free.)
+- `session-start.sh` + `settings.json` unchanged vs HEAD; SessionStart output identical.
+
+**NOT tested (needs registration first):** the hooks actually *firing* from Claude Code; whether
+the compaction summary really carries decisions forward (needs a real `/compact` after wiring);
+`index.log` growth over time (no rotation yet — tiny lines, fine for now).
+
+**Proposed `settings.json` snippet — for Harper to review, do not apply before:**
+```json
+{
+  "hooks": {
+    "SessionStart": [ { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh" } ] } ],
+    "SessionEnd":   [ { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh", "timeout": 10 } ] } ],
+    "PreCompact":   [ { "hooks": [ { "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh" } ] } ]
+  }
+}
+```
+`timeout: 10` raises the SessionEnd budget from 1.5 s so a big transcript copy isn't cut off.
+After wiring, verify: end a session → new file in `sessions/`; run `/compact` → summary has the
+"Durable decisions & facts" section with `UNLOGGED` marks.
+
+_— Claude~ (Acer)_

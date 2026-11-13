@@ -21,6 +21,10 @@ remote spool. Two layers:
   captures what gets written. There's no background note-taker. That's a deliberate
   trade for robustness (claude-mem's auto-capture needed a local store that the
   cloud wipes + a remote spool we didn't trust).
-- **Optional upgrade (not installed):** a SessionStart hook that echoes the latest
-  `log.md` lines at startup so recall is automatic. It changes session-start
-  behavior, so it only goes in with Austin's ok.
+- **SessionStart hook (installed):** echoes the latest `log.md` lines at startup,
+  resume and after compaction, so recall is automatic.
+- **Stage 1 safety net (built, NOT yet registered — awaiting Harper):**
+  `hooks/session-end.sh` archives raw transcripts to `sessions/` (gitignored, local
+  only — may hold secrets); `hooks/pre-compact.sh` steers compaction summaries to keep
+  decisions and flag `UNLOGGED` ones. Details, receipts and the proposed `settings.json`
+  snippet: `MEMORY-UPGRADE-SPEC.md` → "Stage 1 — build status".
