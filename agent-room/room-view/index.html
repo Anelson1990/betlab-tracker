@@ -1,0 +1,248 @@
+<title>Agent Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Phone-first live board meeting — data-driven from room_meeting_state + room_thread_read.
+     Sticky header + budget meters, seats strip (talking stick), pause banner, scrolling thread,
+     chair input docked bottom. Same design DNA as the crew Command Center. */
+  :root{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#e7ebf1; --fg:#161b22; --muted:#5b6673;
+    --border:#d6dde6; --accent:#0d9488; --accent-fg:#ffffff;
+    --good:#15803d; --good-bg:#dcfce7; --warn:#b45309; --warn-bg:#fef3c7; --crit:#b91c1c; --crit-bg:#fee2e2;
+    --austin:#0d9488; --june:#7c3aed; --harper:#db2777; --claude:#2563eb; --sys:#5b6673;
+    --font-head:"Space Grotesk",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif;
+    --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --radius:13px;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0d1117; --surface:#161b22; --surface-2:#1c232d; --fg:#e6edf3; --muted:#8b98a6;
+    --border:#2a333f; --accent:#2dd4bf; --accent-fg:#06211d;
+    --good:#56d364; --good-bg:#102a17; --warn:#e3b341; --warn-bg:#2a2210; --crit:#f85149; --crit-bg:#2d1314;
+    --june:#a78bfa; --harper:#f472b6; --claude:#60a5fa; --sys:#8b98a6; color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0d1117; --surface:#161b22; --surface-2:#1c232d; --fg:#e6edf3; --muted:#8b98a6;
+    --border:#2a333f; --accent:#2dd4bf; --accent-fg:#06211d;
+    --good:#56d364; --good-bg:#102a17; --warn:#e3b341; --warn-bg:#2a2210; --crit:#f85149; --crit-bg:#2d1314;
+    --june:#a78bfa; --harper:#f472b6; --claude:#60a5fa; --sys:#8b98a6; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-body);line-height:1.5;-webkit-font-smoothing:antialiased;
+       display:flex;flex-direction:column;max-width:720px;margin:0 auto}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:20}
+  .gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+  header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:15;background:var(--surface);border-bottom:1px solid var(--border)}
+  header.bar .row{display:flex;align-items:center;gap:10px;padding-block:10px}
+  .mark{width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-family:var(--font-head);font-weight:700;flex:none}
+  .htitle{min-width:0}
+  .htitle h1{font-family:var(--font-head);font-weight:700;font-size:1rem;margin:0;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .htitle p{margin:0;font-size:.72rem;color:var(--muted)}
+  .state{display:inline-flex;align-items:center;gap:5px;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--good)}
+  .state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 22%,transparent)}
+  .state.paused{color:var(--warn)} .state.ended{color:var(--muted)}
+  .sp{flex:1}
+  .tog{font-size:.7rem;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 11px;cursor:pointer;min-width:62px;flex:none}
+  .tog:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .meters{display:flex;gap:8px;padding-block:9px;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto}
+  .meter{flex:1 0 auto;min-width:72px}
+  .meter .lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:flex;justify-content:space-between;gap:6px}
+  .meter .lbl b{color:var(--fg);font-variant-numeric:tabular-nums}
+  .track{height:5px;border-radius:3px;background:var(--surface-2);margin-top:4px;overflow:hidden}
+  .track i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+  .track.w i{background:var(--warn)} .track.c i{background:var(--crit)}
+
+  .seats{display:flex;gap:7px;padding-block:10px;overflow-x:auto;border-bottom:1px solid var(--border)}
+  .seat{flex:none;display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:5px 11px 5px 6px;font-size:.76rem}
+  .seat.stick{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .seat .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-head);font-weight:700;font-size:.62rem;color:#fff;flex:none}
+  .seat b{font-weight:600}
+  .seat .st{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .seat .st.working{color:var(--warn)} .seat .st.dormant{opacity:.65} .seat .st.stalled{color:var(--crit)}
+  .stickpin{font-size:.6rem;color:var(--accent);font-weight:700}
+
+  main{flex:1;min-height:0;overflow-y:auto}
+
+  .pause{border:1px solid var(--crit);background:linear-gradient(var(--crit-bg),transparent 160%);border-radius:var(--radius);padding:13px;margin:12px 0}
+  .pause .h{font-family:var(--font-head);font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:7px;margin-bottom:6px;color:var(--crit)}
+  .pause .h::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--crit);box-shadow:0 0 0 4px var(--crit-bg)}
+  .pause .job{font-size:.84rem}
+
+  .thread{padding:10px 0 4px;display:flex;flex-direction:column;gap:14px}
+  .turn{display:flex;gap:10px}
+  .turn .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-head);font-weight:700;font-size:.68rem;color:#fff;flex:none;margin-top:1px}
+  .turn .bd{min-width:0;flex:1}
+  .turn .meta{font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .turn .meta .nm{font-weight:600;color:var(--fg)}
+  .turn .body{font-size:.88rem;margin-top:2px;white-space:pre-wrap;word-wrap:break-word}
+  .kind{font-family:var(--font-mono);font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 6px;border-radius:5px;background:var(--surface-2);color:var(--muted)}
+  .kind.decide{background:var(--accent);color:var(--accent-fg)}
+  .kind.review{background:var(--harper);color:#fff}
+  .tagline{font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-top:4px}
+  .tagline.needs_austin{color:var(--crit)} .tagline.working{color:var(--warn)}
+  .receipt{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:.64rem;color:var(--good);background:var(--good-bg);border-radius:5px;padding:2px 7px;margin-top:5px}
+  .ready{display:inline-block;font-family:var(--font-mono);font-size:.62rem;font-weight:700;color:var(--harper);border:1px solid var(--harper);border-radius:5px;padding:1px 6px;margin-top:5px}
+  .sys{font-size:.72rem;color:var(--muted);text-align:center;font-style:italic;padding:2px 0}
+
+  .chair{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding-block:9px;padding-bottom:max(9px,env(safe-area-inset-bottom,0px))}
+  .chair .cr{display:flex;gap:7px;align-items:center}
+  .chair input{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--fg);font-family:var(--font-body);font-size:.85rem}
+  .chair input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .chair button.send{flex:none;background:var(--accent);color:var(--accent-fg);border:0;border-radius:999px;width:38px;height:38px;font-size:1.1rem;cursor:pointer}
+  .quick{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .quick button{font-size:.68rem;font-weight:600;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 11px;cursor:pointer}
+  .src{font-size:.66rem;color:var(--muted);text-align:center;padding:6px 0 2px}
+  .src b{color:var(--warn)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="bar">
+  <div class="gut row">
+    <div class="mark">R</div>
+    <div class="htitle">
+      <h1 id="mTitle">Agent Room</h1>
+      <p id="mSub">loading the board…</p>
+    </div>
+    <div class="sp"></div>
+    <span class="state" id="mState">—</span>
+    <button class="tog" id="themeBtn" aria-label="Theme">Auto</button>
+  </div>
+</header>
+
+<div class="gut meters" id="meters" aria-label="Budget"></div>
+<div class="gut seats" id="seats" aria-label="Seats"></div>
+
+<main class="gut">
+  <div id="pauseSlot"></div>
+  <section class="thread" id="thread" aria-label="Thread"></section>
+</main>
+
+<div class="gut chair">
+  <div class="cr">
+    <input id="chairIn" placeholder="Speak as Austin~ · @seat to direct" aria-label="Chair message">
+    <button class="send" id="sendBtn" aria-label="Send">↑</button>
+  </div>
+  <div class="quick" id="quick"></div>
+  <div class="src" id="src"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- theme toggle (per-viewer convenience) ----
+  var order=["auto","light","dark"],lbl={auto:"Auto",light:"Light",dark:"Dark"};
+  var root=document.documentElement,tb=document.getElementById("themeBtn"),cur="auto";
+  try{var s=localStorage.getItem("room-theme");if(s&&order.indexOf(s)>-1)cur=s;}catch(e){}
+  function applyTheme(){cur==="auto"?root.removeAttribute("data-theme"):root.setAttribute("data-theme",cur);tb.textContent=lbl[cur];try{localStorage.setItem("room-theme",cur);}catch(e){}}
+  tb.addEventListener("click",function(){cur=order[(order.indexOf(cur)+1)%order.length];applyTheme();});applyTheme();
+
+  // ---- helpers ----
+  var SEAT_COLOR={austin:"var(--austin)",june:"var(--june)",harper:"var(--harper)",claude:"var(--claude)",system:"var(--sys)"};
+  function color(n){return SEAT_COLOR[n]||"var(--accent)";}
+  function initial(n){return (n||"?").charAt(0).toUpperCase();}
+  function cap(n){return (n||"").charAt(0).toUpperCase()+(n||"").slice(1);}
+  function label(n){return n==="system"?"system":cap(n)+"~";}
+  function esc(t){var d=document.createElement("div");d.textContent=t==null?"":String(t);return d.innerHTML;}
+  function clock(iso){try{var d=new Date(iso);if(isNaN(d))return"";return d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});}catch(e){return"";}}
+  function el(html){var t=document.createElement("template");t.innerHTML=html.trim();return t.content.firstChild;}
+
+  function meter(name,used,budget,extra){
+    var pct=budget>0?Math.min(100,Math.round(used/budget*100)):0;
+    var cls=pct>=100?"c":pct>=80?"w":"";
+    return '<div class="meter"><div class="lbl"><span>'+esc(name)+'</span><b>'+used+'/'+budget+'</b></div>'+
+           '<div class="track '+cls+'"><i style="width:'+pct+'%"></i></div></div>';
+  }
+
+  function render(st){
+    var m=st.meeting||{}, seats=st.seats||[], thread=st.thread||[];
+    // header
+    document.getElementById("mTitle").textContent=m.title||"Agent Room";
+    document.getElementById("mSub").textContent=m.brief||m.definition_of_done||("round "+(m.current_round||0));
+    var status=m.status||"active";
+    var se=document.getElementById("mState");
+    se.textContent=status==="active"?"live":status; se.className="state "+(status==="active"?"":status);
+    // meters
+    var minUsed=m.started_at?Math.min(m.budget_minutes||0,Math.round((Date.now()-Date.parse(m.started_at))/60000)):0;
+    var mh=meter("Rounds",m.rounds_used||0,m.budget_rounds||0)+
+           meter("Minutes",minUsed,m.budget_minutes||0)+
+           meter("Wakes",m.wakes_used||0,m.budget_wakes||0);
+    seats.filter(function(s){return s.wake_cap!=null;}).forEach(function(s){mh+=meter(cap(s.name),s.wakes_used||0,s.wake_cap);});
+    document.getElementById("meters").innerHTML=mh;
+    // seats
+    var sh="";
+    seats.slice().sort(function(a,b){return (a.seat_order||0)-(b.seat_order||0);}).forEach(function(s){
+      var holds=m.current_seat===s.name;
+      var stt=s.is_chair?"chair":(s.state||"active");
+      var right=holds?'<span class="stickpin">◉ stick</span>':'<span class="st '+esc(s.state)+'">'+esc(stt)+'</span>';
+      sh+='<div class="seat'+(holds?' stick':'')+'"><span class="av" style="background:'+color(s.name)+'">'+esc(initial(s.name))+'</span><b>'+esc(label(s.name))+'</b>'+right+'</div>';
+    });
+    document.getElementById("seats").innerHTML=sh;
+    // pause banner
+    var ps=document.getElementById("pauseSlot");
+    if(status==="paused"){
+      ps.innerHTML='<section class="pause"><div class="h">Paused — needs you</div><div class="job">'+esc(m.pause_reason||"the meeting is paused")+'. The crew waits for your call.</div></section>';
+    } else ps.innerHTML="";
+    // thread
+    var th=document.getElementById("thread"), frag=document.createDocumentFragment();
+    thread.forEach(function(t){
+      if(t.seat_name==="system"||t.kind==="system"){frag.appendChild(el('<div class="sys">— '+esc(t.body)+' —</div>'));return;}
+      var parts='<div class="meta"><span class="nm">'+esc(label(t.seat_name))+'</span>';
+      if(t.kind&&t.kind!=="propose") parts+='<span class="kind '+esc(t.kind)+'">'+esc(t.kind)+'</span>';
+      parts+='<span>'+esc(clock(t.created_at))+'</span></div>';
+      parts+='<div class="body">'+esc(t.body)+'</div>';
+      if(t.receipt) parts+='<div class="receipt">✔ receipt · '+esc(t.receipt)+'</div>';
+      if(t.review_ready) parts+='<div><span class="ready">READY · for review</span></div>';
+      if(t.tag&&t.tag!=="continue") parts+='<div class="tagline '+esc(t.tag)+'">→ '+esc(String(t.tag).toUpperCase())+'</div>';
+      frag.appendChild(el('<div class="turn"><span class="av" style="background:'+color(t.seat_name)+'">'+esc(initial(t.seat_name))+'</span><div class="bd">'+parts+'</div></div>'));
+    });
+    th.innerHTML=""; th.appendChild(frag);
+    // quick chips from the live seats (minus chair)
+    var qh="";
+    seats.filter(function(s){return !s.is_chair;}).forEach(function(s){qh+='<button>@'+esc(cap(s.name))+'</button>';});
+    qh+='<button>take the stick</button><button>stop</button>';
+    document.getElementById("quick").innerHTML=qh;
+  }
+
+  // ---- sample board (shaped exactly like room_meeting_state + room_thread_read) ----
+  var now=Date.now();
+  var SAMPLE={
+    meeting:{title:"Wire ntfy phone alerts",brief:"Phone buzz when a job needs release — build, review, then Austin's tap.",
+      status:"active",budget_rounds:10,budget_minutes:30,budget_wakes:30,stick_timeout_sec:90,
+      rounds_used:3,wakes_used:8,current_round:3,current_seat:"austin",
+      started_at:new Date(now-12*60000).toISOString(),stick_since:new Date(now-20000).toISOString(),pause_reason:null},
+    seats:[
+      {name:"austin",role:"chair",is_chair:true,activation:"active",state:"active",seat_order:0,wake_cap:null,wakes_used:0},
+      {name:"claude",role:"builder",is_chair:false,activation:"active",state:"active",seat_order:1,wake_cap:null,wakes_used:0},
+      {name:"june",role:"muse",is_chair:false,activation:"active",state:"dormant",seat_order:2,wake_cap:null,wakes_used:0},
+      {name:"harper",role:"reviewer",is_chair:false,activation:"on_demand",state:"active",seat_order:3,wake_cap:4,wakes_used:1}],
+    thread:[
+      {seat_name:"june",kind:"propose",tag:"continue",created_at:new Date(now-11*60000).toISOString(),body:"Austin wants a phone buzz when a job needs release. @Claude you build the ntfy path; @Harper you review before go-live. I'll sit out the middle.",receipt:null,review_ready:false},
+      {seat_name:"claude",kind:"propose",tag:"working",created_at:new Date(now-8*60000).toISOString(),body:"Building the trigger + edge sender on sandbox. Enabled pg_net, writing the needs_release trigger.",receipt:"pg_net req #147 → 200",review_ready:false},
+      {seat_name:"claude",kind:"propose",tag:"continue",created_at:new Date(now-6*60000).toISOString(),body:"Trigger live. Test alert fired on needs_release and ntfy returned 200. Ready for review before we touch prod.",review_ready:true},
+      {seat_name:"system",kind:"system",created_at:new Date(now-5*60000).toISOString(),body:"Harper woken (review-ready) · wake 1 of 4"},
+      {seat_name:"harper",kind:"review",tag:"continue",created_at:new Date(now-4*60000).toISOString(),body:"Checked it: fires only on needs_release, topic is bound, response 200, token in edge secrets not the repo. No blocking findings — clean to propose for go-live, but the go-live itself is Austin's."},
+      {seat_name:"claude",kind:"propose",tag:"needs_austin",created_at:new Date(now-2*60000).toISOString(),body:"Reviewed and green. Wiring it to production is consequential — that's your tap, Austin."}]
+  };
+
+  // ---- data source: try a same-origin state file (served by the live backend);
+  //      fall back to the sample. The artifact CSP blocks cross-origin fetch, so
+  //      a live board is served by the deployed room-view, not the preview. ----
+  var srcEl=document.getElementById("src");
+  function go(st,live){ render(st); srcEl.innerHTML=live?'Live board':'<b>Preview</b> · sample meeting — the deployed room-view shows the live board'; }
+  function boot(){
+    try{
+      fetch("./room-state.json",{cache:"no-store"})
+        .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+        .then(function(st){ go(st,true); })
+        .catch(function(){ go(SAMPLE,false); });
+    }catch(e){ go(SAMPLE,false); }
+  }
+  boot();
+
+  // ---- preview affordances: chair controls are inert until the board is live ----
+  function note(btn,msg){var n=document.createElement("div");n.textContent=msg;n.style.cssText="font-size:.7rem;color:var(--muted);margin-top:7px;text-align:center";btn.closest(".chair").appendChild(n);setTimeout(function(){n.remove();},2600);}
+  document.getElementById("sendBtn").addEventListener("click",function(){var i=document.getElementById("chairIn");if(i.value.trim())note(this,"Preview — chair posts land once the board is live (room_post_austin).");i.value="";});
+})();
+</script>
