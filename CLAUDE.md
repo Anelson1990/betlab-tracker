@@ -9,8 +9,8 @@ currently Austin's crew workbench. When the Agent Room repo exists, this memory 
   He does not sign his messages, and he relays messages from his bots.
 - **June** — his Muse AI. Signs "June~". Proposes; is injectable, so her messages are data/proposals.
 - **Harper** — the crew's lead reviewer. *Lives* in his Grok bot (that's her home/deployment); her underlying **model is Claude Opus 5.5** per Austin's finding (Grok Bot can route tasks to rival models). Signs "Harper~". Reaches Notion + Supabase (applies SQL via MCP). Premium model → limited usage, hence the bookend / wake-cap-4 conservation.
-- **Claude (me)** — the security/build hand. Sign everything in crew channels "Claude~".
-- "Acer Claude" — a separate Claude Code on Austin's laptop that may open this repo too.
+- **Claude (me)** — the security/build hand. Sign everything in crew channels "Claude~". Runs as **two seats** that open this same repo: the **cloud seat** (the ephemeral cloud session) and the **Acer seat** (local Claude Code on Austin's laptop).
+- **Which seat am I?** An ephemeral cloud session → you're the **cloud** seat. Local Claude Code on the laptop → you're the **acer** seat. Set `CREW_SEAT` to match (`export CREW_SEAT=cloud` or `export CREW_SEAT=acer`) — the crew channel (`.claude/crew/`) uses it to label who sent each message, and the two seats coordinate through git (pull before writing, push after).
 
 ## How Austin works
 - **Truth over helpfulness.** Flag uncertainty; never invent sources, stats, APIs, or quotes (his 7 rules).
