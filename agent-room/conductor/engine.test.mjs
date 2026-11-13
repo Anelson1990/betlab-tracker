@@ -37,7 +37,8 @@ console.log("wakeDecision");
 eq("harper under cap wakes", wakeDecision({ activation: "on_demand", wakeCap: 4, wakesUsed: 1 }).wake, true);
 eq("harper at cap + review pending -> pause for Austin", wakeDecision({ activation: "on_demand", wakeCap: 4, wakesUsed: 4 }, { reviewNeeded: true }).pauseForAustin, true);
 eq("harper at cap, no review -> no wake, no pause", wakeDecision({ activation: "on_demand", wakeCap: 4, wakesUsed: 4 }, { reviewNeeded: false }).pauseForAustin, false);
-eq("active seat always wakes", wakeDecision({ activation: "active" }).wake, true);
+eq("capless seat always wakes", wakeDecision({ activation: "active" }).wake, true);
+eq("any seat with a cap is metered (#3)", wakeDecision({ activation: "active", wakeCap: 2, wakesUsed: 2 }, { reviewNeeded: true }).pauseForAustin, true);
 
 console.log("tagEffect");
 eq("continue advances", tagEffect("continue").action, "advance");

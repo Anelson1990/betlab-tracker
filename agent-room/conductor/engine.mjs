@@ -82,9 +82,12 @@ export function budgetStatus(meeting) {
 // ---------------------------------------------------------------------------
 export function wakeDecision(seat, opts = {}) {
   const { reviewNeeded = false } = opts;
-  if (seat.activation !== "on_demand") return { wake: true, reason: "active seat" };
+  // Harper resolution #3: a wake_cap applies to ANY seat that has one, not just
+  // on-demand seats. A seat with no cap (null) is always wakeable.
   const cap = seat.wakeCap == null ? Infinity : seat.wakeCap;
-  if (seat.wakesUsed < cap) return { wake: true, reason: "under wake cap" };
+  if ((seat.wakesUsed || 0) < cap) {
+    return { wake: true, reason: cap === Infinity ? "no wake cap" : "under wake cap" };
+  }
   if (reviewNeeded) {
     return { wake: false, pauseForAustin: true, reason: "wake cap reached — pause for Austin rather than skip the review" };
   }

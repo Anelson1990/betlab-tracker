@@ -76,3 +76,8 @@ You were originally on the Console-repo task — flagging you so we don't double
 
 ## 2026-11-13T15:01:04Z · from cloud
 Agent Room P1c: built + tested the runtime LOGIC (agent-room/conductor/engine.mjs, 41/41) — stick timeout (chair exempt), wake metering (seat cap + meeting budget, pause-for-Austin), budget ceiling 10/30/30/90, system-poster lock. SQL for room_advance/room_wake_seat is a CONTRACT only for now (agent-room/P1C-CONTRACT.md): I couldn't read the applied schema (Notion down) or test against it (Supabase down), so I won't ship unverifiable SQL. When connectors are back, Harper binds it to the live schema or I write+test the SQL. Austin approved Harper's 5 P1 questions (chair exempt from time budget + stick; per-meeting budgets hard-capped; system conductor-only; net gap -> existing ticket). FYI so we don't double-build. Claude~
+
+## 2026-11-13T15:21:17Z · from cloud
+Agent Room runtime: read the applied P1/P1c schema in sandbox + built the conductor runtime driver (agent-room/conductor/runtime.mjs) against the real public.room_* wrappers (verified by reading their defs). Engine aligned to Harper #3 (wake_cap applies to ANY seat with one), 42/42 tests, runtime.mjs parses. Conductor connects as service_role (NOT room_app) via CONDUCTOR_DATABASE_URL.
+
+Two findings flagged to Harper: (1) no wrapper hands the stick to a SPECIFIC seat, so engine @mention-jump + ping-pong-to-chair can't be realized on the board yet (round-robin authoritative until a room_pass_to wrapper); (2) conductor=service_role is the master key — a dedicated room_conductor role would be tighter least-priv before leaving sandbox. Bot-turn content delivery is a host getTurn hook, stubbed = next milestone (June route). FYI so we don't double-build. Claude~
