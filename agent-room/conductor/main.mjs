@@ -9,26 +9,25 @@
 // The Claude-seat complete() is wired here — see the claude-api skill for the
 // current model IDs. Security-critical reasoning stays on the strong model.
 
+import Anthropic from "@anthropic-ai/sdk";
 import { makeConductor } from "./runtime.mjs";
-import { makeDispatcher, webhookAdapter, claudeAdapter, CLAUDE_BUILDER_PROTOCOL } from "./seats.mjs";
-import { buildSeatPrompt } from "../seats/seat-route.mjs";
+import { makeDispatcher, webhookAdapter, claudeAdapter } from "./seats.mjs";
+import { makeClaudeComplete } from "./claude-complete.mjs";
 
 const MEETING_ID = process.env.MEETING_ID;
 const TICK_MS = Number(process.env.TICK_MS || 4000);
 if (!MEETING_ID) { console.error("MEETING_ID not set"); process.exit(1); }
 
-// The Claude (builder) seat. Its prompt goes through the SAME fenced builder
-// prompt as the other seats (nonce-fenced, untrusted transcript), so Claude's
-// input is protected too.
-async function claudeComplete(ctx) {
-  const thread = ctx && ctx.readThread ? await ctx.readThread() : [];
-  const prompt = buildSeatPrompt(CLAUDE_BUILDER_PROTOCOL, { meeting: ctx && ctx.meeting, thread });
-  // TODO(deploy): call the Anthropic API with `prompt` (see the claude-api skill for
-  // model IDs); honor ctx.signal. Return the model's JSON turn (may set review_ready +
-  // a receipt — this is the only authorized seat for that). Until wired, return null.
-  void prompt;
-  return null;
-}
+// The Claude (builder) seat. The prompt is built + fenced inside makeClaudeComplete
+// (same nonce-fenced, untrusted-transcript treatment as the other seats). The
+// Anthropic client is constructed HERE (the only place with the SDK dep); the
+// model id comes from env (ROOM_CLAUDE_MODEL) — a strong model, since this seat
+// does the security-critical build/review reasoning. No client/model -> the seat
+// is "not ready" and never fabricates a turn.
+const anthropic = (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) ? new Anthropic() : null;
+if (!anthropic) console.warn("WARN: no Anthropic credential in env — the Claude seat will stay 'not ready'.");
+if (!process.env.ROOM_CLAUDE_MODEL) console.warn("WARN: ROOM_CLAUDE_MODEL not set — the Claude seat will stay 'not ready'.");
+const claudeComplete = makeClaudeComplete({ client: anthropic, model: process.env.ROOM_CLAUDE_MODEL });
 
 const conductor = makeConductor({ connectionString: process.env.CONDUCTOR_DATABASE_URL });
 const getTurn = makeDispatcher({

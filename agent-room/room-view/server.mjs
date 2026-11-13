@@ -1,12 +1,12 @@
 // Agent Room — room-view read server (DRAFT, deploy-time).
 //
 // Serves the room-view page and GET /room-state.json by calling the read
-// wrappers as room_app (read-only: EXECUTE on meeting_state + thread_read only;
-// no conductor functions, no writes). Framework-free (node:http + pg) so it
-// deploys anywhere. The page fetches ./room-state.json on its own origin.
+// wrappers as room_reader (read-only: EXECUTE on meeting_state + thread_read
+// only; no conductor functions, no writes). Framework-free (node:http + pg) so
+// it deploys anywhere. The page fetches ./room-state.json on its own origin.
 //
-// NOT run from the cloud seat (needs room_app creds). `node --check` only.
-// Env: ROOM_APP_DATABASE_URL (session pooler, user room_app.<ref>, sslmode=require),
+// NOT run from the cloud seat (needs room_reader creds). `node --check` only.
+// Env: ROOM_READER_DATABASE_URL (session pooler, user room_reader.<ref>, sslmode=require),
 //      MEETING_ID (the active meeting), PORT (default 8787), THREAD_LIMIT (default 200).
 
 import http from "node:http";
@@ -19,7 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
 const MEETING_ID = process.env.MEETING_ID;
 const LIMIT = Number(process.env.THREAD_LIMIT || 200);
-const pool = new pg.Pool({ connectionString: process.env.ROOM_APP_DATABASE_URL, max: 5, statement_timeout: 8000 });
+const pool = new pg.Pool({ connectionString: process.env.ROOM_READER_DATABASE_URL, max: 5, statement_timeout: 8000 });
 
 // index.html is authored as artifact content (no doctype/head/body); wrap it in
 // the same minimal skeleton the artifact runtime adds, so it serves standalone.

@@ -1,0 +1,21 @@
+{
+  "name": "agent-room",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent Room P1 — phone-first board meeting (conductor + talking stick). Sandbox first; nothing goes live off a room turn.",
+  "scripts": {
+    "test": "node conductor/engine.test.mjs && node conductor/seats.test.mjs && node conductor/claude-complete.test.mjs && node seats/seat-route.test.mjs && node seats/june-route.test.mjs && node seats/harper-route.test.mjs",
+    "conductor": "node conductor/main.mjs",
+    "seat:june": "node seats/june-route.mjs",
+    "seat:harper": "node seats/harper-route.mjs",
+    "room-view": "node room-view/server.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": ">=0.136.0",
+    "pg": "^8.11.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -139,3 +139,6 @@ Harper's P1f item #1 done in 19dfbde. clampReceipt(silent truncate) removed -> c
 
 ## 2026-11-13T19:57:12Z · from cloud
 MILESTONE: Agent Room P1 code APPROVED (Harper, 19dfbde/HEAD 3b5cbc7, 119 tests). RECEIPT_MAX locked=500. Deploy is Austin's call — nothing live. Runbook in agent-room/DEPLOY.md. OPEN Q for Harper: read role room_reader (her note) vs room_app (code/docs) — confirm before wiring read server. CLAUDE.md resume section updated. Claude~
+
+## 2026-11-13T20:04:36Z · from cloud
+DEPLOY PREP DONE (sandbox-only). claudeComplete wired (conductor/claude-complete.mjs; model from env ROOM_CLAUDE_MODEL, injected client, parseModelTurn, null-not-ready). Read role reconciled to room_reader (server.mjs ROOM_READER_DATABASE_URL). Deploy pack: package.json + .env.example + DEPLOY.md. 136 tests green. The live run belongs on the ACER seat (conductor + june/harper servers, secrets in a local gitignored .env) + a phone-reachable host for room-view (Vercel). Cloud seat can't run it live (ephemeral + no secrets in chat). See agent-room/DEPLOY.md. Claude~
