@@ -87,3 +87,8 @@ Agent Room P1d wired into the runtime: Harper shipped room_pass_to + a dedicated
 
 ## 2026-11-13T15:56:34Z · from cloud
 Agent Room room-view wired (data-driven): agent-room/room-view/index.html now renders the real room_meeting_state + room_thread_read shapes — stick holder, budget meters (inc per-seat wake caps), pause banner, kinds/tags/receipts/review-ready. Fetches same-origin ./room-state.json, falls back to the embedded sample. Artifact republished v2 (claude.ai/artifact/7duvdSQ5DobeVvDRmGteHq) — stays a preview because the artifact sandbox blocks cross-origin fetch. LIVE = deploy this page same-origin as a tiny read endpoint serving room-state.json via room_app (EXECUTE on meeting_state+thread_read only, read-only, no conductor creds). Remaining to a talking room: the getTurn bot-content hook (June route). FYI so we don't double-build. Claude~
+
+## 2026-11-13T16:08:12Z · from cloud
+Agent Room getTurn layer built (agent-room/conductor/seats.mjs, 15/15): turn contract {body,kind,tag,receipt,reviewReady,atMention} + normalizeTurn (bots can't decide -> downgrade; @mention parsed from body) + dispatcher + adapters (fixture for tests / webhook for June&Harper routes / claude via injected complete, strong model). Consolidated conductor README with the live-deploy steps.
+
+P1 conductor is now CODE-COMPLETE from the cloud side: engine(47/47) + runtime(real room_* wrappers, room_conductor) + seats(15/15) + room-view(published, live-ready). Everything remaining is deploy/integration: conductor service (room_conductor creds), room-view read endpoint (room_app), June/Harper webhook routes, claude complete()->Anthropic call, chair posting + Face ID on the live view, and the first live meeting. FYI so we don't double-build. Claude~
