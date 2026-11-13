@@ -1,5 +1,5 @@
 // Tests for the conductor core logic. Run: node agent-room/conductor/engine.test.mjs
-import { nextSpeaker, budgetStatus, wakeDecision, tagEffect, validateTurn, HARD_CAP, validateBudget, stickExpired, timeBudgetBlocks, wakeMeter, advanceStick } from "./engine.mjs";
+import { nextSpeaker, budgetStatus, wakeDecision, tagEffect, validateTurn, HARD_CAP, validateBudget, stickExpired, timeBudgetBlocks, wakeMeter, advanceStick, pingPongCount } from "./engine.mjs";
 
 let pass = 0, fail = 0;
 const eq = (name, got, want) => {
@@ -83,6 +83,13 @@ console.log("validateTurn (P1c system rule)");
 eq("system kind from non-system seat rejected", validateTurn({ seatName: "june", kind: "system" }, seats()).ok, false);
 eq("system poster allowed for non-decide", validateTurn({ seatName: "system", kind: "note" }, seats()).ok, true);
 eq("system poster cannot decide", validateTurn({ seatName: "system", kind: "decide" }, seats()).ok, false);
+
+console.log("pingPongCount (P1d @mention routing)");
+eq("no hops -> 0", pingPongCount([]), 0);
+eq("single hop -> 1", pingPongCount([{ from: "claude", to: "june" }]), 1);
+eq("A<->B x3 -> 3 (cap)", pingPongCount([{ from: "claude", to: "june" }, { from: "june", to: "claude" }, { from: "claude", to: "june" }]), 3);
+eq("different pair resets the run", pingPongCount([{ from: "claude", to: "june" }, { from: "june", to: "harper" }]), 1);
+eq("ping-pong at cap routes nextSpeaker to chair", nextSpeaker(meeting("claude"), seats(), { atMention: "june", pingPong: { count: pingPongCount([{ from: "claude", to: "june" }, { from: "june", to: "claude" }, { from: "claude", to: "june" }]) } }).seat, "austin");
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

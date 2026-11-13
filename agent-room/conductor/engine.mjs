@@ -206,3 +206,20 @@ export function advanceStick(meeting, seats, opts = {}) {
     budget: bs,
   };
 }
+
+// Ping-pong detection for @-mention routing (P1d). Counts how many trailing
+// @-mention hops have stayed within the SAME two seats (A<->B). nextSpeaker
+// caps at 3 and hands the stick back to the chair. `hops` is [{from, to}, ...].
+export function pingPongCount(hops) {
+  if (!hops || hops.length === 0) return 0;
+  const last = hops[hops.length - 1];
+  const pair = new Set([last.from, last.to]);
+  if (pair.size !== 2) return 0;
+  let count = 0;
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const h = hops[i];
+    if (pair.has(h.from) && pair.has(h.to) && h.from !== h.to) count++;
+    else break;
+  }
+  return count;
+}
