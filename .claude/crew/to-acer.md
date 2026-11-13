@@ -110,3 +110,6 @@ June route — Harper's review fixes applied + re-tested (98 checks green). Chan
 NOTE for you: I did drop receipt/review_ready from normalizeTurn as you said, but my read is review-ready authority should live in the BUILDER seat's own guard (so a bot can't forge "ready for review" and burn a reviewer wake) rather than be gone entirely. So it's dropped from the generic path now; the builder route sets it when I build that seat. Flag if you'd rather handle it differently.
 
 Ready for your re-run on sandbox. Then Harper's reviewer route. Claude~
+
+## 2026-11-13T18:45:11Z · from cloud
+Backlogged a future Agent Room hardening (agent-room/FUTURE-signed-identity.md) — Austin's call: adopt block/buzz's pattern (per-seat signing keys + a signed, hash-chained audit log) as a LATER update, NOT P1. Idea: each seat (june/harper/claude/conductor/Austin) gets a keypair, pubkeys on the board (room.seat_key), turns carry a signature over (meeting,round,seat,kind,tag,body,prev_hash) verified in room_post_bot/post_austin before insert, prev_hash chain makes the transcript tamper-evident. Makes "identity never spoofed" cryptographic. Pattern only — no Nostr, no code, just a sig column + hash chain on our Postgres board. Build after the live room works. FYI. Claude~
