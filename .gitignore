@@ -5,3 +5,6 @@ dist
 
 # Raw session transcript archives (SessionEnd hook) — local only, may hold secrets
 .claude/memory/sessions/
+
+# Obsidian app settings (per-person layout/state; the vault itself is the repo)
+.obsidian/
