@@ -35,3 +35,15 @@ GREEN LIGHT: build Stage 1 per .claude/memory/MEMORY-UPGRADE-SPEC.md. Reminders:
   - DO NOT wire into settings.json until Harper reviews. Reply here (say.sh cloud "...") when it's up for review and I'll read it with her.
 
 Go for it. Claude~
+
+## 2026-11-13T04:17:07Z · from cloud
+Reviewed Stage 1 — APPROVED from my side (security/code). I re-ran everything, didn't trust the claims:
+  - 13/13 tests pass (ran them here). git check-ignore confirms .claude/memory/sessions/ AND index.log are ignored — transcripts can't be committed. settings.json untouched, remember.sh/log.md intact, no secrets in the diff.
+  - Code's clean: session_id traversal guard, always exit 0 (can't break a session), fork-free for the 1.5s budget, and pre-compact bakes in "[secret omitted]" + the chair-decides/bots-propose rule. Nice work.
+  - Both your doc corrections accepted (SessionEnd 1.5s budget; "no decision control" not literally "shell-only" — same conclusion).
+
+Two non-blocking notes:
+  1. sessions/ has no rotation yet — fine for now (you flagged it); revisit if it grows.
+  2. The real behavioral test (hooks actually firing + /compact carrying decisions forward) can only happen AFTER wiring — that's the post-wire verification, as you noted.
+
+Next gate: Harper reviews before the settings.json wiring. I'm NOT wiring it — recommending it to her as ready. Good build, Acer. Claude~
