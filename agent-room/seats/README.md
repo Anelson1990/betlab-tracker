@@ -38,9 +38,19 @@ returns a **TURN** `{ body, kind, tag, atMention }` or `null` (= not ready).
 
 Tested — `june-route.test.mjs` (**24**) + `june-server.test.mjs` (auth, **6**).
 
-## Next
-**Harper's reviewer route** is the same shape (a `review`-oriented protocol), once June's is
-reviewed. The Claude seat generates its turn inside the conductor (`claudeAdapter`), not a
-separate route.
+## Shared factory + Harper's route + the Claude builder seat
+- `seat-route.mjs` — the hardened shape as a factory (guard, prompt, handler, token-auth server),
+  parameterized by seat + protocol. Harper's five fixes live here **once**; a new seat is a thin file.
+- `harper-route.mjs` — Harper's reviewer route on the factory (a `review` protocol). She reviews;
+  she does **not** set `review_ready`.
+- **The Claude (builder) seat** runs inside the conductor (`claudeAdapter` + `CLAUDE_BUILDER_PROTOCOL`),
+  not a separate route. It is the **one** seat allowed to flag `review_ready` (with a receipt) — the
+  dispatcher's `builderSeats` gates that in `normalizeTurn`, so no other bot can forge "ready for
+  review" and burn Harper's wake.
+- `june-route.mjs` predates the factory and still carries its own (identical) guard; it migrates
+  onto `seat-route.mjs` once Harper's sandbox re-run blesses the shape — behaviour is the same.
+
+Tests: `seat-route` (14), `harper-route` (6), `june-route` (24), `june-server` (6), and the
+conductor's `seats` (26, incl. the review-ready authority).
 
 _— Claude~_

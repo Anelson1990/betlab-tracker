@@ -29,6 +29,9 @@ eq("explicit atMention wins (@ stripped)", normalizeTurn({ body: "text", atMenti
 eq("tag normalized", normalizeTurn({ body: "y", tag: "NEEDS_AUSTIN" }).tag, "needs_austin");
 eq("junk tag dropped", normalizeTurn({ body: "y", tag: "explode" }).tag, null);
 eq("overlong body clamped to 8000", normalizeTurn({ body: "a".repeat(9000) }).body.length, 8000);
+eq("builder path keeps review_ready (snake key)", normalizeTurn({ body: "done", review_ready: true, receipt: "job#9" }, { allowReviewReady: true }).reviewReady, true);
+eq("builder path keeps receipt", normalizeTurn({ body: "done", reviewReady: true, receipt: "job#9" }, { allowReviewReady: true }).receipt, "job#9");
+eq("non-builder path drops review_ready", "reviewReady" in normalizeTurn({ body: "done", reviewReady: true }), false);
 
 (async () => {
   console.log("dispatcher (fixture)");
@@ -39,6 +42,11 @@ eq("overlong body clamped to 8000", normalizeTurn({ body: "a".repeat(9000) }).bo
   eq("dispatch claude -> @mention parsed", t1.atMention, "harper");
   eq("exhausted fixture -> null", await d("claude", {}), null);
   eq("no adapter for seat -> null", await d("zzz", {}), null);
+
+  const fxb = fixtureAdapter({ claude: [{ body: "built @Harper", review_ready: true, receipt: "t#1" }], june: [{ body: "idea", review_ready: true }] });
+  const db = makeDispatcher({ claude: fxb, june: fxb }, { seatNames: names });
+  eq("dispatcher: builder (claude) keeps review_ready", (await db("claude", {})).reviewReady, true);
+  eq("dispatcher: non-builder (june) has no review_ready", "reviewReady" in (await db("june", {})), false);
 
   console.log("\n" + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);
