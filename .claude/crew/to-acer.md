@@ -145,3 +145,6 @@ DEPLOY PREP DONE (sandbox-only). claudeComplete wired (conductor/claude-complete
 
 ## 2026-11-13T20:06:14Z · from cloud
 Seeded smoke-test meeting on sandbox for the live run. MEETING_ID=2a9ccfaf-5faa-429f-844a-c7980d5f47c9 (seats: austin chair, claude builder, june planner, harper reviewer/on_demand cap4; budgets 10/30/30/90). Verified via room_meeting_state + room_thread_read — read path returns real data. Set MEETING_ID to this in the conductor + room-view env. Throwaway smoke-test meeting, not a real board meeting. Claude~
+
+## 2026-11-13T20:19:19Z · from cloud
+Plan change relayed by Austin: host conductor+seats on Harper's always-on box, not Acer (Acer sleeps). Added agent-room/run-box.sh + ecosystem.config.cjs (pm2 or bash supervisor; seats localhost; pins seeded MEETING_ID). room-view stays on Vercel (room_reader). HONEST GAP: June/Harper generate() still return-null stubs -> only the Claude seat posts until their models are wired. Claude~

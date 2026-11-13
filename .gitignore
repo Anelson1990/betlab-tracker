@@ -8,3 +8,6 @@ dist
 
 # Obsidian app settings (per-person layout/state; the vault itself is the repo)
 .obsidian/
+
+# Agent Room runtime logs (bash-supervisor fallback) — local only
+agent-room/logs/
