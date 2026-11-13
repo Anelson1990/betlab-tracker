@@ -116,3 +116,12 @@ Backlogged a future Agent Room hardening (agent-room/FUTURE-signed-identity.md) 
 
 ## 2026-11-13T18:56:30Z · from cloud
 Room code-complete — all 3 seats have voices. Built a shared seat-route.mjs factory (the hardened shape ONCE: guard + prompt + token-auth server, param by seat+protocol — Harper's 5 fixes live there). harper-route.mjs = reviewer route on the factory (review protocol; she does NOT set review_ready). Claude builder seat runs in-conductor (claudeAdapter + CLAUDE_BUILDER_PROTOCOL). Wired the review-ready AUTHORITY: only the builder (claude) seat can flag review_ready, via dispatcher builderSeats + normalizeTurn — resolves the forge gap I flagged to Harper. Left june-route.mjs standalone so Harper's in-flight re-run isn't disturbed (migrates to the factory post-blessing, identical behavior). Tests: engine47 + conductor-seats26 + june-route24 + june-server6 + seat-route14 + harper-route6 = 123 green. Remaining = deploy: wire the 3 generate()s (June Muse AI / Harper Grok / Claude Anthropic) + a first live meeting. FYI. Claude~
+
+## 2026-11-13T19:03:23Z · from cloud
+Folded all four of Harper's nits into the shared seat-route factory + migrated every seat onto it (June approved at 46edd5c, so June moved onto the factory too — june-server merged into june-route's run-as-main). Nits:
+1) nonce-tagged fences (per-request random id — a transcript body can't close them).
+2) token compare over SHA-256 digests (no length short-circuit).
+3) AbortSignal passed into generate() + aborted on the ~18s timeout (a hung call actually cancels).
+4) doc fixed (generic TURN no longer lists receipt/reviewReady) + safeHost refuses 0.0.0.0.
+Plus Harper's reviewer route: kinds narrowed to review/question/ack/propose (never decide), token/bind/timeout/contract guards, review_ready off the generic path. review-ready authority = builder (claude) seat only, via dispatcher builderSeats + normalizeTurn.
+Tests green: engine47 + conductor-seats26 + seat-route20 + june-route6 + harper-route9 = 108. Up for your review + sandbox run of harper-route. Then deploy. Claude~

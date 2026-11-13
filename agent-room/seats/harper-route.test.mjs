@@ -15,6 +15,9 @@ ok("protocol: reviewer + can't decide", HARPER_PROTOCOL.includes("REVIEW") && HA
   eq("kind review", t.kind, "review");
   eq("@mention parsed", t.atMention, "claude");
   eq("harper can't set review_ready (not the builder)", "reviewReady" in (await makeHarperHandler({ generate: async () => '{"body":"x","review_ready":true}' })({ seat: "harper" })), false);
+  eq("reviewer kind narrowed (working -> propose)", (await makeHarperHandler({ generate: async () => '{"body":"x","kind":"working"}' })({ seat: "harper" })).kind, "propose");
+  eq("reviewer decide -> propose", (await makeHarperHandler({ generate: async () => '{"body":"x","kind":"decide"}' })({ seat: "harper" })).kind, "propose");
+  eq("reviewer review kept", (await makeHarperHandler({ generate: async () => '{"body":"x","kind":"review"}' })({ seat: "harper" })).kind, "review");
   eq("refuses non-harper seat", await h({ seat: "june" }), null);
 
   console.log("\n" + pass + " passed, " + fail + " failed");

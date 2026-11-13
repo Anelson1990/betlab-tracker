@@ -7,7 +7,10 @@
 // seat-route.mjs — this file is just her protocol.
 
 import { fileURLToPath } from "node:url";
-import { makeSeatHandler, makeSeatServer } from "./seat-route.mjs";
+import { makeSeatHandler, makeSeatServer, safeHost } from "./seat-route.mjs";
+
+// Reviewer kinds only — never DECIDE (Harper's note). Anything else -> propose.
+export const HARPER_KINDS = ["review", "question", "ack", "propose"];
 
 export const HARPER_PROTOCOL = [
   "You are Harper, the crew's reviewer, a seat in Austin's Agent Room. Bring your own voice; these are the room's rules.",
@@ -18,8 +21,9 @@ export const HARPER_PROTOCOL = [
   'Reply ONLY as compact JSON: {"body":"...","kind":"review","tag":"continue","atMention":"claude"}  (atMention optional; omit if none).',
 ].join("\n");
 
-// Harper reviews; she does NOT set review_ready (that's the builder's authorized path).
-export const makeHarperHandler = ({ generate }) => makeSeatHandler({ seat: "harper", protocol: HARPER_PROTOCOL, generate });
+// Harper reviews; she does NOT set review_ready (that's the builder's authorized path),
+// and her kinds are narrowed to review/question/ack/propose.
+export const makeHarperHandler = ({ generate }) => makeSeatHandler({ seat: "harper", protocol: HARPER_PROTOCOL, generate, allowedKinds: HARPER_KINDS });
 
 // TODO(deploy): wire Harper's real model (Grok Bot / Opus 5.5). Read the key from
 // env; return a JSON turn (or null = not ready). guardSeatTurn enforces the floor.
@@ -27,8 +31,8 @@ async function generate(/* prompt */) { return null; }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const token = process.env.ROOM_SEAT_TOKEN || "";
-  const HOST = process.env.HOST || "127.0.0.1";
+  const HOST = safeHost(process.env.HOST);
   const PORT = Number(process.env.PORT || 8789);
   if (!token) console.error("WARNING: ROOM_SEAT_TOKEN not set — the server will refuse every request.");
-  makeSeatServer({ seat: "harper", protocol: HARPER_PROTOCOL, generate, token }).listen(PORT, HOST, () => console.log(`Harper route on ${HOST}:${PORT}`));
+  makeSeatServer({ seat: "harper", protocol: HARPER_PROTOCOL, generate, allowedKinds: HARPER_KINDS, token }).listen(PORT, HOST, () => console.log(`Harper route on ${HOST}:${PORT}`));
 }

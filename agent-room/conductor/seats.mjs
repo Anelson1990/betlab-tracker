@@ -2,7 +2,9 @@
 //
 // How each seat produces a turn for the conductor's tick(). A seat returns a
 // TURN object (or null = still working / not ready):
-//   { body (required), kind?, tag?, receipt?, reviewReady?, atMention? }
+//   { body (required), kind?, tag?, atMention? }
+//     (receipt?/reviewReady? are honored only from the authorized builder seat —
+//      the dispatcher's builderSeats; stripped from every other seat.)
 //     kind: "propose" | "review" | ...   (never "decide" — bots can't DECIDE)
 //     tag:  "continue" | "pass" | "working" | "needs_austin" | "done"
 //     atMention: a seat to hand the stick to (else parsed from "@Name" in body)
