@@ -112,9 +112,94 @@ export function tagEffect(tag) {
 // - a review-ready flag must carry a receipt (claim vs receipt)
 // ---------------------------------------------------------------------------
 export function validateTurn(turn, seats) {
+  // kind=system is the conductor's voice only — it comes from the special
+  // 'system' poster, never a seat-bot (which could otherwise forge round
+  // markers or "stick passed to you" and hijack turn order).
+  if (turn.kind === "system" && turn.seatName !== "system") {
+    return { ok: false, error: "kind=system is conductor-only (the 'system' poster)" };
+  }
+  if (turn.seatName === "system") {
+    if (turn.kind === "decide") return { ok: false, error: "the 'system' poster cannot DECIDE" };
+    return { ok: true, system: true }; // conductor-only; credential enforced server-side
+  }
   const seat = seats.find((s) => s.name === turn.seatName);
   if (!seat) return { ok: false, error: "unknown seat" };
   if (turn.kind === "decide" && !seat.isChair) return { ok: false, error: "only the chair may DECIDE" };
   if (turn.reviewReady && !turn.receipt) return { ok: false, error: "review-ready requires a receipt / self-verify" };
   return { ok: true };
+}
+
+// ===========================================================================
+// P1c — runtime enforcement the conductor drives (backs room_advance /
+// room_wake_seat). Still pure logic; the SQL functions enforce the same rules
+// server-side. DRAFT for Harper's review.
+// ===========================================================================
+
+// Locked safety ceiling. Per-meeting budgets may be LOWER, never higher.
+export const HARD_CAP = { rounds: 10, minutes: 30, wakes: 30, stickTimeoutSec: 90 };
+
+// A meeting's budget must be positive and within the hard cap on every axis.
+export function validateBudget(budget) {
+  const errors = [];
+  for (const k of ["rounds", "minutes", "wakes", "stickTimeoutSec"]) {
+    const v = budget ? budget[k] : undefined;
+    if (v == null || !(v > 0)) errors.push(`${k} must be > 0`);
+    else if (v > HARD_CAP[k]) errors.push(`${k} ${v} exceeds hard cap ${HARD_CAP[k]}`);
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// Stick timeout: has the current holder gone silent past the stick window?
+// The chair (Austin) is NEVER timed out — he takes as long as he wants.
+export function stickExpired(meeting, currentSeat, turnStartedAtMs, nowMs) {
+  if (currentSeat && currentSeat.isChair) {
+    return { expired: false, reason: "chair holds the stick — never timed out" };
+  }
+  const windowMs = (meeting.budget.stickTimeoutSec || HARD_CAP.stickTimeoutSec) * 1000;
+  const elapsedMs = nowMs - turnStartedAtMs;
+  const expired = elapsedMs >= windowMs;
+  return { expired, elapsedSec: Math.round(elapsedMs / 1000), reason: expired ? "stick timeout — reclaim + advance" : "within stick window" };
+}
+
+// Meeting time budget as a post gate (mirrors the board trigger, defence in
+// depth). The chair is exempt — can post/close/decide past the time cap.
+export function timeBudgetBlocks(meeting, startedAtMs, nowMs, posterIsChair) {
+  if (posterIsChair) return false;
+  return (nowMs - startedAtMs) > meeting.budget.minutes * 60000;
+}
+
+// Wake metering (backs room_wake_seat): a wake must pass BOTH the seat's wake
+// cap AND the meeting's wake budget. Over either, if a review is pending we
+// pause for Austin rather than skip it (fail-safe, not fail-open).
+export function wakeMeter(seat, meeting, opts = {}) {
+  const { reviewNeeded = false } = opts;
+  const base = wakeDecision(seat, opts);
+  if (!base.wake) return { ...base, incrementSeat: false, incrementMeeting: false };
+  if (meeting.used.wakes >= meeting.budget.wakes) {
+    return { wake: false, pauseForAustin: reviewNeeded, reason: "meeting wake budget spent", incrementSeat: false, incrementMeeting: false };
+  }
+  return { wake: true, reason: base.reason, incrementSeat: true, incrementMeeting: true };
+}
+
+// room_advance: the conductor's "pass the stick" decision. Stops if the meeting
+// budget is exhausted (pause for Austin); otherwise routes to the next speaker,
+// flagging a reclaimed (timed-out) stick and a new round on a wrap.
+export function advanceStick(meeting, seats, opts = {}) {
+  const { currentTurnStartedAtMs = 0, nowMs = 0, atMention = null, pingPong = { count: 0 } } = opts;
+  const bs = budgetStatus(meeting);
+  if (bs.level === "stop") {
+    return { action: "stop", reason: "meeting budget exhausted — pause for Austin", budget: bs };
+  }
+  const currentSeat = seats.find((s) => s.name === meeting.currentSeat) || null;
+  const stick = stickExpired(meeting, currentSeat, currentTurnStartedAtMs, nowMs);
+  const ns = nextSpeaker(meeting, seats, { atMention, pingPong });
+  return {
+    action: "advance",
+    next: ns.seat,
+    roundAdvance: ns.roundAdvance,
+    wakeNeeded: ns.wakeNeeded || false,
+    stickExpired: stick.expired,
+    reason: ns.reason,
+    budget: bs,
+  };
 }

@@ -1,5 +1,5 @@
 // Tests for the conductor core logic. Run: node agent-room/conductor/engine.test.mjs
-import { nextSpeaker, budgetStatus, wakeDecision, tagEffect, validateTurn } from "./engine.mjs";
+import { nextSpeaker, budgetStatus, wakeDecision, tagEffect, validateTurn, HARD_CAP, validateBudget, stickExpired, timeBudgetBlocks, wakeMeter, advanceStick } from "./engine.mjs";
 
 let pass = 0, fail = 0;
 const eq = (name, got, want) => {
@@ -51,6 +51,37 @@ eq("bot DECIDE is rejected", validateTurn({ seatName: "june", kind: "decide" }, 
 eq("chair DECIDE is allowed", validateTurn({ seatName: "austin", kind: "decide" }, seats()).ok, true);
 eq("review-ready without receipt rejected", validateTurn({ seatName: "claude", reviewReady: true }, seats()).ok, false);
 eq("review-ready with receipt allowed", validateTurn({ seatName: "claude", reviewReady: true, receipt: "job#147" }, seats()).ok, true);
+
+console.log("validateBudget (P1c)");
+eq("locked budget within cap is ok", validateBudget({ rounds: 10, minutes: 30, wakes: 30, stickTimeoutSec: 90 }).ok, true);
+eq("lower per-meeting budget is ok", validateBudget({ rounds: 3, minutes: 10, wakes: 5, stickTimeoutSec: 60 }).ok, true);
+eq("over-cap rounds rejected", validateBudget({ rounds: 11, minutes: 30, wakes: 30, stickTimeoutSec: 90 }).ok, false);
+eq("zero minutes rejected", validateBudget({ rounds: 10, minutes: 0, wakes: 30, stickTimeoutSec: 90 }).ok, false);
+
+console.log("stickExpired (P1c)");
+eq("non-chair past 90s -> expired", stickExpired(meeting("claude"), { name: "claude", isChair: false }, 0, 91000).expired, true);
+eq("non-chair within 90s -> not expired", stickExpired(meeting("claude"), { name: "claude", isChair: false }, 0, 80000).expired, false);
+eq("chair never times out", stickExpired(meeting("austin"), { name: "austin", isChair: true }, 0, 999000).expired, false);
+
+console.log("timeBudgetBlocks (P1c)");
+eq("non-chair past 30min blocked", timeBudgetBlocks(meeting("claude"), 0, 31 * 60000, false), true);
+eq("non-chair within 30min ok", timeBudgetBlocks(meeting("claude"), 0, 29 * 60000, false), false);
+eq("chair exempt from time budget", timeBudgetBlocks(meeting("austin"), 0, 999 * 60000, true), false);
+
+console.log("wakeMeter (P1c)");
+eq("harper under both caps wakes", wakeMeter({ activation: "on_demand", wakeCap: 4, wakesUsed: 1 }, meeting("claude")).wake, true);
+eq("harper at seat cap + review -> pause", wakeMeter({ activation: "on_demand", wakeCap: 4, wakesUsed: 4 }, meeting("claude"), { reviewNeeded: true }).pauseForAustin, true);
+eq("meeting wake budget spent + review -> pause", wakeMeter({ activation: "active" }, { budget: { wakes: 30 }, used: { wakes: 30 } }, { reviewNeeded: true }).pauseForAustin, true);
+
+console.log("advanceStick (P1c)");
+eq("budget stop halts advance", advanceStick({ budget: { rounds: 10, minutes: 30, wakes: 30, stickTimeoutSec: 90 }, used: { rounds: 10, minutes: 1, wakes: 1 }, currentSeat: "claude" }, seats(), { nowMs: 1000, currentTurnStartedAtMs: 0 }).action, "stop");
+eq("normal advance routes to next", advanceStick(meeting("claude"), seats(), { nowMs: 1000, currentTurnStartedAtMs: 0 }).next, "june");
+eq("expired stick flagged on advance", advanceStick(meeting("claude"), seats(), { nowMs: 91000, currentTurnStartedAtMs: 0 }).stickExpired, true);
+
+console.log("validateTurn (P1c system rule)");
+eq("system kind from non-system seat rejected", validateTurn({ seatName: "june", kind: "system" }, seats()).ok, false);
+eq("system poster allowed for non-decide", validateTurn({ seatName: "system", kind: "note" }, seats()).ok, true);
+eq("system poster cannot decide", validateTurn({ seatName: "system", kind: "decide" }, seats()).ok, false);
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
