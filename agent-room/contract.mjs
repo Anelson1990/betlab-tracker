@@ -37,13 +37,19 @@ export function clampBody(raw) {
   return cps.length > BODY_MAX ? cps.slice(0, BODY_MAX).join("") : b;
 }
 
-// Receipt length limit — kept in sync with P1f's DB receipt check. Used by both
-// the seat-route guard and the conductor's normalizeTurn so the two agree.
+// Receipt length limit — kept in sync with P1f's DB receipt check.
 export const RECEIPT_MAX = 500;
-export function clampReceipt(raw) {
+// Clean a receipt: trim, and treat whitespace-only (or null/undefined) as "no
+// receipt" (-> null). It does NOT truncate: an over-length receipt is REFUSED
+// at validateTurn (fail closed), never silently cut, so evidence is never
+// quietly mangled. (Harper's fix — "cap it at 500 and refuse, don't clamp".)
+export function cleanReceipt(raw) {
   const r = (raw == null ? "" : String(raw)).trim();
-  const cps = Array.from(r);
-  return cps.length > RECEIPT_MAX ? cps.slice(0, RECEIPT_MAX).join("") : r;
+  return r === "" ? null : r;
+}
+// True if a receipt is over the DB/contract limit — the refusal condition.
+export function receiptTooLong(raw) {
+  return raw != null && Array.from(String(raw)).length > RECEIPT_MAX;
 }
 
 // The only seats that may flag review_ready (with a receipt). Hardcoded — not a

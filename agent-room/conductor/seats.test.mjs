@@ -32,6 +32,8 @@ eq("overlong body clamped to 8000", normalizeTurn({ body: "a".repeat(9000) }).bo
 eq("builder path keeps review_ready (snake key)", normalizeTurn({ body: "done", review_ready: true, receipt: "job#9" }, { allowReviewReady: true }).reviewReady, true);
 eq("builder path keeps receipt", normalizeTurn({ body: "done", reviewReady: true, receipt: "job#9" }, { allowReviewReady: true }).receipt, "job#9");
 eq("non-builder path drops review_ready", "reviewReady" in normalizeTurn({ body: "done", reviewReady: true }), false);
+eq("builder path drops receipt when review_ready is false", normalizeTurn({ body: "done", review_ready: false, receipt: "job#9" }, { allowReviewReady: true }).receipt, null);
+eq("builder path: whitespace-only receipt -> null", normalizeTurn({ body: "done", review_ready: true, receipt: "   " }, { allowReviewReady: true }).receipt, null);
 
 (async () => {
   console.log("dispatcher (fixture)");

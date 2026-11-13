@@ -16,7 +16,7 @@
 //            wakeCap, wakesUsed, state:'active'|'dormant'|'working'|'stalled'|'done' }
 //   turn = { seatName, kind, tag, body, receipt, reviewReady, atMention }
 
-import { BUILDER_SEATS } from "../contract.mjs";
+import { BUILDER_SEATS, RECEIPT_MAX, receiptTooLong } from "../contract.mjs";
 const BUILDERS = new Set(BUILDER_SEATS);
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,11 @@ export function validateTurn(turn, seats) {
   if (turn.reviewReady) {
     if (!BUILDERS.has(turn.seatName)) return { ok: false, error: "only the builder seat may flag review-ready" };
     if (!turn.receipt) return { ok: false, error: "review-ready requires a receipt" };
+    if (receiptTooLong(turn.receipt)) return { ok: false, error: `receipt exceeds ${RECEIPT_MAX} chars (refused, not truncated)` };
+  } else if (turn.receipt) {
+    // A receipt without review-ready is malformed — refuse, don't carry it. Other
+    // evidence belongs in the body. (Fail closed before postBot / P1f.)
+    return { ok: false, error: "a receipt is only allowed with review-ready" };
   }
   return { ok: true };
 }

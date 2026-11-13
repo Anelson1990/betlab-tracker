@@ -11,7 +11,7 @@
 
 import http from "node:http";
 import crypto from "node:crypto";
-import { botKind, validTag, clampBody, clampReceipt } from "../contract.mjs";
+import { botKind, validTag, clampBody, cleanReceipt } from "../contract.mjs";
 
 const MAX_BODY_BYTES = 1_000_000;
 const TIMED_OUT = Symbol("timeout");
@@ -63,7 +63,9 @@ export function guardSeatTurn(raw, { allowReviewReady = false, allowedKinds } = 
   const out = { body, kind, tag: validTag(t.tag), atMention: t.atMention ? String(t.atMention).toLowerCase().replace(/^@/, "") : null };
   if (allowReviewReady) {
     out.reviewReady = !!(t.reviewReady || t.review_ready);
-    out.receipt = t.receipt ? clampReceipt(t.receipt) : null;
+    // Receipt rides ONLY with review_ready; cleaned (trim, whitespace-only ->
+    // null), never truncated — over-length is refused downstream at validateTurn.
+    out.receipt = out.reviewReady ? cleanReceipt(t.receipt) : null;
   }
   return out;
 }

@@ -19,7 +19,9 @@ eq("decide -> propose", guardSeatTurn({ body: "x", kind: "decide" }).kind, "prop
 eq("body clamped to 8000", guardSeatTurn({ body: "a".repeat(9000) }).body.length, 8000);
 eq("review_ready dropped by default", "reviewReady" in guardSeatTurn({ body: "x", review_ready: true }), false);
 eq("review_ready kept when allowed", guardSeatTurn({ body: "x", review_ready: true, receipt: "r" }, { allowReviewReady: true }).reviewReady, true);
-eq("receipt clamped to 500", guardSeatTurn({ body: "x", review_ready: true, receipt: "a".repeat(900) }, { allowReviewReady: true }).receipt.length, 500);
+eq("over-length receipt is NOT truncated (refused downstream, not clamped)", guardSeatTurn({ body: "x", review_ready: true, receipt: "a".repeat(900) }, { allowReviewReady: true }).receipt.length, 900);
+eq("whitespace-only receipt dropped to null", guardSeatTurn({ body: "x", review_ready: true, receipt: "   " }, { allowReviewReady: true }).receipt, null);
+eq("receipt not attached when review_ready is false", guardSeatTurn({ body: "x", review_ready: false, receipt: "r" }, { allowReviewReady: true }).receipt, null);
 eq("allowedKinds narrows (working -> propose)", guardSeatTurn({ body: "x", kind: "working" }, { allowedKinds: ["review", "question", "ack", "propose"] }).kind, "propose");
 eq("allowedKinds keeps review", guardSeatTurn({ body: "x", kind: "review" }, { allowedKinds: ["review", "propose"] }).kind, "review");
 

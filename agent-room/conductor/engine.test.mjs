@@ -53,6 +53,9 @@ eq("chair DECIDE is allowed", validateTurn({ seatName: "austin", kind: "decide" 
 eq("review-ready without receipt rejected", validateTurn({ seatName: "claude", reviewReady: true }, seats()).ok, false);
 eq("builder review-ready with receipt allowed", validateTurn({ seatName: "claude", reviewReady: true, receipt: "job#147" }, seats()).ok, true);
 eq("non-builder review-ready rejected (even with receipt)", validateTurn({ seatName: "june", reviewReady: true, receipt: "x" }, seats()).ok, false);
+eq("over-length receipt refused, not truncated", validateTurn({ seatName: "claude", reviewReady: true, receipt: "a".repeat(501) }, seats()).ok, false);
+eq("receipt exactly at the 500 limit allowed", validateTurn({ seatName: "claude", reviewReady: true, receipt: "a".repeat(500) }, seats()).ok, true);
+eq("receipt without review-ready refused (evidence belongs in body)", validateTurn({ seatName: "claude", receipt: "x" }, seats()).ok, false);
 
 console.log("validateBudget (P1c)");
 eq("locked budget within cap is ok", validateBudget({ rounds: 10, minutes: 30, wakes: 30, stickTimeoutSec: 90 }).ok, true);
