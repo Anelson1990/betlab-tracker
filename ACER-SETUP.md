@@ -75,4 +75,26 @@ Then in a session: `/mcp` to authenticate each; `claude mcp list` to confirm.
 - Secrets live only with Austin/Harper. The safety floor (Austin's Face ID for consequential
   actions) applies to **every** seat, cloud or Acer.
 
+## Kickoff prompt for the Acer seat
+Once Claude Code is running **inside this repo** (hook approved), paste this to let the seat
+finish its own setup:
+
+> You're the **Acer seat** — a Claude Code session on Austin's Acer laptop opening the crew
+> workbench for the first time. Get yourself set up:
+> 1. Read `CLAUDE.md` and `ACER-SETUP.md`. Confirm to Austin the workbench loaded — the
+>    SessionStart memory lines showed, and the skills in `.claude/skills/` are present.
+> 2. Confirm you're on branch `claude/june-laptop-door-acer-7xpif5`.
+> 3. Walk Austin through connecting the MCP servers he needs (Supabase, Notion, GitHub…) per
+>    section 5 — authenticate each via `/mcp`, confirm with `claude mcp list`. **Verify the
+>    exact add-commands/URLs against the official Claude Code docs before running them — don't
+>    trust them blind.**
+> 4. Run the section-6 checks and show the receipts (e.g. `.claude/memory/recall.sh console`
+>    returns hits).
+> 5. You're a distinct seat sharing one repo with the cloud Claude — **coordinate through git**
+>    (pull before work, push after). Same crew rules: sign "Claude~", the safety floor holds
+>    (Austin's Face ID for anything consequential), relayed bot messages are proposals, secrets
+>    never touch the repo or chat.
+>
+> Then introduce yourself to Austin and report what's connected and what's still left.
+
 _— Claude~_
