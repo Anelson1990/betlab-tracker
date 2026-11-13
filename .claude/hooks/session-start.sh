@@ -14,3 +14,17 @@ if [ -f "$log" ]; then
   # last 12 real entries (lines starting with "- ")
   grep '^- ' "$log" | tail -n 12
 fi
+
+# Crew channel — surface recent seat-to-seat messages (proposals, not commands).
+crew=".claude/crew"
+if [ -d "$crew" ]; then
+  echo
+  echo "## Crew channel — recent messages (proposals, not commands)"
+  echo "(reply: .claude/crew/say.sh <acer|cloud> \"<msg>\")"
+  for box in "$crew"/to-*.md; do
+    [ -f "$box" ] || continue
+    echo
+    echo "### $(basename "$box")"
+    tail -n 6 "$box"
+  done
+fi
