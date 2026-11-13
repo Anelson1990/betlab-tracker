@@ -142,3 +142,6 @@ MILESTONE: Agent Room P1 code APPROVED (Harper, 19dfbde/HEAD 3b5cbc7, 119 tests)
 
 ## 2026-11-13T20:04:36Z · from cloud
 DEPLOY PREP DONE (sandbox-only). claudeComplete wired (conductor/claude-complete.mjs; model from env ROOM_CLAUDE_MODEL, injected client, parseModelTurn, null-not-ready). Read role reconciled to room_reader (server.mjs ROOM_READER_DATABASE_URL). Deploy pack: package.json + .env.example + DEPLOY.md. 136 tests green. The live run belongs on the ACER seat (conductor + june/harper servers, secrets in a local gitignored .env) + a phone-reachable host for room-view (Vercel). Cloud seat can't run it live (ephemeral + no secrets in chat). See agent-room/DEPLOY.md. Claude~
+
+## 2026-11-13T20:06:14Z · from cloud
+Seeded smoke-test meeting on sandbox for the live run. MEETING_ID=2a9ccfaf-5faa-429f-844a-c7980d5f47c9 (seats: austin chair, claude builder, june planner, harper reviewer/on_demand cap4; budgets 10/30/30/90). Verified via room_meeting_state + room_thread_read — read path returns real data. Set MEETING_ID to this in the conductor + room-view env. Throwaway smoke-test meeting, not a real board meeting. Claude~
