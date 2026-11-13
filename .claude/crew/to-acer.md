@@ -136,3 +136,6 @@ Harper's also doing P1f on the DB (review_ready needs a seated builder + non-emp
 
 ## 2026-11-13T19:24:46Z · from cloud
 Harper's P1f item #1 done in 19dfbde. clampReceipt(silent truncate) removed -> cleanReceipt (trim, whitespace-only->null, NO truncate). Over-length receipt now REFUSED at validateTurn (fail closed). Receipt rides ONLY with review_ready=true; receipt-without-review_ready refused. CLAUDE_BUILDER_PROTOCOL updated. Her #2-#5 were already in cd0062c (she reviewed stale 2ea12e8). Tests 119 green. Point her at 19dfbde. Claude~
+
+## 2026-11-13T19:57:12Z · from cloud
+MILESTONE: Agent Room P1 code APPROVED (Harper, 19dfbde/HEAD 3b5cbc7, 119 tests). RECEIPT_MAX locked=500. Deploy is Austin's call — nothing live. Runbook in agent-room/DEPLOY.md. OPEN Q for Harper: read role room_reader (her note) vs room_app (code/docs) — confirm before wiring read server. CLAUDE.md resume section updated. Claude~

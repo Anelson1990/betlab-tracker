@@ -37,7 +37,8 @@ export function clampBody(raw) {
   return cps.length > BODY_MAX ? cps.slice(0, BODY_MAX).join("") : b;
 }
 
-// Receipt length limit — kept in sync with P1f's DB receipt check.
+// Receipt length limit — LOCKED at 500 to match P1f's DB receipt check
+// (confirmed by Harper's approval of 19dfbde). Over-limit is refused, not cut.
 export const RECEIPT_MAX = 500;
 // Clean a receipt: trim, and treat whitespace-only (or null/undefined) as "no
 // receipt" (-> null). It does NOT truncate: an over-length receipt is REFUSED
