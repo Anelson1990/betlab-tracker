@@ -46,6 +46,13 @@ eq("allowedKinds keeps review", guardSeatTurn({ body: "x", kind: "review" }, { a
   const g = await post({ "x-room-token": TOKEN });
   eq("good token -> 200", g.status, 200);
   eq("good token -> turn", (await g.json()).kind, "review");
+
+  // makeSeatServer locks review_ready off, even if allowReviewReady:true is passed.
+  const srvLock = makeSeatServer({ seat: "claude", protocol: P, allowReviewReady: true, generate: async () => '{"body":"built","review_ready":true,"receipt":"r"}', token: TOKEN });
+  await new Promise((r) => srvLock.listen(0, "127.0.0.1", r));
+  const lr = await fetch(`http://127.0.0.1:${srvLock.address().port}/`, { method: "POST", headers: { "content-type": "application/json", "x-room-token": TOKEN }, body: JSON.stringify({ seat: "claude", meeting: {}, thread: [] }) });
+  eq("server locks review_ready off even if opted in", "reviewReady" in (await lr.json()), false);
+  srvLock.close();
   srv.close();
 
   console.log("\n" + pass + " passed, " + fail + " failed");

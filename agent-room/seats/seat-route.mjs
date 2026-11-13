@@ -11,10 +11,9 @@
 
 import http from "node:http";
 import crypto from "node:crypto";
-import { botKind, validTag, clampBody } from "../contract.mjs";
+import { botKind, validTag, clampBody, clampReceipt } from "../contract.mjs";
 
 const MAX_BODY_BYTES = 1_000_000;
-const RECEIPT_MAX = 500;
 const TIMED_OUT = Symbol("timeout");
 
 function withTimeout(p, ms, onTimeout) {
@@ -64,7 +63,7 @@ export function guardSeatTurn(raw, { allowReviewReady = false, allowedKinds } = 
   const out = { body, kind, tag: validTag(t.tag), atMention: t.atMention ? String(t.atMention).toLowerCase().replace(/^@/, "") : null };
   if (allowReviewReady) {
     out.reviewReady = !!(t.reviewReady || t.review_ready);
-    out.receipt = t.receipt ? Array.from(clampBody(t.receipt)).slice(0, RECEIPT_MAX).join("") : null;
+    out.receipt = t.receipt ? clampReceipt(t.receipt) : null;
   }
   return out;
 }
@@ -95,8 +94,10 @@ function tokenEq(a, b) {
 }
 
 // Deployable server. Requires the shared x-room-token, fails closed, generic errors.
+// review_ready is LOCKED OFF here: only the in-conductor builder (claudeAdapter)
+// path may set it — an external seat server never can, whatever opts are passed.
 export function makeSeatServer({ token, ...handlerOpts }) {
-  const handle = makeSeatHandler(handlerOpts);
+  const handle = makeSeatHandler({ ...handlerOpts, allowReviewReady: false });
   return http.createServer((req, res) => {
     if (req.method !== "POST") { res.writeHead(405); return res.end(); }
     if (!token || !tokenEq(req.headers["x-room-token"], token)) {

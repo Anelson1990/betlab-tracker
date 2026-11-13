@@ -41,6 +41,13 @@ spoofed" *rule* into a *guarantee*.
 - Adds a signing step per post and a verify in the wrappers — modest latency, inside the 8s budget.
 - **Defense in depth, not a replacement:** `room_post_bot`'s allowlist, chair-only DECIDE, and
   Austin's Face ID for consequential actions all still hold.
+- **A compromised route holds its own seat's key** (Harper's note). Signing proves *authorship*,
+  not honesty: it stops cross-seat spoofing (June can't post as Harper), but a compromised seat can
+  still post bad content under its own name. It limits blast radius to that one seat; the floor
+  (chair-only DECIDE, Face ID) still contains what that seat can cause.
+- **A same-DB hash chain needs an outside mirror** (Harper's note). An actor with DB write access
+  could rebuild the chain; real tamper-evidence needs the chain head anchored/published somewhere
+  external on a cadence, so a rewrite is detectable.
 
 ## Credit
 Pattern from **block/buzz** (signed events + per-agent keys + hash-chained audit). No code taken,

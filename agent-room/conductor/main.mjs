@@ -10,16 +10,23 @@
 // current model IDs. Security-critical reasoning stays on the strong model.
 
 import { makeConductor } from "./runtime.mjs";
-import { makeDispatcher, webhookAdapter, claudeAdapter } from "./seats.mjs";
+import { makeDispatcher, webhookAdapter, claudeAdapter, CLAUDE_BUILDER_PROTOCOL } from "./seats.mjs";
+import { buildSeatPrompt } from "../seats/seat-route.mjs";
 
 const MEETING_ID = process.env.MEETING_ID;
 const TICK_MS = Number(process.env.TICK_MS || 4000);
 if (!MEETING_ID) { console.error("MEETING_ID not set"); process.exit(1); }
 
-// TODO(deploy): wire the real Anthropic call. Returns a TURN { body, kind?, tag?,
-// receipt?, reviewReady?, atMention? } or null (= still working). Until wired it
-// returns null, so the Claude seat simply holds until its stick times out.
-async function claudeComplete(/* ctx */) {
+// The Claude (builder) seat. Its prompt goes through the SAME fenced builder
+// prompt as the other seats (nonce-fenced, untrusted transcript), so Claude's
+// input is protected too.
+async function claudeComplete(ctx) {
+  const thread = ctx && ctx.readThread ? await ctx.readThread() : [];
+  const prompt = buildSeatPrompt(CLAUDE_BUILDER_PROTOCOL, { meeting: ctx && ctx.meeting, thread });
+  // TODO(deploy): call the Anthropic API with `prompt` (see the claude-api skill for
+  // model IDs); honor ctx.signal. Return the model's JSON turn (may set review_ready +
+  // a receipt — this is the only authorized seat for that). Until wired, return null.
+  void prompt;
   return null;
 }
 

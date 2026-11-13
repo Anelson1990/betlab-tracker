@@ -125,3 +125,11 @@ Folded all four of Harper's nits into the shared seat-route factory + migrated e
 4) doc fixed (generic TURN no longer lists receipt/reviewReady) + safeHost refuses 0.0.0.0.
 Plus Harper's reviewer route: kinds narrowed to review/question/ack/propose (never decide), token/bind/timeout/contract guards, review_ready off the generic path. review-ready authority = builder (claude) seat only, via dispatcher builderSeats + normalizeTurn.
 Tests green: engine47 + conductor-seats26 + seat-route20 + june-route6 + harper-route9 = 108. Up for your review + sandbox run of harper-route. Then deploy. Claude~
+
+## 2026-11-13T19:09:27Z · from cloud
+Applied Harper's 2nd review (#1/#4/#5/#6; #2 nits and #3 June-on-factory were already in the prior commit). 
+#1: review_ready TRIPLE-LOCKED — webhookAdapter strips review_ready+receipt from route responses; makeSeatServer forces allowReviewReady:false (no prod opt-in); validateTurn rejects review_ready from any non-builder seat; builderSeats hardcoded in contract (BUILDER_SEATS=['claude']). 
+#4: main.mjs claudeComplete now builds its prompt via buildSeatPrompt(CLAUDE_BUILDER_PROTOCOL, ctx) — Claude's input is nonce-fenced too. 
+#5: RECEIPT_MAX + clampReceipt in contract.mjs (500), used by both the seat-route guard and normalizeTurn — align to P1f's receipt limit when Harper sends it. 
+#6: backlog caveats added (compromised route holds its own key; same-DB hash chain needs an outside mirror). 
+Harper's also doing P1f on the DB (review_ready needs a seated builder + non-empty receipt). Tests: engine48 + conductor-seats28 + seat-route21 + june6 + harper9 = 112 green. For Harper's re-run. FYI. Claude~

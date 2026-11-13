@@ -16,7 +16,9 @@
 //                        `complete()` so the deploy wires the real Anthropic call
 //                        (keeps security-critical reasoning on the strong model).
 
-import { botKind, validTag, clampBody } from "../contract.mjs";
+import { botKind, validTag, clampBody, clampReceipt, BUILDER_SEATS } from "../contract.mjs";
+
+const BUILDERS = new Set(BUILDER_SEATS); // hardcoded — the only seats that may flag review_ready
 
 export function extractMention(body, seatNames) {
   const m = String(body || "").match(/@([A-Za-z][\w-]*)/);
@@ -37,21 +39,20 @@ export function normalizeTurn(raw, { seatNames = [], allowReviewReady = false } 
   // review_ready + receipt are honored ONLY from the authorized builder path
   // (allowReviewReady), so a bot can't forge "ready for review" and burn a
   // reviewer's wake. The dispatcher sets this true only for the builder seat.
-  if (allowReviewReady) { out.reviewReady = !!(t.reviewReady || t.review_ready); out.receipt = t.receipt ? clampBody(t.receipt) : null; }
+  if (allowReviewReady) { out.reviewReady = !!(t.reviewReady || t.review_ready); out.receipt = t.receipt ? clampReceipt(t.receipt) : null; }
   return out;
 }
 
 // Dispatcher: getTurn(seat, ctx) -> normalized TURN (or null). `registry` maps a
 // seat name to an adapter; "*" is a fallback. A missing adapter yields null, so
 // the conductor treats the seat as "not ready" (its stick times out cleanly).
-export function makeDispatcher(registry, { seatNames = [], builderSeats = ["claude"] } = {}) {
-  const builders = new Set(builderSeats);
+export function makeDispatcher(registry, { seatNames = [] } = {}) {
   return async function getTurn(seat, ctx) {
     const adapter = (registry && (registry[seat] || registry["*"])) || null;
     if (!adapter) return null;
     const names = seatNames.length ? seatNames : (ctx && ctx.seats ? ctx.seats.map((s) => s.name) : []);
     const raw = await adapter(seat, ctx);
-    return normalizeTurn(raw, { seatNames: names, allowReviewReady: builders.has(seat) });
+    return normalizeTurn(raw, { seatNames: names, allowReviewReady: BUILDERS.has(seat) });
   };
 }
 
@@ -92,7 +93,11 @@ export function webhookAdapter(url, opts = {}) {
         signal: ctl ? ctl.signal : undefined,
       });
       if (!res || !res.ok) return null;
-      return await res.json();
+      const data = await res.json();
+      // External routes can never carry review_ready/receipt — only the in-conductor
+      // builder sets those. Strip them defensively, whatever a route returns.
+      if (data && typeof data === "object") { delete data.review_ready; delete data.reviewReady; delete data.receipt; }
+      return data;
     } catch (e) {
       return null; // timeout / abort / network / bad json -> not ready
     } finally {

@@ -51,7 +51,8 @@ console.log("validateTurn");
 eq("bot DECIDE is rejected", validateTurn({ seatName: "june", kind: "decide" }, seats()).ok, false);
 eq("chair DECIDE is allowed", validateTurn({ seatName: "austin", kind: "decide" }, seats()).ok, true);
 eq("review-ready without receipt rejected", validateTurn({ seatName: "claude", reviewReady: true }, seats()).ok, false);
-eq("review-ready with receipt allowed", validateTurn({ seatName: "claude", reviewReady: true, receipt: "job#147" }, seats()).ok, true);
+eq("builder review-ready with receipt allowed", validateTurn({ seatName: "claude", reviewReady: true, receipt: "job#147" }, seats()).ok, true);
+eq("non-builder review-ready rejected (even with receipt)", validateTurn({ seatName: "june", reviewReady: true, receipt: "x" }, seats()).ok, false);
 
 console.log("validateBudget (P1c)");
 eq("locked budget within cap is ok", validateBudget({ rounds: 10, minutes: 30, wakes: 30, stickTimeoutSec: 90 }).ok, true);

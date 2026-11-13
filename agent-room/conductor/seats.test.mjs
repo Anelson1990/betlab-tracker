@@ -1,5 +1,5 @@
 // Tests for the getTurn layer. Run: node agent-room/conductor/seats.test.mjs
-import { extractMention, normalizeTurn, makeDispatcher, fixtureAdapter } from "./seats.mjs";
+import { extractMention, normalizeTurn, makeDispatcher, fixtureAdapter, webhookAdapter } from "./seats.mjs";
 
 let pass = 0, fail = 0;
 const eq = (name, got, want) => {
@@ -47,6 +47,11 @@ eq("non-builder path drops review_ready", "reviewReady" in normalizeTurn({ body:
   const db = makeDispatcher({ claude: fxb, june: fxb }, { seatNames: names });
   eq("dispatcher: builder (claude) keeps review_ready", (await db("claude", {})).reviewReady, true);
   eq("dispatcher: non-builder (june) has no review_ready", "reviewReady" in (await db("june", {})), false);
+
+  const fakeFetch = async () => ({ ok: true, json: async () => ({ body: "hi", kind: "propose", review_ready: true, receipt: "r" }) });
+  const raw = await webhookAdapter("http://x", { fetchImpl: fakeFetch })("june", { meeting: {}, readThread: async () => [] });
+  eq("webhookAdapter strips review_ready from the route response", "review_ready" in raw, false);
+  eq("webhookAdapter strips receipt from the route response", "receipt" in raw, false);
 
   console.log("\n" + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);

@@ -36,3 +36,17 @@ export function clampBody(raw) {
   const cps = Array.from(b);
   return cps.length > BODY_MAX ? cps.slice(0, BODY_MAX).join("") : b;
 }
+
+// Receipt length limit — kept in sync with P1f's DB receipt check. Used by both
+// the seat-route guard and the conductor's normalizeTurn so the two agree.
+export const RECEIPT_MAX = 500;
+export function clampReceipt(raw) {
+  const r = (raw == null ? "" : String(raw)).trim();
+  const cps = Array.from(r);
+  return cps.length > RECEIPT_MAX ? cps.slice(0, RECEIPT_MAX).join("") : r;
+}
+
+// The only seats that may flag review_ready (with a receipt). Hardcoded — not a
+// per-call option — so it can't be widened in production. The DB (P1f) enforces
+// the same: review_ready needs a seated builder + a non-empty receipt.
+export const BUILDER_SEATS = ["claude"];

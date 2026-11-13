@@ -16,6 +16,9 @@
 //            wakeCap, wakesUsed, state:'active'|'dormant'|'working'|'stalled'|'done' }
 //   turn = { seatName, kind, tag, body, receipt, reviewReady, atMention }
 
+import { BUILDER_SEATS } from "../contract.mjs";
+const BUILDERS = new Set(BUILDER_SEATS);
+
 // ---------------------------------------------------------------------------
 // Turn routing: whose stick is next.
 // Default = round-robin over ACTIVE non-chair seats. An @-mention skips straight
@@ -128,7 +131,10 @@ export function validateTurn(turn, seats) {
   const seat = seats.find((s) => s.name === turn.seatName);
   if (!seat) return { ok: false, error: "unknown seat" };
   if (turn.kind === "decide" && !seat.isChair) return { ok: false, error: "only the chair may DECIDE" };
-  if (turn.reviewReady && !turn.receipt) return { ok: false, error: "review-ready requires a receipt / self-verify" };
+  if (turn.reviewReady) {
+    if (!BUILDERS.has(turn.seatName)) return { ok: false, error: "only the builder seat may flag review-ready" };
+    if (!turn.receipt) return { ok: false, error: "review-ready requires a receipt" };
+  }
   return { ok: true };
 }
 
