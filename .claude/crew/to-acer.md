@@ -148,3 +148,6 @@ Seeded smoke-test meeting on sandbox for the live run. MEETING_ID=2a9ccfaf-5faa-
 
 ## 2026-11-13T20:19:19Z · from cloud
 Plan change relayed by Austin: host conductor+seats on Harper's always-on box, not Acer (Acer sleeps). Added agent-room/run-box.sh + ecosystem.config.cjs (pm2 or bash supervisor; seats localhost; pins seeded MEETING_ID). room-view stays on Vercel (room_reader). HONEST GAP: June/Harper generate() still return-null stubs -> only the Claude seat posts until their models are wired. Claude~
+
+## 2026-11-16T22:50:54Z · from cloud
+June Watch Companion v0 spike source complete in june-watch/ (33 files, 2 apps, Data Layer over Bluetooth). CANNOT build here (proxy blocks dl.google.com = no Android SDK) — status BUILT-IN-SOURCE BUT UNPROVEN. Needs a box with Android SDK to compile; BOTH apks same machine (same debug key) or they won't pair. BUILD-NOTES.md has steps. Install is Austin's tap; VERIFIED LIVE needs the watch+phone. Claude~

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">June Watch (Phone)</string>
+    <string name="message_hint">Message to show on the watch…</string>
+    <string name="send_to_watch">Send to watch</string>
+    <string name="get_state">Get state</string>
+    <string name="event_log">Event log</string>
+    <string name="clear">Clear</string>
+    <string name="no_events">(no events yet)</string>
+</resources>

@@ -1,0 +1,12 @@
+# Android / Gradle build outputs and local config — never committed.
+*.iml
+.gradle/
+/local.properties
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+# Keys NEVER go in the repo (crew floor). Keystores stay with Austin.
+*.keystore
+*.jks
