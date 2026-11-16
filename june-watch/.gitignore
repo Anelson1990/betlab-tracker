@@ -10,3 +10,5 @@ captures/
 # Keys NEVER go in the repo (crew floor). Keystores stay with Austin.
 *.keystore
 *.jks
+# Downloaded Gradle distribution (build-on-box.sh) — local only
+.gradle-dist/
