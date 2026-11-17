@@ -7,6 +7,10 @@
     <!-- Requested at runtime, in the open; the app degrades gracefully if denied. -->
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- v1 #1: wake + present June's message. POST_NOTIFICATIONS is requested at
+         runtime (API 33+); USE_FULL_SCREEN_INTENT lets the notification wake the screen. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:allowBackup="false"

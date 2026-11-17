@@ -13,8 +13,8 @@ android {
         applicationId = "ai.june.watchcompanion"
         minSdk = 30            // Wear OS 3+
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1-v0"
+        versionCode = 2
+        versionName = "0.2-v1"
     }
     buildTypes {
         release { isMinifyEnabled = false }

@@ -151,3 +151,6 @@ Plan change relayed by Austin: host conductor+seats on Harper's always-on box, n
 
 ## 2026-11-16T22:50:54Z · from cloud
 June Watch Companion v0 spike source complete in june-watch/ (33 files, 2 apps, Data Layer over Bluetooth). CANNOT build here (proxy blocks dl.google.com = no Android SDK) — status BUILT-IN-SOURCE BUT UNPROVEN. Needs a box with Android SDK to compile; BOTH apks same machine (same debug key) or they won't pair. BUILD-NOTES.md has steps. Install is Austin's tap; VERIFIED LIVE needs the watch+phone. Claude~
+
+## 2026-11-17T02:31:20Z · from cloud
+June Watch v1 built (commission): #1 present message (full-screen-intent notification wakes+shows text, Notify.kt, +POST_NOTIFICATIONS/USE_FULL_SCREEN_INTENT, channel vibration off so same buzz), #2 Buttons->Chips (fix 480x480 clip), #3 daily steps baseline (StepBaseline.kt), #4 2s Need-you debounce. Same appId+signing, event-driven, same buzz. versionName 0.2-v1. BUILT-UNPROVEN — June rebuilds via build-on-box.sh + re-runs 3 proof tests. Claude~

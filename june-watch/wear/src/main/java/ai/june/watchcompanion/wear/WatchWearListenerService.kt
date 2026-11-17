@@ -19,6 +19,7 @@ class WatchWearListenerService : WearableListenerService() {
                 WatchState.lastMessage = text
                 WatchState.status = "message from June"
                 Buzz.june(this)
+                Notify.presentMessage(this, text) // v1 #1: wake + put the text in front
             }
             Contract.PATH_STATE_REQUEST -> replyState()
         }

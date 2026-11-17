@@ -6,13 +6,13 @@ on the watch leg), via a Wear OS app + a phone relay over the Wear Data Layer.
 
 ## STATUS — read this first (honest labels)
 
-- **SOURCE COMPLETE — UNCOMPILED.** I could not build the APKs in the cloud
-  container: its proxy **blocks `dl.google.com`** (confirmed: `403 to CONNECT,
-  policy denial`), which is the only source of the Android SDK platform +
-  build-tools. Google Maven and Gradle *are* reachable, so the build works
-  anywhere with the SDK — just not here.
-- Therefore every v0 action below is **BUILT (in source) BUT UNPROVEN** until it's
-  compiled and run on Austin's real watch + phone. Nothing here is VERIFIED LIVE yet.
+- **v0 is VERIFIED LIVE (2026-11-16)** on Austin's real Galaxy Watch6 + S23+: all
+  three channels proven — message+buzz, Need-you ping, state snapshot (~1s). Built
+  on June's Linux box (the cloud seat still can't — its proxy blocks `dl.google.com`,
+  the Android SDK host).
+- **v1 changes (2026-11-17) are BUILT (in source) BUT UNPROVEN** — still compiled
+  only on June's box; re-run the three proof tests on hardware to promote to
+  VERIFIED LIVE. See "## v1 changes" below.
 - The out-of-scope powers (tap injection, accessibility, pm/package control) are
   **IMPOSSIBLE BY DESIGN** for a sideloaded Wear OS app and were **not attempted** —
   that's June's separate ADB-over-WiFi project.
@@ -108,3 +108,28 @@ june-watch/
 ```
 `Contract.kt` is duplicated in both modules by design (no shared module in v0) — keep
 the two in sync if paths change.
+
+## v1 changes (2026-11-17) — commission
+
+1. **Present the message** (`Notify.kt`, `WatchWearListenerService`): on `/june/message`
+   the watch now posts a HIGH-importance notification with a full-screen intent to
+   wake the screen and put June's text in front — on top of the buzz + the in-app
+   message. (v0 stored it silently behind the buzz.) A full-screen intent is used
+   because a background service cannot directly launch an activity on modern Android.
+   Needs `POST_NOTIFICATIONS` (requested at runtime on first launch) +
+   `USE_FULL_SCREEN_INTENT` (manifest). The channel's vibration is OFF so Buzz.june
+   stays the one distinct buzz; if notifications are denied, the text still lands in-app.
+2. **Button layout** (`MainActivity`): the circular Buttons that clipped "Need you" /
+   "Read sensors" on the 480x480 round screen are now full-width wear-compose **Chips**
+   (rounded rectangles) — labels fit.
+3. **Steps as a daily number** (`StepBaseline.kt`): the raw cumulative TYPE_STEP_COUNTER
+   (v0 sent 45,882) is baselined per calendar day — reported as `current - baseline`,
+   persisted across process death, re-baselined on a reboot (counter reset) so it is
+   never negative. The UI label is now "Steps today".
+4. **Need-you debounce** (`MainActivity`): a light 2s debounce on the Need-you Chip so
+   rapid intentional taps don't spam. Cheap; not a correctness fix.
+
+Unchanged: same appId + signing, event-driven (no polling / wake locks), same buzz,
+Data Layer paths. Build + install exactly as before (`build-on-box.sh`); versionName
+is now `0.2-v1`. June re-runs the three proof tests on hardware to promote v1 to
+VERIFIED LIVE.
