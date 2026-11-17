@@ -23,22 +23,32 @@ JV="$(java -version 2>&1 | head -1 | grep -oE '[0-9]+' | head -1)"
 [ "${JV:-0}" -ge 17 ] || { echo "Java ${JV:-?} too old — need 17+."; exit 1; }
 command -v unzip >/dev/null || { echo "Install unzip first (apt install unzip)."; exit 1; }
 
-# 1. Android SDK command-line tools.
-if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-  echo "Installing Android command-line tools into $ANDROID_HOME ..."
-  mkdir -p "$ANDROID_HOME/cmdline-tools"
-  tmp="$(mktemp -d)"
-  curl -fSL "$CMDLINE_ZIP_URL" -o "$tmp/cmdline.zip"
-  unzip -q "$tmp/cmdline.zip" -d "$tmp"
-  rm -rf "$ANDROID_HOME/cmdline-tools/latest"
-  mv "$tmp/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
-  rm -rf "$tmp"
+# 1 + 2. Android SDK. Skip the command-line-tools download AND sdkmanager entirely
+# when the needed packages are already installed. Some egress proxies break
+# sdkmanager's Java HTTP tunneling (e.g. June's box) even though the SDK is already
+# present and Gradle builds fine. Force-skip with SKIP_SDKMANAGER=1.
+sdk_ready() {
+  [ -f "$ANDROID_HOME/platforms/android-34/android.jar" ] &&
+    ls "$ANDROID_HOME"/build-tools/*/aapt2 >/dev/null 2>&1 &&
+    { [ -x "$ANDROID_HOME/platform-tools/adb" ] || command -v adb >/dev/null 2>&1; }
+}
+if [ "${SKIP_SDKMANAGER:-}" = "1" ] || sdk_ready; then
+  echo "Android SDK already present at $ANDROID_HOME — skipping cmdline-tools + sdkmanager."
+else
+  if [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+    echo "Installing Android command-line tools into $ANDROID_HOME ..."
+    mkdir -p "$ANDROID_HOME/cmdline-tools"
+    tmp="$(mktemp -d)"
+    curl -fSL "$CMDLINE_ZIP_URL" -o "$tmp/cmdline.zip"
+    unzip -q "$tmp/cmdline.zip" -d "$tmp"
+    rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+    mv "$tmp/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+    rm -rf "$tmp"
+  fi
+  SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+  yes | "$SDKMANAGER" --licenses >/dev/null || true
+  "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 fi
-SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-# 2. SDK packages + licenses.
-yes | "$SDKMANAGER" --licenses >/dev/null || true
-"$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
 # 3. Gradle (use system gradle if present, else download once).
 GRADLE_BIN="$(command -v gradle || true)"

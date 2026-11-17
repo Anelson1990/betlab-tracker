@@ -10,9 +10,10 @@ on the watch leg), via a Wear OS app + a phone relay over the Wear Data Layer.
   three channels proven — message+buzz, Need-you ping, state snapshot (~1s). Built
   on June's Linux box (the cloud seat still can't — its proxy blocks `dl.google.com`,
   the Android SDK host).
-- **v1 changes (2026-11-17) are BUILT (in source) BUT UNPROVEN** — still compiled
-  only on June's box; re-run the three proof tests on hardware to promote to
-  VERIFIED LIVE. See "## v1 changes" below.
+- **v1 is VERIFIED LIVE (2026-11-17)** on the real hardware: message presentation
+  (watch woke forward with the app ~6s after send), Need-you (one tap = one line),
+  state (~1s; `{"battery":22,"steps":0,"heartRate":87}`), chips legible — all PASS.
+  See "## v1 changes" and "## v1.1 backlog" below.
 - The out-of-scope powers (tap injection, accessibility, pm/package control) are
   **IMPOSSIBLE BY DESIGN** for a sideloaded Wear OS app and were **not attempted** —
   that's June's separate ADB-over-WiFi project.
@@ -133,3 +134,25 @@ Unchanged: same appId + signing, event-driven (no polling / wake locks), same bu
 Data Layer paths. Build + install exactly as before (`build-on-box.sh`); versionName
 is now `0.2-v1`. June re-runs the three proof tests on hardware to promote v1 to
 VERIFIED LIVE.
+
+## v1.1 backlog (raised during v1 proof — NOT yet commissioned)
+
+- **Fresh state sampling.** A `/june/state/request` currently replies from the last
+  sensor snapshot, so a cold request (right after an update, before any "Read
+  sensors" tap) returns `null` sensor fields. v1.1 candidate: sample fresh before
+  replying. Careful: a `WearableListenerService` can be torn down after
+  `onMessageReceived` returns, so an async sensor read needs `goAsync()` or a
+  short-lived foreground, not a bare callback.
+- **Daily steps baseline = install, not midnight.** `StepBaseline` sets the day's
+  baseline at the first read, so day one counts from install rather than midnight
+  (steps=0 at first read tonight is expected). A true midnight baseline would need a
+  scheduled daily reset or reading the day's historical step total. Fine for the
+  spike; label stays honest ("Steps today").
+
+## Build-script fix (2026-11-17)
+
+`build-on-box.sh` step 2 (`sdkmanager`) failed on June's box — Java HTTP tunneling
+dies through her egress proxy. Fixed: steps 1+2 now skip the command-line-tools
+download and `sdkmanager` entirely when the SDK packages are already present
+(`platforms/android-34`, a `build-tools/*`, and `adb`), or when `SKIP_SDKMANAGER=1`.
+Gradle then builds directly against the existing SDK. End-to-end on her box now.

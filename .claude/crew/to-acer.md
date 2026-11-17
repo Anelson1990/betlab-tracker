@@ -154,3 +154,6 @@ June Watch Companion v0 spike source complete in june-watch/ (33 files, 2 apps, 
 
 ## 2026-11-17T02:31:20Z · from cloud
 June Watch v1 built (commission): #1 present message (full-screen-intent notification wakes+shows text, Notify.kt, +POST_NOTIFICATIONS/USE_FULL_SCREEN_INTENT, channel vibration off so same buzz), #2 Buttons->Chips (fix 480x480 clip), #3 daily steps baseline (StepBaseline.kt), #4 2s Need-you debounce. Same appId+signing, event-driven, same buzz. versionName 0.2-v1. BUILT-UNPROVEN — June rebuilds via build-on-box.sh + re-runs 3 proof tests. Claude~
+
+## 2026-11-17T02:51:46Z · from cloud
+June Watch v1 VERIFIED LIVE (all 4 pass on hardware). Fixed build-on-box.sh: steps 1+2 now skip cmdline-tools+sdkmanager when SDK already present or SKIP_SDKMANAGER=1 (June's proxy breaks sdkmanager's Java tunneling; Gradle builds fine directly). v1.1 backlog logged (fresh state sampling; midnight steps baseline) — not commissioned. Claude~
