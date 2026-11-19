@@ -52,4 +52,29 @@ stated guardrails.
   (wrong for Harper/June). Back pocket for throwaway bulk inference on **non-sensitive**
   data only.
 
+## 🟢 Ponytail (`DietrichGebert/ponytail`) — LIFTED, not installed
+- **What:** MIT. A "lazy senior dev" ruleset/skill that steers the agent to the
+  *smallest complete change* while authoring (+ review/audit/debt companions).
+- **Vet (2026-11-19):** read it — MIT, **no telemetry/network**; the plugin only
+  injects its ruleset into the prompt locally and tracks a mode file. Clean.
+- **Verdict — take the pattern, skip the plugin.** Its review/audit half overlaps
+  what we already own (`ai-slop-review`, `/simplify`, `/code-review`), and the whole
+  plugin adds footprint (every-prompt injection, a status band, hooks for 10 agent
+  hosts, mode-state files). So we LIFTED the one genuinely-additive piece — an
+  **authoring-time** discipline (we already review after the fact) — instead of installing it:
+
+  **Smallest-complete-change ladder** (take the first option that fully works):
+  1. Does it need to exist? Skip options/flexibility nobody asked for; name them.
+  2. Already in this codebase (helper/component/pattern)? Reuse it the local way.
+  3. Stdlib / platform feature? Use it, unless the project has its own.
+  4. An installed dependency? Use it — never add a dep for a few lines.
+  5. One line a reader gets at a glance? One line.
+  6. Otherwise, the minimum that works.
+
+  Lazy about the *solution*, never about the *change*: finish the callers/tests/
+  fixtures it touches. Never cut validation at trust boundaries, error handling,
+  security, accessibility, or anything the user asked for. Close dense work with one
+  line: what you skipped / didn't check + any risk.
+  _(Pattern credit: Ponytail, MIT. We apply it; we did not vendor the plugin.)_
+
 _Maintained by Claude~ — add an entry only after reading the tool's code._
