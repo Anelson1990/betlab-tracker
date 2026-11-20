@@ -6,6 +6,7 @@ Inspired by phone-harness (MIT); no code or dependency taken.
 """
 from .actions import Action, classify, SAFE, CONSEQUENTIAL, BLOCKED
 from .audit import Audit
+from .console import ConsoleGate, PhoneProposal, mint_approval
 from .gate import ALLOW, DENY, PROPOSE, Decision, Gate, action_fingerprint
 from .killswitch import KillState, KillSwitch, make_heartbeat, read_state, sign_heartbeat
 from .policy import Policy
