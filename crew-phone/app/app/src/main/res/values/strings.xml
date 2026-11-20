@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Crew Phone Gate</string>
+    <string name="toggle_label">GO — allow agents</string>
+    <string name="go_status">GO — agents allowed (keep this screen open)</string>
+    <string name="stop_status">STOP — agents locked out</string>
+    <string name="key_label">Device key (provision into the harness)</string>
+    <string name="copy_key">Copy device key</string>
+    <string name="key_help">Set this as CREWPHONE_DEVICE_KEY (base64) on the harness box. The harness reads GO via: adb exec-out run-as ai.june.crewphonegate cat files/go.json</string>
+</resources>

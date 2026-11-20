@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- An octagon (stop-sign silhouette). Placeholder art. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,34 L66,34 L80,48 L80,72 L66,86 L42,86 L28,72 L28,48 Z" />
+</vector>

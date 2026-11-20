@@ -45,13 +45,21 @@ def _summary(action: A.Action, reason: str) -> str:
 
 
 class Session:
-    def __init__(self, serial: str, gate: G.Gate, audit: Audit, executor=None):
+    def __init__(self, serial: str, gate: G.Gate, audit: Audit, executor=None, killswitch=None):
         self.serial = serial
         self.gate = gate
         self.audit = audit
         self.executor = executor or adb_executor(serial)
+        self.killswitch = killswitch  # physical STOP/GO; None = not wired (no lockout)
 
     def request(self, action: A.Action, approval: str | None = None) -> Result:
+        # Physical kill switch first: STOP locks agents out of EVERYTHING (reads too).
+        if self.killswitch is not None:
+            ks = self.killswitch.state()
+            if not ks.go:
+                fp = G.action_fingerprint(action)
+                self.audit.record({"event": "locked_out", "op": action.op, "reason": ks.reason, "fp": fp})
+                return Result(G.DENY, "locked", f"kill switch STOP: {ks.reason}", fp)
         d = self.gate.decide(action, approval=approval)
         self.audit.record({
             "event": "decision", "op": action.op, "app": action.app,
