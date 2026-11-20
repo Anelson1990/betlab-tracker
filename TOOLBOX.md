@@ -77,4 +77,19 @@ stated guardrails.
   line: what you skipped / didn't check + any risk.
   _(Pattern credit: Ponytail, MIT. We apply it; we did not vendor the plugin.)_
 
+## 🟡 phone-harness (`phone-harness/phone-harness`) — pattern → built our own (`crew-phone/`)
+- **What:** MIT. Lets an agent drive a real phone (adb / iPhone Mirroring). Clean adb
+  vocabulary (`screencap`, `uiautomator dump`, `input ...`).
+- **Vet (2026-11-20):** read it — MIT, adb backend clean, BUT ships **PostHog
+  telemetry** (opt-out) and has **no consequential-action gate** (its only classifier
+  checks whether an agent *script escapes to the host*, not whether it spends money).
+  Its "Cloud" product markets **stealth / real numbers / 2FA / unlimited devices** —
+  misuse-adjacent (bot-farm shaped); avoid. Don't install or depend on it.
+- **What we did:** built our OWN **`crew-phone/`** (Android/adb, zero deps, no
+  telemetry) with the gate it lacks — read/navigate run free; consequential
+  (buy/send/pay/approve/install/delete) is refused → a proposal needing Austin's
+  Face-ID tap. Unforgeable HMAC approval (chair key never with the agent), fail-closed,
+  default read-only, app-scoped, audited. 30 tests green. Live run is remote (an adb
+  box); Bridge Console wiring is the next step. See `crew-phone/README.md`.
+
 _Maintained by Claude~ — add an entry only after reading the tool's code._
