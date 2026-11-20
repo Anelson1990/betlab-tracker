@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1221">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>SpiderFoot</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#0b1221; color:#e6edf3; }
+  header { position:sticky; top:0; background:#0e1730; padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #223; }
+  header h1 { font-size:17px; margin:0; flex:1; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#555; }
+  .dot.up { background:#2ecc71; } .dot.down { background:#e74c3c; }
+  main { padding:16px; max-width:720px; margin:0 auto; }
+  input, select, button { font:inherit; width:100%; padding:12px; margin:6px 0; border-radius:10px; border:1px solid #2a3550; background:#0e1730; color:#e6edf3; }
+  button { background:#2b5bd7; border:none; font-weight:600; cursor:pointer; }
+  button.ghost { background:#1a2340; }
+  button.danger { background:#7a1020; }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; }
+  .tabs button { width:auto; flex:1; }
+  .tabs button.on { background:#2b5bd7; }
+  .card { background:#0e1730; border:1px solid #223; border-radius:12px; padding:14px; margin:10px 0; }
+  .card h3 { margin:0 0 4px; font-size:16px; }
+  .muted { color:#93a1c0; font-size:13px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:#1a2340; }
+  .pill.RUNNING { background:#13406b; } .pill.FINISHED { background:#14532d; }
+  .pill.ERROR-FAILED, .pill.ABORTED { background:#5b1420; }
+  .row { display:flex; justify-content:space-between; gap:8px; }
+  .hide { display:none; }
+  a { color:#7aa2f7; }
+  pre { white-space:pre-wrap; word-break:break-word; font-size:12px; }
+</style>
+</head>
+<body>
+<header><span id="dot" class="dot"></span><h1>SpiderFoot</h1><span class="muted" id="who"></span></header>
+<main>
+
+  <section id="login" class="hide">
+    <div class="card">
+      <h3>Connect</h3>
+      <p class="muted">Enter the bridge token (set as <code>SFBRIDGE_TOKEN</code> on the SpiderFoot box).</p>
+      <input id="token" type="password" placeholder="bridge token" autocomplete="off">
+      <button onclick="saveToken()">Connect</button>
+      <p class="muted" id="loginErr"></p>
+    </div>
+  </section>
+
+  <section id="app" class="hide">
+    <div class="tabs">
+      <button id="tScans" class="on" onclick="show('scans')">Scans</button>
+      <button id="tNew" onclick="show('new')">New scan</button>
+    </div>
+
+    <div id="scans">
+      <div id="scanList"></div>
+    </div>
+
+    <div id="new" class="hide">
+      <div class="card">
+        <h3>New scan</h3>
+        <input id="target" placeholder="target: domain, IP, email, name…" autocomplete="off">
+        <select id="usecase">
+          <option value="all">All — every module (slow, loud)</option>
+          <option value="footprint" selected>Footprint — map the target's attack surface</option>
+          <option value="investigate">Investigate — focused, some active checks</option>
+          <option value="passive">Passive — nothing touches the target</option>
+        </select>
+        <button onclick="startScan()">Start scan</button>
+        <p class="muted">Authorized targets only.</p>
+        <p class="muted" id="newErr"></p>
+      </div>
+    </div>
+
+    <div id="detail" class="hide"></div>
+  </section>
+
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let TOKEN = localStorage.getItem("sfbridge_token") || "";
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ "Authorization": "Bearer " + TOKEN }, opts.headers || {});
+  const r = await fetch("/api/" + path, opts);
+  if (r.status === 401) { logout(); throw new Error("unauthorized"); }
+  return r;
+}
+function logout() { TOKEN = ""; localStorage.removeItem("sfbridge_token"); $("login").classList.remove("hide"); $("app").classList.add("hide"); }
+function saveToken() {
+  TOKEN = $("token").value.trim();
+  if (!TOKEN) return;
+  localStorage.setItem("sfbridge_token", TOKEN);
+  ping().then(okUp => { if (okUp) { $("login").classList.add("hide"); $("app").classList.remove("hide"); loadScans(); } else { $("loginErr").textContent = "Couldn't reach the bridge / bad token."; } });
+}
+async function ping() {
+  try { const r = await api("ping"); const up = r.ok; $("dot").className = "dot " + (up ? "up" : "down"); return up; }
+  catch { $("dot").className = "dot down"; return false; }
+}
+function show(which) {
+  $("detail").classList.add("hide");
+  for (const [tab, sec] of [["tScans","scans"],["tNew","new"]]) {
+    $(sec).classList.toggle("hide", sec !== which);
+    $(tab).classList.toggle("on", sec === which);
+  }
+  if (which === "scans") loadScans();
+}
+async function loadScans() {
+  try {
+    const rows = await (await api("scanlist")).json();
+    if (!rows.length) { $("scanList").innerHTML = '<p class="muted">No scans yet. Start one.</p>'; return; }
+    $("scanList").innerHTML = rows.map(r => {
+      const id=r[0], name=esc(r[1]), target=esc(r[2]), status=esc(r[6]), total=r[7];
+      return `<div class="card" onclick="openScan('${id}')">
+        <div class="row"><h3>${name}</h3><span class="pill ${status}">${status}</span></div>
+        <div class="muted">${target}</div>
+        <div class="muted">${total} results · started ${esc(r[4])}</div></div>`;
+    }).join("");
+  } catch (e) { $("scanList").innerHTML = '<p class="muted">Error loading scans.</p>'; }
+}
+async function openScan(id) {
+  try {
+    const s = await (await api("scanstatus?id=" + encodeURIComponent(id))).json();
+    if (!s.length) { return; }
+    const [name, target, created, started, ended, status] = s;
+    let types = [];
+    try { types = await (await api("scansummary?id=" + encodeURIComponent(id) + "&by=type")).json(); } catch {}
+    const typeRows = (types||[]).slice(0,25).map(t => `<div class="row"><span>${esc(t[0])}</span><span class="muted">${t[t.length-1]}</span></div>`).join("") || '<p class="muted">No results yet.</p>';
+    $("detail").innerHTML = `
+      <div class="card">
+        <div class="row"><h3>${esc(name)}</h3><span class="pill ${esc(status)}">${esc(status)}</span></div>
+        <div class="muted">${esc(target)}</div>
+        <div class="muted">started ${esc(started)} · ended ${esc(ended)}</div>
+        <div style="margin-top:10px">
+          <button class="ghost" onclick="act('stopscan','${id}')">Stop</button>
+          <button class="danger" onclick="act('scandelete','${id}')">Delete</button>
+          <button class="ghost" onclick="openScan('${id}')">Refresh</button>
+        </div>
+      </div>
+      <div class="card"><h3>Results by type</h3>${typeRows}</div>`;
+    $("scans").classList.add("hide"); $("new").classList.add("hide"); $("detail").classList.remove("hide");
+  } catch (e) {}
+}
+async function act(endpoint, id) {
+  if (endpoint === "scandelete" && !confirm("Delete this scan?")) return;
+  try { await api(endpoint + "?id=" + encodeURIComponent(id)); } catch {}
+  show("scans");
+}
+async function startScan() {
+  const target = $("target").value.trim();
+  if (!target) { $("newErr").textContent = "Enter a target."; return; }
+  const usecase = $("usecase").value;
+  const body = new URLSearchParams({ scanname: target, scantarget: target, modulelist: "", typelist: "", usecase });
+  try {
+    const r = await api("startscan", { method:"POST", headers:{ "Content-Type":"application/x-www-form-urlencoded" }, body: body.toString() });
+    if (r.ok) { $("target").value = ""; show("scans"); } else { $("newErr").textContent = "SpiderFoot rejected the scan (" + r.status + ")."; }
+  } catch (e) { $("newErr").textContent = "Couldn't start the scan."; }
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// boot
+if (TOKEN) { ping().then(up => { if (up) { $("app").classList.remove("hide"); loadScans(); } else { logout(); } }); }
+else { $("login").classList.remove("hide"); }
+setInterval(() => { if (TOKEN && !$("app").classList.contains("hide")) ping(); }, 20000);
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "SpiderFoot",
+  "short_name": "SpiderFoot",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1221",
+  "theme_color": "#0b1221",
+  "start_url": "/",
+  "scope": "/"
+}
