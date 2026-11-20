@@ -62,3 +62,19 @@ Built against SpiderFoot OSS endpoints (`smicallef/spiderfoot`, GPL) read from i
 `sfwebui.py`: `ping`, `scanlist`, `scanstatus`, `scansummary`, `scaneventresults`,
 `startscan`, `stopscan`, `scandelete`, `modules`, `eventtypes`, … No SpiderFoot code
 is bundled; the bridge only talks to a running instance over HTTP.
+
+## Native app (installable APK)
+
+`app/` is a thin WebView wrapper around this same mobile UI, so you get a real
+installable app (icon, no browser bars) instead of add-to-home-screen. It holds no
+secrets — the web page still does the token login; the app just stores the bridge
+URL (editable from the menu) and loads it.
+
+Build it on a box with the Android SDK (June, like the watch/gate apps):
+```bash
+cd app && bash build-on-box.sh
+# -> app/build/outputs/apk/debug/app-debug.apk ; adb install -r it
+# Open "SpiderFoot", enter the bridge URL (http://<box-tailscale-ip>:8600) + token.
+```
+appId `ai.june.spiderfoot`, minSdk 24. It allows cleartext HTTP (the bridge is http
+over your private tunnel) — keep it on the tunnel, never the public internet.

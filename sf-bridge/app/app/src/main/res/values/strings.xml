@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SpiderFoot</string>
+    <string name="bridge_url">SpiderFoot bridge URL</string>
+    <string name="bridge_url_help">The sf-bridge address, reachable over your private tunnel (e.g. Tailscale).</string>
+    <string name="load">Load</string>
+    <string name="reload">Reload</string>
+    <string name="set_url">Set bridge URL</string>
+</resources>
